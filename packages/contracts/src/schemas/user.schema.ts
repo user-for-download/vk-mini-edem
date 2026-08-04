@@ -20,6 +20,7 @@ export const userSchema = z.object({
   isVerified: z.boolean().optional(),
   car: carSchema.optional(),
   about: z.string().max(500).optional(),
+  createdAt: z.string().datetime().optional(),
 });
 
 export type User = z.infer<typeof userSchema>;

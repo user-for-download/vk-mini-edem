@@ -11,13 +11,15 @@ import {
   Textarea,
   Title,
 } from "@vkontakte/vkui";
-import type { Trip } from "@/types";
+import type { Trip, User, Role } from "@/types";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCreateReviewMutation } from "@/queries/useReviewsQuery";
 
 export interface CreateReviewModalProps extends ModalCardProps {
   id: string;
   trip: Trip | null;
+  target?: User | null;
+  targetRole?: Role | null;
   onClose: () => void;
 }
 
@@ -107,6 +109,8 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
 export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   id,
   trip,
+  target,
+  targetRole,
   onClose,
   ...restProps
 }) => {
@@ -118,14 +122,16 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const createReview = useCreateReviewMutation();
 
+  const targetUser = target ?? trip?.driver ?? null;
+
   const handleSubmit = () => {
     if (!trip) {
       setValidationError("Поездка не выбрана");
       return;
     }
 
-    if (!trip.driver?.id) {
-      setValidationError("Не найден водитель для отзыва");
+    if (!targetUser?.id) {
+      setValidationError("Не найден пользователь для отзыва");
       return;
     }
 
@@ -147,7 +153,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
     createReview.mutate(
       {
         tripId: trip.id,
-        targetUserId: trip.driver.id,
+        targetUserId: targetUser.id,
         rating,
         text: trimmedText,
       },
@@ -189,7 +195,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
 
   const canSubmit =
     Boolean(trip) &&
-    Boolean(trip?.driver?.id) &&
+    Boolean(targetUser?.id) &&
     text.trim().length > 0 &&
     !isSubmitting;
 
@@ -197,7 +203,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
     <ModalCard
       id={id}
       onClose={onClose}
-      title="Оставить отзыв"
+      title={targetUser?.name ? `Отзыв о ${targetUser.name}` : "Оставить отзыв"}
       description={
         trip ? `${trip.fromCity} → ${trip.toCity}, ${trip.date}` : undefined
       }

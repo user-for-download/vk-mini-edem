@@ -54,6 +54,7 @@ authRouter.post("/vk", async (c) => {
           }
         : undefined,
       about: user.about || undefined,
+      createdAt: user.createdAt.toISOString(),
     },
   });
 });
@@ -96,6 +97,7 @@ authRouter.post("/refresh", async (c) => {
           }
         : undefined,
       about: user.about || undefined,
+      createdAt: user.createdAt.toISOString(),
     },
   });
 });

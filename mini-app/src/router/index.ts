@@ -5,7 +5,6 @@ import {
   PANEL_SEARCH,
   PANEL_TRIPS_MANAGE,
   PANEL_TRIP_REQUESTS,
-  PANEL_MY_BOOKINGS,
   PANEL_PASSENGER_BOOKINGS,
   PANEL_PASSENGER_HISTORY,
   PANEL_TRIP_DETAILS,
@@ -13,6 +12,8 @@ import {
   PANEL_SETTINGS_NOTIFICATIONS,
   PANEL_SETTINGS_SUPPORT,
   PANEL_SETTINGS_ABOUT,
+  PANEL_ABOUT_TERMS,
+  PANEL_ABOUT_PRIVACY,
 } from "@/consts/panels";
 
 export const router = createHashRouter([
@@ -55,11 +56,6 @@ export const router = createHashRouter([
     panel: PANEL_PASSENGER_BOOKINGS,
   },
   {
-    path: "/bookings/my",
-    view: VIEW_ACTION,
-    panel: PANEL_MY_BOOKINGS,
-  },
-  {
     path: "/bookings/history",
     view: VIEW_ACTION,
     panel: PANEL_PASSENGER_HISTORY,
@@ -90,6 +86,16 @@ export const router = createHashRouter([
     path: "/profile/about",
     view: VIEW_PROFILE,
     panel: PANEL_SETTINGS_ABOUT,
+  },
+  {
+    path: "/profile/about/terms",
+    view: VIEW_PROFILE,
+    panel: PANEL_ABOUT_TERMS,
+  },
+  {
+    path: "/profile/about/privacy",
+    view: VIEW_PROFILE,
+    panel: PANEL_ABOUT_PRIVACY,
   },
   {
     path: "*",

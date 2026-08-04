@@ -16,6 +16,8 @@ export interface ProfilePanelProps {
   onChangeRole: (role: Role) => void;
   onOpenCreateReview: () => void;
   onOpenReviewForTrip?: (trip: Trip) => void;
+  onOpenCarForm?: () => void;
+  onOpenEditProfile?: () => void;
   onOpenMyBookings?: () => void;
   onOpenHistory?: () => void;
   onOpenNotifications: () => void;
@@ -29,6 +31,8 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   onChangeRole,
   onOpenCreateReview,
   onOpenReviewForTrip,
+  onOpenCarForm,
+  onOpenEditProfile,
   onOpenMyBookings,
   onOpenHistory,
   onOpenNotifications,
@@ -71,25 +75,18 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             </Caption>
           )}
           <Spacing size={16} />
-          <Button
-            mode="secondary"
-            size="m"
-            onClick={() => {
-              enqueueSnackbar({
-                type: "success",
-                title: "Профиль обновлен",
-                subtitle: "Изменения успешно сохранены",
-                dedupeKey: "profile_update",
-              });
-            }}
-          >
+          <Button mode="secondary" size="m" onClick={onOpenEditProfile}>
             Редактировать
           </Button>
         </Box>
 
         <Box padding="system" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <InfoRow header="Поездок совершено">{currentUser.tripsCount}</InfoRow>
-          <InfoRow header="На сервисе с">2024</InfoRow>
+          <InfoRow header="На сервисе с">
+            {currentUser.createdAt
+              ? new Date(currentUser.createdAt).getFullYear()
+              : "—"}
+          </InfoRow>
         </Box>
 
         <Box padding="system">
@@ -97,13 +94,38 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         </Box>
       </Group>
 
-      {role === "driver" && currentUser.car && (
+      {role === "driver" && (
         <Group header={<Header size="s">Автомобиль</Header>}>
-          <Box padding="system" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <InfoRow header="Модель">{currentUser.car.model}</InfoRow>
-            <InfoRow header="Цвет">{currentUser.car.color}</InfoRow>
-            <InfoRow header="Номер">{currentUser.car.plate}</InfoRow>
-          </Box>
+          {currentUser.car ? (
+            <>
+              <Box
+                padding="system"
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+              >
+                <InfoRow header="Модель">{currentUser.car.model}</InfoRow>
+                <InfoRow header="Цвет">{currentUser.car.color}</InfoRow>
+                <InfoRow header="Номер">{currentUser.car.plate}</InfoRow>
+              </Box>
+
+              <Box padding="system" style={{ paddingTop: 0 }}>
+                <Button mode="secondary" size="m" onClick={onOpenCarForm}>
+                  Изменить автомобиль
+                </Button>
+              </Box>
+            </>
+          ) : (
+            <Box padding="system">
+              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                Чтобы публиковать поездки как водитель, добавьте автомобиль.
+              </Text>
+
+              <Spacing size={12} />
+
+              <Button mode="primary" size="m" onClick={onOpenCarForm}>
+                Добавить автомобиль
+              </Button>
+            </Box>
+          )}
         </Group>
       )}
 

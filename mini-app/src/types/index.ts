@@ -21,6 +21,7 @@ export interface User {
   isVerified?: boolean;
   car?: Car;
   about?: string;
+  createdAt?: string;
 }
 
 export type TripTag =

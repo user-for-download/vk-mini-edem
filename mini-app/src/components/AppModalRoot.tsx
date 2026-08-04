@@ -1,26 +1,59 @@
-import type { FC } from "react";
+import { type FC, lazy, Suspense } from "react";
 import { ModalRoot } from "@vkontakte/vkui";
 import {
+  MODAL_CAR_FORM,
   MODAL_CREATE_REVIEW,
   MODAL_CREATE_TRIP,
   MODAL_DRIVER_PROFILE,
+  MODAL_EDIT_PROFILE,
   MODAL_SELECT_REVIEW_TRIP,
 } from "@/consts/modals";
-import type { Trip, User } from "@/types";
-import { CreateTripModal } from "@/modals/CreateTripModal/CreateTripModal";
-import { CreateReviewModal } from "@/modals/CreateReviewModal/CreateReviewModal";
-import { DriverProfileModal } from "@/modals/DriverProfileModal/DriverProfileModal";
-import { SelectReviewTripModal } from "@/modals/SelectReviewTripModal/SelectReviewTripModal";
+import type { Trip } from "@/types";
+
+const SelectReviewTripModal = lazy(() =>
+  import("@/modals/SelectReviewTripModal/SelectReviewTripModal").then((m) => ({
+    default: m.SelectReviewTripModal,
+  }))
+);
+const CreateTripModal = lazy(() =>
+  import("@/modals/CreateTripModal/CreateTripModal").then((m) => ({
+    default: m.CreateTripModal,
+  }))
+);
+const CreateReviewModal = lazy(() =>
+  import("@/modals/CreateReviewModal/CreateReviewModal").then((m) => ({
+    default: m.CreateReviewModal,
+  }))
+);
+const DriverProfileModal = lazy(() =>
+  import("@/modals/DriverProfileModal/DriverProfileModal").then((m) => ({
+    default: m.DriverProfileModal,
+  }))
+);
+const CarFormModal = lazy(() =>
+  import("@/modals/CarFormModal/CarFormModal").then((m) => ({
+    default: m.CarFormModal,
+  }))
+);
+const EditProfileModal = lazy(() =>
+  import("@/modals/EditProfileModal/EditProfileModal").then((m) => ({
+    default: m.EditProfileModal,
+  }))
+);
 
 export interface AppModalRootProps {
   activeModal: string | null;
   reviewTrip: Trip | null;
-  activeDriver: User | null;
+
+  /**
+   * Id водителя для DriverProfileModal.
+   */
+  driverId: string | null;
+
   onClose: () => void;
 
   /**
    * Вызывается после успешного создания поездки.
-   * Используется, чтобы переключить роль на driver и открыть /trips/my.
    */
   onTripCreated?: () => void;
 
@@ -31,32 +64,42 @@ export interface AppModalRootProps {
 }
 
 /**
- * Единая точка сборки модалок приложения — переключаются по activeModal, как того требует VKUI.
- * Детали поездки и бронирование места сюда не входят: это полноценные страницы
- * (см. src/panels/TripDetailsPanel), а не модальные окна.
+ * Единая точка сборки модалок приложения с ленивой загрузкой.
  */
 export const AppModalRoot: FC<AppModalRootProps> = ({
   activeModal,
   reviewTrip,
-  activeDriver,
+  driverId,
   onClose,
   onTripCreated,
   onSelectReviewTrip,
 }) => {
   return (
-    <ModalRoot activeModal={activeModal} onClose={onClose}>
-      <SelectReviewTripModal
-        id={MODAL_SELECT_REVIEW_TRIP}
-        onClose={onClose}
-        onSelectTrip={onSelectReviewTrip ?? (() => {})}
-      />
-      <CreateTripModal
-        id={MODAL_CREATE_TRIP}
-        onClose={onClose}
-        onTripCreated={onTripCreated}
-      />
-      <CreateReviewModal id={MODAL_CREATE_REVIEW} trip={reviewTrip} onClose={onClose} />
-      <DriverProfileModal id={MODAL_DRIVER_PROFILE} driver={activeDriver} onClose={onClose} />
-    </ModalRoot>
+    <Suspense fallback={null}>
+      <ModalRoot activeModal={activeModal} onClose={onClose}>
+        <SelectReviewTripModal
+          id={MODAL_SELECT_REVIEW_TRIP}
+          onClose={onClose}
+          onSelectTrip={onSelectReviewTrip ?? (() => {})}
+        />
+        <CreateTripModal
+          id={MODAL_CREATE_TRIP}
+          onClose={onClose}
+          onTripCreated={onTripCreated}
+        />
+        <CreateReviewModal
+          id={MODAL_CREATE_REVIEW}
+          trip={reviewTrip}
+          onClose={onClose}
+        />
+        <DriverProfileModal
+          id={MODAL_DRIVER_PROFILE}
+          driverId={driverId}
+          onClose={onClose}
+        />
+        <CarFormModal id={MODAL_CAR_FORM} onClose={onClose} />
+        <EditProfileModal id={MODAL_EDIT_PROFILE} onClose={onClose} />
+      </ModalRoot>
+    </Suspense>
   );
 };

@@ -1,4 +1,3 @@
-// mini-app/src/modals/DriverProfileModal/DriverProfileModal.tsx
 import type { FC } from "react";
 import {
   Avatar,
@@ -10,7 +9,6 @@ import {
   Text,
 } from "@vkontakte/vkui";
 import { useSearchParams } from "@vkontakte/vk-mini-apps-router";
-import type { User } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useUserQuery } from "@/queries/useUsersQuery";
@@ -18,69 +16,100 @@ import { useUserReviewsQuery } from "@/queries/useReviewsQuery";
 
 export interface DriverProfileModalProps extends ModalCardProps {
   id: string;
-  driver: User | null;
+
+  /**
+   * Id водителя.
+   *
+   * Если не передан явно, берем из search params: driverId.
+   */
+  driverId?: string | null;
+
   onClose: () => void;
 }
 
 /**
- * Публичный профиль водителя: рейтинг, машина, «о себе» и последние отзывы.
- * Теперь данные берутся из API:
+ * Публичный профиль водителя.
+ *
+ * Больше не использует mock-fallback.
+ * Данные загружаются через:
  * - GET /api/users/:id
  * - GET /api/reviews/user/:userId
  */
 export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   id,
-  driver,
+  driverId: driverIdProp,
   onClose,
   ...restProps
 }) => {
   const [searchParams] = useSearchParams();
 
-  const driverId = driver?.id || searchParams.get("driverId") || "";
-
-  const { data: fetchedDriver, isLoading: isDriverLoading } =
-    useUserQuery(driverId);
-
-  const resolvedDriver = fetchedDriver ?? driver;
+  const driverId = driverIdProp || searchParams.get("driverId") || "";
 
   const {
-    data: reviewsData,
-    isLoading: isReviewsLoading,
-    isError: isReviewsError,
-  } = useUserReviewsQuery(resolvedDriver?.id ?? driverId);
+    data: driver,
+    isLoading: isLoadingDriver,
+    isError: isDriverError,
+  } = useUserQuery(driverId);
 
-  if (!resolvedDriver && isDriverLoading) {
+  const {
+    data: reviews,
+  } = useUserReviewsQuery(driver?.id ?? "");
+
+  if (!driverId) {
     return null;
   }
 
-  if (!resolvedDriver) {
-    return null;
+  if (isLoadingDriver) {
+    return (
+      <ModalCard
+        id={id}
+        onClose={onClose}
+        title="Профиль водителя"
+        description="Загрузка профиля..."
+        {...restProps}
+      >
+        <Box padding="system" style={{ paddingTop: 0 }}>
+          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            Загружаем данные водителя.
+          </Text>
+        </Box>
+      </ModalCard>
+    );
   }
 
-  const driverReviews = (reviewsData ?? []).slice(0, 2);
+  if (isDriverError || !driver) {
+    return (
+      <ModalCard
+        id={id}
+        onClose={onClose}
+        title="Профиль не найден"
+        description="Не удалось загрузить данные водителя"
+        {...restProps}
+      >
+        <Box padding="system" style={{ paddingTop: 0 }}>
+          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            Пользователь недоступен или был удален.
+          </Text>
+        </Box>
+      </ModalCard>
+    );
+  }
+
+  const driverReviews = (reviews ?? []).slice(0, 2);
 
   return (
     <ModalCard
       id={id}
       onClose={onClose}
-      title={resolvedDriver.name}
-      description={
-        resolvedDriver.isVerified ? "Личность подтверждена" : undefined
-      }
+      title={driver.name}
+      description={driver.isVerified ? "Личность подтверждена" : undefined}
       {...restProps}
     >
       <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
-        <Avatar
-          src={resolvedDriver.avatar}
-          size={72}
-          style={{ margin: "0 auto 12px" }}
-        />
+        <Avatar src={driver.avatar} size={72} style={{ margin: "0 auto 12px" }} />
 
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <RatingBadge
-            value={resolvedDriver.rating}
-            reviewsCount={resolvedDriver.reviewsCount}
-          />
+          <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
         </div>
 
         <Text
@@ -89,60 +118,38 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
             marginTop: 4,
           }}
         >
-          {resolvedDriver.tripsCount} поездок на сервисе
+          {driver.tripsCount} поездок на сервисе
         </Text>
 
-        {resolvedDriver.car && (
+        {driver.car && (
           <Text weight="2" style={{ marginTop: 12 }}>
-            {resolvedDriver.car.model} · {resolvedDriver.car.color}
+            {driver.car.model} · {driver.car.color}
           </Text>
         )}
 
-        {resolvedDriver.about && (
+        {driver.about && (
           <Text
             style={{
               marginTop: 8,
               color: "var(--vkui--color_text_secondary)",
             }}
           >
-            {resolvedDriver.about}
+            {driver.about}
           </Text>
         )}
       </Box>
 
-      <Spacing size={8} />
-      <Separator />
+      {driverReviews.length > 0 && (
+        <>
+          <Spacing size={8} />
+          <Separator />
 
-      {isReviewsLoading && (
-        <Box padding="system">
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-            Загрузка отзывов...
-          </Text>
-        </Box>
-      )}
-
-      {isReviewsError && (
-        <Box padding="system">
-          <Text style={{ color: "var(--vkui--color_text_negative)" }}>
-            Не удалось загрузить отзывы
-          </Text>
-        </Box>
-      )}
-
-      {!isReviewsLoading && !isReviewsError && driverReviews.length > 0 && (
-        <div style={{ textAlign: "left" }}>
-          {driverReviews.map((review) => (
-            <ReviewCard key={review.id} review={review} />
-          ))}
-        </div>
-      )}
-
-      {!isReviewsLoading && !isReviewsError && driverReviews.length === 0 && (
-        <Box padding="system">
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-            Отзывов пока нет
-          </Text>
-        </Box>
+          <div style={{ textAlign: "left" }}>
+            {driverReviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </div>
+        </>
       )}
     </ModalCard>
   );

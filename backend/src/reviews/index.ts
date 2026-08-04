@@ -207,6 +207,153 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
   return c.json(availableTrips.map(serializeTrip));
 });
 
+reviewsRouter.get("/available", requireUser, async (c) => {
+  const user = c.get("user");
+  const now = new Date();
+
+  const candidates: Array<{
+    id: string;
+    tripId: string;
+    targetRole: "driver" | "passenger";
+    trip: any;
+    target: any;
+  }> = [];
+
+  const passengerBookings = await db.booking.findMany({
+    where: {
+      passengerId: user.id,
+      status: "confirmed",
+    },
+    include: {
+      trip: {
+        include: {
+          driver: {
+            include: {
+              car: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  for (const booking of passengerBookings) {
+    const trip = booking.trip;
+    const isTripCompleted =
+      trip.status === "completed" || trip.departureAt <= now;
+
+    if (trip.status === "cancelled" || !isTripCompleted) {
+      continue;
+    }
+
+    candidates.push({
+      id: `${trip.id}:${trip.driver.id}`,
+      tripId: trip.id,
+      targetRole: "driver",
+      trip,
+      target: trip.driver,
+    });
+  }
+
+  const driverTrips = await db.trip.findMany({
+    where: {
+      driverId: user.id,
+    },
+    include: {
+      bookings: {
+        where: {
+          status: "confirmed",
+        },
+        include: {
+          passenger: {
+            include: {
+              car: true,
+            },
+          },
+        },
+      },
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+  });
+
+  for (const trip of driverTrips) {
+    const isTripCompleted =
+      trip.status === "completed" || trip.departureAt <= now;
+
+    if (trip.status === "cancelled" || !isTripCompleted) {
+      continue;
+    }
+
+    for (const booking of trip.bookings) {
+      if (booking.passengerId === user.id) {
+        continue;
+      }
+
+      candidates.push({
+        id: `${trip.id}:${booking.passengerId}`,
+        tripId: trip.id,
+        targetRole: "passenger",
+        trip,
+        target: booking.passenger,
+      });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return c.json([]);
+  }
+
+  const tripIds = Array.from(new Set(candidates.map((item) => item.tripId)));
+
+  const existingReviews = await db.review.findMany({
+    where: {
+      authorId: user.id,
+      tripId: {
+        in: tripIds,
+      },
+    },
+    select: {
+      tripId: true,
+      targetUserId: true,
+    },
+  });
+
+  const reviewedKeys = new Set(
+    existingReviews.map((review) => `${review.tripId}:${review.targetUserId}`)
+  );
+
+  const available = candidates
+    .filter((candidate) => !reviewedKeys.has(candidate.id))
+    .sort((a, b) => b.trip.departureAt.getTime() - a.trip.departureAt.getTime());
+
+  return c.json(
+    available.map((item) => ({
+      id: item.id,
+      targetRole: item.targetRole,
+      trip: serializeTrip(item.trip),
+      target: {
+        id: item.target.id,
+        name: item.target.name,
+        avatar: item.target.avatar,
+        rating: item.target.rating,
+        reviewsCount: item.target.reviewsCount,
+        tripsCount: item.target.tripsCount,
+        car: item.target.car
+          ? {
+              model: item.target.car.model,
+              color: item.target.car.color,
+              plate: item.target.car.plate,
+            }
+          : undefined,
+      },
+    }))
+  );
+});
+
 /**
  * Публичный список отзывов о пользователе.
  */

@@ -48,6 +48,7 @@ function serializeUser(user: UserWithCar) {
         }
       : undefined,
     about: user.about ?? undefined,
+    createdAt: user.createdAt ? user.createdAt.toISOString() : undefined,
   };
 }
 
@@ -73,6 +74,7 @@ function serializeTrip(
       hour: "2-digit",
       minute: "2-digit",
     }),
+    departureAt: trip.departureAt.toISOString(),
     durationMinutes: trip.durationMinutes,
     distanceKm: trip.distanceKm,
     price: trip.price,
@@ -469,6 +471,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   }
 
   const updated = await db.$transaction(async (tx) => {
+    // 1. Decline all pending bookings
     await tx.booking.updateMany({
       where: {
         tripId: trip.id,
@@ -479,6 +482,44 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
       },
     });
 
+    // 2. Find confirmed passengers
+    const confirmedBookings = await tx.booking.findMany({
+      where: {
+        tripId: trip.id,
+        status: "confirmed",
+      },
+      select: {
+        passengerId: true,
+      },
+    });
+
+    const passengerIds = Array.from(
+      new Set(confirmedBookings.map((booking) => booking.passengerId))
+    );
+
+    // 3. Driver +1 tripsCount
+    await tx.user.update({
+      where: { id: trip.driverId },
+      data: {
+        tripsCount: {
+          increment: 1,
+        },
+      },
+    });
+
+    // 4. Each confirmed passenger +1 tripsCount
+    for (const passengerId of passengerIds) {
+      await tx.user.update({
+        where: { id: passengerId },
+        data: {
+          tripsCount: {
+            increment: 1,
+          },
+        },
+      });
+    }
+
+    // 5. Update trip status
     return tx.trip.update({
       where: { id: trip.id },
       data: {

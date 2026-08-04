@@ -27,6 +27,7 @@ export const tripSchema = z.object({
   toAddress: z.string(),
   date: z.string(),
   time: z.string(),
+  departureAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().positive(),
   distanceKm: z.number().positive(),
   price: z.number().int().positive(),

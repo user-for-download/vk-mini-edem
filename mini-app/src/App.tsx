@@ -13,13 +13,14 @@ import {
 
 import { VIEW_ACTION, VIEW_HOME, VIEW_PROFILE, type ViewId } from "@/consts/views";
 import {
+  MODAL_CAR_FORM,
   MODAL_CREATE_REVIEW,
   MODAL_CREATE_TRIP,
   MODAL_DRIVER_PROFILE,
+  MODAL_EDIT_PROFILE,
   MODAL_SELECT_REVIEW_TRIP,
 } from "@/consts/modals";
 import type { Role, Trip, User } from "@/types";
-import { drivers } from "@/mock/data";
 import { AppTabbar } from "@/components/AppTabbar";
 import { AppModalRoot } from "@/components/AppModalRoot";
 import { AppSnackbar } from "@/components/AppSnackbar";
@@ -54,19 +55,14 @@ export default function App() {
   const activeModal = routerModal || searchParams.get("modal") || null;
 
   const driverId = searchParams.get("driverId");
-  const tripId = searchParams.get("tripId");
 
-  const [activeDriverState, setActiveDriverState] = useState<User | null>(null);
   const [reviewTripState, setReviewTripState] = useState<Trip | null>(null);
 
-  const activeDriver =
-    activeDriverState || (driverId ? drivers.find((d) => d.id === driverId) || null : null);
   const reviewTrip = reviewTripState;
 
   useSwipeBackSync();
 
   const closeModal = () => {
-    setActiveDriverState(null);
     setReviewTripState(null);
     if (searchParams.has("modal")) {
       setSearchParams(
@@ -100,7 +96,6 @@ export default function App() {
   };
 
   const openDriverProfile = (driver: User) => {
-    setActiveDriverState(driver);
     setSearchParams(
       (prev) => {
         prev.set("driverId", driver.id);
@@ -140,6 +135,22 @@ export default function App() {
     routeNavigator.showModal(MODAL_CREATE_REVIEW);
   };
 
+  const openCarForm = () => {
+    setSearchParams((prev) => {
+      prev.set("modal", MODAL_CAR_FORM);
+      return prev;
+    });
+    routeNavigator.showModal(MODAL_CAR_FORM);
+  };
+
+  const openEditProfile = () => {
+    setSearchParams((prev) => {
+      prev.set("modal", MODAL_EDIT_PROFILE);
+      return prev;
+    });
+    routeNavigator.showModal(MODAL_EDIT_PROFILE);
+  };
+
   return (
     <>
       <SplitLayout
@@ -171,6 +182,8 @@ export default function App() {
               onChangeRole={setRole}
               onOpenCreateReview={openCreateReview}
               onOpenReviewForTrip={openReviewForTrip}
+              onOpenCarForm={openCarForm}
+              onOpenEditProfile={openEditProfile}
             />
           </Epic>
         </SplitCol>
@@ -178,7 +191,7 @@ export default function App() {
       <AppModalRoot
         activeModal={activeModal ?? null}
         reviewTrip={reviewTrip}
-        activeDriver={activeDriver}
+        driverId={driverId}
         onClose={closeModal}
         onTripCreated={handleTripCreated}
         onSelectReviewTrip={handleSelectReviewTrip}
