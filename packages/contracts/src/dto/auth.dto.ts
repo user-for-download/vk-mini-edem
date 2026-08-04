@@ -1,10 +1,12 @@
 import { z } from "zod";
-import { userSchema } from "../schemas/user.schema";
+import { userSchema } from "../schemas/user.schema.js";
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
+
 export const authRequestSchema = z.object({
   vkUserId: z.number().int().positive(),
   sign: z.string().min(1),
+  ts: z.number().int().positive(),
 });
 
 export type AuthRequest = z.infer<typeof authRequestSchema>;

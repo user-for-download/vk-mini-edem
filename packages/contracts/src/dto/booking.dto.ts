@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { bookingStatusSchema } from "../schemas/booking.schema";
+import { bookingStatusSchema } from "../schemas/booking.schema.js";
 
-// ─── CreateBookingDto ───────────────────────────────────────────────────────
 export const createBookingDtoSchema = z.object({
   tripId: z.string(),
   seat: z.number().int().min(1).max(8),
@@ -10,7 +9,6 @@ export const createBookingDtoSchema = z.object({
 
 export type CreateBookingDto = z.infer<typeof createBookingDtoSchema>;
 
-// ─── UpdateBookingStatusDto ─────────────────────────────────────────────────
 export const updateBookingStatusDtoSchema = z.object({
   status: bookingStatusSchema,
 });

@@ -35,12 +35,14 @@ type VkLaunchParams = ReturnType<typeof parseURLSearchParamsForGetLaunchParams> 
 let bootstrapPromise: Promise<void> | null = null;
 let refreshPromise: Promise<void> | null = null;
 
-async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string }> {
+async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string; ts: number }> {
   const launchParams = parseURLSearchParamsForGetLaunchParams(
     window.location.search
   ) as VkLaunchParams;
 
   let vkUserId = Number(launchParams.vk_user_id);
+
+  const ts = Date.now();
 
   let sign =
     launchParams.vk_sign ||
@@ -63,6 +65,7 @@ async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string }> {
   return {
     vkUserId,
     sign,
+    ts,
   };
 }
 
@@ -86,11 +89,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ status: "initializing" });
 
       try {
-        const { vkUserId, sign } = await getVkAuthPayload();
+        const { vkUserId, sign, ts } = await getVkAuthPayload();
 
         const response = await authApi.loginWithVk({
           vkUserId,
           sign,
+          ts,
         });
 
         apiClient.setToken(response.accessToken);

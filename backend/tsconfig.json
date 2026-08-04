@@ -11,10 +11,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
-    "outDir": "./dist",
-    "paths": {
-      "@edem/contracts": ["../packages/contracts/src/index.ts"]
-    }
+    "outDir": "./dist"
   },
   "include": ["src/**/*", "prisma/**/*"]
 }

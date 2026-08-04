@@ -1,18 +1,84 @@
+// backend/src/auth/index.ts
 import { Hono } from "hono";
 import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
 import { db } from "../db.js";
+import { env } from "../env.js";
+
+import { verifyVkSignature } from "./vkSign.js";
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "./tokens.js";
+import { createRateLimiter } from "../middleware/rateLimit.js";
 
 export const authRouter = new Hono();
 
-authRouter.post("/vk", async (c) => {
+const authRateLimiter = createRateLimiter({
+  windowMs: env.AUTH_RATE_WINDOW_MS,
+  max: env.AUTH_RATE_MAX,
+  keyPrefix: "auth",
+});
+
+function serializeUser(user: {
+  id: string;
+  name: string;
+  avatar: string;
+  rating: number;
+  reviewsCount: number;
+  tripsCount: number;
+  isVerified: boolean;
+  about: string | null;
+  car: {
+    model: string;
+    color: string;
+    plate: string;
+  } | null;
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    avatar: user.avatar,
+    rating: user.rating,
+    reviewsCount: user.reviewsCount,
+    tripsCount: user.tripsCount,
+    isVerified: user.isVerified,
+    car: user.car
+      ? {
+          model: user.car.model,
+          color: user.car.color,
+          plate: user.car.plate,
+        }
+      : undefined,
+    about: user.about || undefined,
+  };
+}
+
+authRouter.post("/vk", authRateLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = authRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
-    return c.json({ message: "Invalid request payload", errors: parseResult.error.format() }, 400);
+    return c.json(
+      {
+        message: "Invalid request payload",
+        errors: parseResult.error.format(),
+      },
+      400
+    );
   }
 
-  const { vkUserId } = parseResult.data;
+  const { vkUserId, sign, ts } = parseResult.data;
+
+  const isValidSignature = verifyVkSignature({
+    vkUserId,
+    sign,
+    ts,
+  });
+
+  if (!isValidSignature) {
+    return c.json({ message: "Invalid or expired signature" }, 401);
+  }
 
   let user = await db.user.findFirst({
     where: { vkUserId },
@@ -28,76 +94,53 @@ authRouter.post("/vk", async (c) => {
         rating: 5.0,
         reviewsCount: 0,
         tripsCount: 0,
-        isVerified: true,
+        isVerified: false,
       },
       include: { car: true },
     });
   }
 
+  const accessToken = await signAccessToken(user.id);
+  const refreshToken = await signRefreshToken(user.id);
+
   return c.json({
-    accessToken: `mock-access-token-${user.id}`,
-    refreshToken: `mock-refresh-token-${user.id}`,
-    expiresIn: 3600,
-    user: {
-      id: user.id,
-      name: user.name,
-      avatar: user.avatar,
-      rating: user.rating,
-      reviewsCount: user.reviewsCount,
-      tripsCount: user.tripsCount,
-      isVerified: user.isVerified,
-      car: user.car
-        ? {
-            model: user.car.model,
-            color: user.car.color,
-            plate: user.car.plate,
-          }
-        : undefined,
-      about: user.about || undefined,
-      createdAt: user.createdAt.toISOString(),
-    },
+    accessToken,
+    refreshToken,
+    expiresIn: env.JWT_ACCESS_TTL_SECONDS,
+    user: serializeUser(user),
   });
 });
 
-authRouter.post("/refresh", async (c) => {
+authRouter.post("/refresh", authRateLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = refreshRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
-    return c.json({ message: "Invalid token" }, 400);
+    return c.json({ message: "Invalid refresh token" }, 400);
   }
 
-  const userId = parseResult.data.refreshToken.replace("mock-refresh-token-", "");
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    include: { car: true },
-  });
+  try {
+    const userId = await verifyRefreshToken(parseResult.data.refreshToken);
 
-  if (!user) {
-    return c.json({ message: "User not found" }, 404);
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      include: { car: true },
+    });
+
+    if (!user) {
+      return c.json({ message: "User not found" }, 401);
+    }
+
+    const accessToken = await signAccessToken(user.id);
+    const refreshToken = await signRefreshToken(user.id);
+
+    return c.json({
+      accessToken,
+      refreshToken,
+      expiresIn: env.JWT_ACCESS_TTL_SECONDS,
+      user: serializeUser(user),
+    });
+  } catch {
+    return c.json({ message: "Invalid refresh token" }, 401);
   }
-
-  return c.json({
-    accessToken: `mock-access-token-${user.id}`,
-    refreshToken: parseResult.data.refreshToken,
-    expiresIn: 3600,
-    user: {
-      id: user.id,
-      name: user.name,
-      avatar: user.avatar,
-      rating: user.rating,
-      reviewsCount: user.reviewsCount,
-      tripsCount: user.tripsCount,
-      isVerified: user.isVerified,
-      car: user.car
-        ? {
-            model: user.car.model,
-            color: user.car.color,
-            plate: user.car.plate,
-          }
-        : undefined,
-      about: user.about || undefined,
-      createdAt: user.createdAt.toISOString(),
-    },
-  });
 });

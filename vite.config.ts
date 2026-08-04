@@ -8,9 +8,12 @@ export default defineConfig(() => {
     root: './mini-app',
     plugins: [react(), tailwindcss()],
     resolve: {
+      dedupe: ['react', 'react-dom'],
       alias: {
         '@': path.resolve(__dirname, './mini-app/src'),
         '@edem/contracts': path.resolve(__dirname, './packages/contracts/src/index.ts'),
+        'react': path.resolve(__dirname, './node_modules/react'),
+        'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
       },
     },
     server: {

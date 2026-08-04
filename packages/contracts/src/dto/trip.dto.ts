@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { tripTagSchema } from "../schemas/trip.schema";
+import { tripTagSchema } from "../schemas/trip.schema.js";
 
-// ─── CreateTripDto ──────────────────────────────────────────────────────────
 export const createTripDtoSchema = z.object({
   fromCity: z.string().min(1).max(100),
   fromAddress: z.string().max(200),
@@ -18,7 +17,6 @@ export const createTripDtoSchema = z.object({
 
 export type CreateTripDto = z.infer<typeof createTripDtoSchema>;
 
-// ─── TripFiltersDto ─────────────────────────────────────────────────────────
 export const tripFiltersDtoSchema = z.object({
   fromCity: z.string().optional(),
   toCity: z.string().optional(),

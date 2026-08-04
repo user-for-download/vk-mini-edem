@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { userSchema, roleSchema } from "./user.schema";
+import { userSchema, roleSchema } from "./user.schema.js";
 
-// ─── Review ─────────────────────────────────────────────────────────────────
 export const reviewSchema = z.object({
   id: z.string(),
   author: userSchema,

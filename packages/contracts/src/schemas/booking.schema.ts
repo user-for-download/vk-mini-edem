@@ -1,13 +1,11 @@
 import { z } from "zod";
-import { userSchema } from "./user.schema";
-import { tripSchema } from "./trip.schema";
+import { userSchema } from "./user.schema.js";
+import { tripSchema } from "./trip.schema.js";
 
-// ─── BookingStatus ──────────────────────────────────────────────────────────
 export const bookingStatusSchema = z.enum(["pending", "confirmed", "declined"]);
 
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 
-// ─── Booking ────────────────────────────────────────────────────────────────
 export const bookingSchema = z.object({
   id: z.string(),
   trip: tripSchema,

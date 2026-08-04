@@ -1,11 +1,11 @@
 // Schemas
-export * from "./schemas/user.schema";
-export * from "./schemas/trip.schema";
-export * from "./schemas/booking.schema";
-export * from "./schemas/review.schema";
+export * from "./schemas/user.schema.js";
+export * from "./schemas/trip.schema.js";
+export * from "./schemas/booking.schema.js";
+export * from "./schemas/review.schema.js";
 
 // DTO
-export * from "./dto/auth.dto";
-export * from "./dto/trip.dto";
-export * from "./dto/booking.dto";
-export * from "./dto/review.dto";
+export * from "./dto/auth.dto.js";
+export * from "./dto/trip.dto.js";
+export * from "./dto/booking.dto.js";
+export * from "./dto/review.dto.js";

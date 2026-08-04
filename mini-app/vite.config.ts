@@ -14,12 +14,15 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@edem/contracts": path.resolve(
           __dirname,
           "../packages/contracts/src/index.ts"
         ),
+        "react": path.resolve(__dirname, "../node_modules/react"),
+        "react-dom": path.resolve(__dirname, "../node_modules/react-dom"),
       },
     },
     define: {
@@ -34,7 +37,7 @@ export default defineConfig(() => {
               if (id.includes("@vkontakte/icons") || id.includes("@vkontakte/vkui")) {
                 return "vkui-vendor";
               }
-              if (id.includes("react")) {
+              if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/")) {
                 return "react-vendor";
               }
               return "vendor";
@@ -46,7 +49,7 @@ export default defineConfig(() => {
     server: {
       proxy: {
         "/api": {
-          target: "http://localhost:3001",
+          target: "http://127.0.0.1:3001",
           changeOrigin: true,
         },
       },
