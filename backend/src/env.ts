@@ -60,10 +60,12 @@ export const env = {
   NODE_ENV,
   isProduction,
 
-  PORT: parseInt(
-    process.env.BACKEND_PORT ||
-      (process.env.NODE_ENV === "production" ? process.env.PORT || "3000" : "3001"),
-    10
+  PORT: intEnv(
+    "BACKEND_PORT",
+    intEnv(
+      "PORT",
+      isProduction ? 3000 : 3001
+    )
   ),
 
   /**
