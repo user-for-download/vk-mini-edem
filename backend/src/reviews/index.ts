@@ -5,7 +5,7 @@ import { createReviewDtoSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
-import { serializeTrip, serializeReview } from "../serializers/index.js";
+import { serializeTrip, serializeReview, type TripWithDriver } from "../serializers/index.js";
 
 export const reviewsRouter = new Hono<AuthEnv>();
 
@@ -114,7 +114,7 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
 
   const availableTrips = Array.from(availableTripsMap.values());
 
-  return c.json(availableTrips.map(serializeTrip));
+  return c.json(availableTrips.map((trip) => serializeTrip(trip)));
 });
 
 /**

@@ -11,7 +11,7 @@ import {
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
-import { serializeBooking } from "../serializers/index.js";
+import { serializeBooking, serializeUser } from "../serializers/index.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
 

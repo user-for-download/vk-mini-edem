@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useState, useEffect } from "react";
-import { Epic, PanelHeader, SplitCol, SplitLayout } from "@vkontakte/vkui";
+import { Epic, SplitCol, SplitLayout } from "@vkontakte/vkui";
 import {
   useActiveVkuiLocation,
   useRouteNavigator,
@@ -154,7 +154,6 @@ export default function App() {
   return (
     <>
       <SplitLayout
-        header={<PanelHeader delimiter="none" fixed={false} />}
         popout={routerPopout}
       >
         <SplitCol>
