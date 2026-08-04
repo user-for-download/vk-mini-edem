@@ -41,6 +41,19 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 }) => {
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
+  const routeNavigator = useRouteNavigator();
+
+  const {
+    data: reviewsData,
+    isLoading: reviewsLoading,
+    isError: reviewsError,
+  } = useUserReviewsQuery(currentUser?.id ?? "");
+
+  const {
+    data: availableReviewTrips,
+    isLoading: availableReviewTripsLoading,
+    isError: availableReviewTripsError,
+  } = useAvailableReviewTripsQuery();
 
   if (!currentUser) {
     return (
@@ -50,20 +63,6 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Panel>
     );
   }
-
-  const routeNavigator = useRouteNavigator();
-
-  const {
-    data: reviewsData,
-    isLoading: reviewsLoading,
-    isError: reviewsError,
-  } = useUserReviewsQuery(currentUser.id);
-
-  const {
-    data: availableReviewTrips,
-    isLoading: availableReviewTripsLoading,
-    isError: availableReviewTripsError,
-  } = useAvailableReviewTripsQuery();
 
   const visibleReviews = (reviewsData ?? []).slice(0, 2);
 

@@ -361,14 +361,14 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const dto = parseResult.data;
   const trip = await db.trip.findUnique({ where: { id } });
 
-  if (!trip) return c.json({ message: "Trip not found" }, 404);
-  if (trip.driverId !== user.id) return c.json({ message: "Forbidden" }, 403);
-  if (trip.status !== "active") return c.json({ message: "Trip is not active" }, 400);
+  if (!trip) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
+  if (trip.driverId !== user.id) return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
+  if (trip.status !== "active") return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
 
   if (dto.departureAt) {
     const newDepartureAt = new Date(dto.departureAt);
     if (newDepartureAt <= new Date()) {
-      return c.json({ message: "Departure time must be in the future" }, 400);
+      return c.json({ code: ERROR_CODES.TRIP_IN_PAST, message: "Departure time must be in the future" }, 400);
     }
   }
 
@@ -433,15 +433,15 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   });
 
   if (!trip) {
-    return c.json({ message: "Trip not found" }, 404);
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
   }
 
   if (trip.driverId !== user.id) {
-    return c.json({ message: "Forbidden" }, 403);
+    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
   }
 
   if (trip.status !== "active") {
-    return c.json({ message: "Trip is not active" }, 400);
+    return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
   }
 
   const updated = await db.$transaction(async (tx) => {
@@ -514,19 +514,19 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   });
 
   if (!trip) {
-    return c.json({ message: "Trip not found" }, 404);
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
   }
 
   if (trip.driverId !== user.id) {
-    return c.json({ message: "Forbidden" }, 403);
+    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
   }
 
   if (trip.status !== "active") {
-    return c.json({ message: "Trip is not active" }, 400);
+    return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
   }
 
   if (!force && trip.departureAt > new Date()) {
-    return c.json({ message: "Trip has not started yet" }, 400);
+    return c.json({ code: ERROR_CODES.TRIP_IN_PAST, message: "Trip has not started yet" }, 400);
   }
 
   const updated = await db.$transaction(async (tx) => {
@@ -594,17 +594,17 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
       },
     });
 
-    logBusinessEvent("trip.completed", {
-      tripId: trip.id,
-      driverId: user.id,
-      passengersCount: passengerIds.length,
-    });
+    return { updated, passengerIds };
+  });
 
-    return updated;
+  logBusinessEvent("trip.completed", {
+    tripId: trip.id,
+    driverId: user.id,
+    passengersCount: updated.passengerIds.length,
   });
 
   return c.json(
-    serializeTrip(updated, {
+    serializeTrip(updated.updated, {
       bookedSeats: [],
       pendingRequestsCount: 0,
     })

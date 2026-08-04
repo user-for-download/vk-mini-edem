@@ -1,14 +1,3 @@
-export class BookingError extends Error {
-  constructor(
-    public message: string,
-    public statusCode: number,
-    public code: ErrorCode
-  ) {
-    super(message);
-    this.name = "BookingError";
-  }
-}
-
 export const ERROR_CODES = {
   VALIDATION_FAILED: "VALIDATION_FAILED",
   UNAUTHORIZED: "UNAUTHORIZED",

@@ -208,7 +208,7 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
   if (!isTripCompleted && !isTripPast) {
     return c.json(
-      { message: "Trip has not started or completed yet" },
+      { code: ERROR_CODES.TRIP_IN_PAST, message: "Trip has not started or completed yet" },
       400
     );
   }

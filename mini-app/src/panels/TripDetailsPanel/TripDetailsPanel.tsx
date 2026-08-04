@@ -60,6 +60,10 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
 
+  const createBooking = useCreateBookingMutation();
+  const cancelTrip = useCancelTripMutation();
+  const completeTrip = useCompleteTripMutation();
+
   if (!currentUser) {
     return (
       <Panel id={id}>
@@ -68,10 +72,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       </Panel>
     );
   }
-
-  const createBooking = useCreateBookingMutation();
-  const cancelTrip = useCancelTripMutation();
-  const completeTrip = useCompleteTripMutation();
 
   if (!trip) {
     return (

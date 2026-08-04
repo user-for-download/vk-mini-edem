@@ -13,6 +13,7 @@ import {
   Subhead,
   Text,
 } from "@vkontakte/vkui";
+import type { DriverBookingAction } from "@edem/contracts";
 import type { Booking, BookingStatus, Trip } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
 import { EmptyState } from "@/components/EmptyState";
@@ -25,7 +26,7 @@ export interface TripRequestsPanelProps {
   isLoading: boolean;
   isError: boolean;
   onBack: () => void;
-  onSetStatus: (bookingId: string, status: "confirmed" | "declined") => void;
+  onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
   onRetry: () => void;
 }
 
@@ -38,7 +39,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 
 const BookingRequestRow: FC<{
   booking: Booking;
-  onSetStatus: (bookingId: string, status: BookingStatus) => void;
+  onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
 }> = memo(({ booking, onSetStatus }) => {
   const statusColor =
     booking.status === "confirmed"

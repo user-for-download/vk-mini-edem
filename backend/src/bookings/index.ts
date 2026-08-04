@@ -541,12 +541,12 @@ bookingsRouter.patch("/:id/status", async (c) => {
         throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
       }
 
+      oldStatus = booking.status;
+
       if (booking.status === newStatus) {
         return booking;
       }
       
-      oldStatus = booking.status;
-
       const trip = await tx.trip.findUnique({
         where: { id: booking.tripId },
       });

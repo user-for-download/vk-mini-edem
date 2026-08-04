@@ -76,9 +76,10 @@ export interface Booking {
 
   /**
    * Поля, которые backend возвращает для истории поездок.
+   * Делаем их обязательными, т.к. они всегда вычисляются на бэкенде.
    */
-  canReview?: boolean;
-  hasReview?: boolean;
+  canReview: boolean;
+  hasReview: boolean;
 }
 
 /**

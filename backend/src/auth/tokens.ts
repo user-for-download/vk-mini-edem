@@ -64,8 +64,8 @@ export async function verifyAccessToken(token: string): Promise<string> {
 export async function verifyRefreshToken(token: string): Promise<string> {
   if (env.ALLOW_DEV_AUTH && token.startsWith("mock-refresh-token-")) {
     logger.warn(
-      "[Auth] DEV mock refresh token accepted. NODE_ENV: %s",
-      env.NODE_ENV
+      { env: env.NODE_ENV },
+      "[Auth] DEV mock refresh token accepted"
     );
     return token.replace("mock-refresh-token-", "");
   }

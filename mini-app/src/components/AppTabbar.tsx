@@ -20,6 +20,7 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
         selected={activeView === VIEW_HOME}
         onClick={() => routeNavigator.push("/")}
         aria-label="Главная"
+        label="Главная"
       >
         <Icon28HomeOutline />
       </TabbarItem>
@@ -29,6 +30,7 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
           routeNavigator.push(role === "driver" ? "/trips/my" : "/trips/search")
         }
         aria-label={role === "driver" ? "Поездки" : "Поиск"}
+        label={role === "driver" ? "Поездки" : "Поиск"}
       >
         <Icon28ServicesOutline />
       </TabbarItem>
@@ -36,6 +38,7 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
         selected={activeView === VIEW_PROFILE}
         onClick={() => routeNavigator.push("/profile")}
         aria-label="Профиль"
+        label="Профиль"
       >
         <Icon28UserOutline />
       </TabbarItem>

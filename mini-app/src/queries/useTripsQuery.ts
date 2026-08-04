@@ -10,6 +10,15 @@ import { tripsApi, type SearchTripsFilters, type UpdateTripDto } from "../api/tr
 import type { CreateTripDto } from "@edem/contracts";
 import type { Trip } from "@/types";
 
+export const TRIP_KEYS = {
+  all: ["trips"] as const,
+  lists: () => [...TRIP_KEYS.all, "list"] as const,
+  list: (filters?: SearchTripsFilters) => [...TRIP_KEYS.lists(), filters] as const,
+  my: () => [...TRIP_KEYS.all, "my"] as const,
+  details: () => [...TRIP_KEYS.all, "detail"] as const,
+  detail: (id: string) => [...TRIP_KEYS.details(), id] as const,
+};
+
 export function useInfiniteTripsQuery(filters?: SearchTripsFilters) {
   return useInfiniteQuery({
     queryKey: [...TRIP_KEYS.lists(), "infinite", filters],
@@ -34,15 +43,6 @@ export function useUpdateTripMutation() {
     },
   });
 }
-
-export const TRIP_KEYS = {
-  all: ["trips"] as const,
-  lists: () => [...TRIP_KEYS.all, "list"] as const,
-  list: (filters?: SearchTripsFilters) => [...TRIP_KEYS.lists(), filters] as const,
-  my: () => [...TRIP_KEYS.all, "my"] as const,
-  details: () => [...TRIP_KEYS.all, "detail"] as const,
-  detail: (id: string) => [...TRIP_KEYS.details(), id] as const,
-};
 
 export function useTripsQuery(filters?: SearchTripsFilters) {
   return useQuery({
