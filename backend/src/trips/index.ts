@@ -167,26 +167,32 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
  */
 tripsRouter.get("/my", requireUser, async (c) => {
   const user = c.get("user");
+  const pageParam = c.req.query("page");
+  const limitParam = c.req.query("limit");
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
+  const skip = (page - 1) * limit;
 
-  const trips = await db.trip.findMany({
-    where: {
-      driverId: user.id,
-    },
-    include: {
-      driver: {
-        include: {
-          car: true,
+  const [trips, total] = await Promise.all([
+    db.trip.findMany({
+      where: {
+        driverId: user.id,
+      },
+      include: {
+        driver: {
+          include: {
+            car: true,
+          },
         },
       },
-    },
-    orderBy: {
-      departureAt: "desc",
-    },
-  });
-
-  if (trips.length === 0) {
-    return c.json([]);
-  }
+      orderBy: {
+        departureAt: "desc",
+      },
+      skip,
+      take: limit,
+    }),
+    db.trip.count({ where: { driverId: user.id } }),
+  ]);
 
   const tripIds = trips.map((trip) => trip.id);
 
@@ -221,14 +227,21 @@ tripsRouter.get("/my", requireUser, async (c) => {
     }
   }
 
-  return c.json(
-    trips.map((trip) =>
+  return c.json({
+    items: trips.map((trip) =>
       serializeTrip(trip, {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
         pendingRequestsCount: pendingCountMap.get(trip.id) ?? 0,
       })
-    )
-  );
+    ),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  });
 });
 
 /**

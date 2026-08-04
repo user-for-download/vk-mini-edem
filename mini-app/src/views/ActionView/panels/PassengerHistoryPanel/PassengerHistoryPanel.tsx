@@ -33,7 +33,6 @@ export interface PassengerHistoryPanelProps {
 }
 
 type HistoryFilter = "all" | "completed" | "cancelled";
-type HistoryCategory = "completed" | "cancelled" | "other";
 
 function isPast(date?: string): boolean {
   if (!date) {
@@ -47,26 +46,6 @@ function isPast(date?: string): boolean {
   }
 
   return time <= Date.now();
-}
-
-function getHistoryCategory(booking: Booking): HistoryCategory {
-  const trip = booking.trip as Trip & {
-    status?: "active" | "cancelled" | "completed";
-    departureAt?: string;
-  };
-
-  if (trip.status === "cancelled" || booking.status === "declined" || booking.status === "cancelled") {
-    return "cancelled";
-  }
-
-  if (
-    booking.status === "confirmed" &&
-    (trip.status === "completed" || isPast(trip.departureAt))
-  ) {
-    return "completed";
-  }
-
-  return "other";
 }
 
 function getStatusData(booking: Booking): {
@@ -280,7 +259,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
     let items = historyItems;
 
     if (filter !== "all") {
-      items = items.filter((item) => getHistoryCategory(item) === filter);
+      items = items.filter((item) => item.historyCategory === filter);
     }
 
     return [...items].sort((a, b) => {

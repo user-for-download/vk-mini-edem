@@ -11,6 +11,7 @@ import {
   Box,
 } from "@vkontakte/vkui";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
+import { usersApi } from "@/api/users.api";
 
 export interface NotificationsPanelProps {
   id: string;
@@ -115,6 +116,16 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
     });
   };
 
+  const toggleNotifications = async (enabled: boolean) => {
+    setSettings((prev) => ({ ...prev, disableAll: !enabled }));
+    try {
+      await usersApi.updateNotificationSettings(enabled);
+      setShowSaved(true);
+    } catch {
+      setSettings((prev) => ({ ...prev, disableAll: !enabled })); // Откат при ошибке
+    }
+  };
+
   const isDisabled = settings.disableAll;
 
   return (
@@ -132,9 +143,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
           after={
             <Switch
               checked={settings.disableAll}
-              onChange={(e) =>
-                updateSettings({ disableAll: e.target.checked })
-              }
+              onChange={(e) => toggleNotifications(!e.target.checked)}
             />
           }
         >

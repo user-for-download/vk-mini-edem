@@ -32,7 +32,13 @@ import { useCreateBookingMutation } from "@/queries/useBookingsQuery";
 import {
   useCancelTripMutation,
   useCompleteTripMutation,
+  TRIP_KEYS,
 } from "@/queries/useTripsQuery";
+import { ApiError } from "@/api/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { MODAL_EDIT_TRIP } from "@/consts/modals";
+import { useModalStore } from "@/store/useModalStore";
+import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -59,6 +65,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
+  const queryClient = useQueryClient();
+  const routeNavigator = useRouteNavigator();
+  const setEditTrip = useModalStore((state) => state.setEditTrip);
 
   const createBooking = useCreateBookingMutation();
   const cancelTrip = useCancelTripMutation();
@@ -140,15 +149,31 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           onBack();
         },
         onError: (error) => {
-          enqueueSnackbar({
-            type: "error",
-            title: "Не удалось отправить заявку",
-            subtitle: error instanceof Error ? error.message : undefined,
-            dedupeKey: `book_error_${trip.id}`,
-          });
+          if (error instanceof ApiError && error.code === 'SEAT_TAKEN') {
+            enqueueSnackbar({
+              type: "error",
+              title: "Место уже занято",
+              subtitle: "Пожалуйста, выберите другое место",
+              dedupeKey: `book_error_${trip.id}`,
+            });
+            // Force refetch to update seat scheme
+            queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(trip.id) });
+          } else {
+            enqueueSnackbar({
+              type: "error",
+              title: "Не удалось отправить заявку",
+              subtitle: error instanceof Error ? error.message : undefined,
+              dedupeKey: `book_error_${trip.id}`,
+            });
+          }
         },
       }
     );
+  };
+
+  const handleEditTrip = () => {
+    setEditTrip(trip);
+    routeNavigator.showModal(MODAL_EDIT_TRIP);
   };
 
   const handleCancelTrip = () => {
@@ -338,6 +363,18 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               </FormStatus>
 
               <Spacing size={16} />
+
+              <Button
+                size="m"
+                mode="secondary"
+                stretched
+                disabled={isCancellingTrip || isCompletingTrip}
+                onClick={handleEditTrip}
+              >
+                Редактировать поездку
+              </Button>
+
+              <Spacing size={12} />
 
               <Button
                 size="m"

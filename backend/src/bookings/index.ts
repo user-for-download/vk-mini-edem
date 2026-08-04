@@ -29,6 +29,7 @@ class BookingError extends Error {
 }
 
 import { logBusinessEvent } from "../logger/business.js";
+import { createNotification } from "../services/notification.service.js";
 
 
 export const bookingsRouter = new Hono<AuthEnv>();
@@ -255,6 +256,15 @@ bookingsRouter.get("/history", async (c) => {
       tripIsCompleted &&
       !hasReview;
 
+    let historyCategory: "completed" | "cancelled" | "other" = "other";
+    if (b.trip.status === "cancelled" || b.status === "declined" || b.status === "cancelled") {
+      historyCategory = "cancelled";
+    } else if (b.status === "confirmed" && (b.trip.status === "completed" || tripIsCompleted)) {
+      historyCategory = "completed";
+    } else if (b.status === "pending" && tripIsCompleted) {
+      historyCategory = "cancelled"; // Не состоялась
+    }
+
     return {
       id: b.id,
       seat: b.seat,
@@ -263,6 +273,7 @@ bookingsRouter.get("/history", async (c) => {
 
       canReview,
       hasReview,
+      historyCategory,
 
       passenger: serializeUser(b.passenger),
 
@@ -463,6 +474,13 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
       passengerId: passenger.id,
       seat,
     });
+
+    await createNotification(
+      booking.trip.driverId,
+      "booking_created",
+      "Новая заявка",
+      `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`
+    );
 
     return c.json(serializeBooking(booking), 201);
   } catch (error) {
@@ -667,6 +685,13 @@ bookingsRouter.patch("/:id/status", async (c) => {
       newStatus,
       driverId: user.id,
     });
+
+    await createNotification(
+      updated.passengerId,
+      "booking_status_changed",
+      newStatus === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+      `Водитель ${newStatus === "confirmed" ? "подтвердил" : "отклонил"} вашу заявку в поездке ${updated.trip.fromCity} → ${updated.trip.toCity}`
+    );
 
     return c.json(serializeBooking(updated));
   } catch (error) {

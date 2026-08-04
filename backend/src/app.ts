@@ -6,6 +6,7 @@ import { tripsRouter } from "./trips/index.js";
 import { bookingsRouter } from "./bookings/index.js";
 import { reviewsRouter } from "./reviews/index.js";
 import { usersRouter } from "./users/index.js";
+import { notificationsRouter } from "./notifications/index.js";
 
 import { env } from "./env.js";
 import { db } from "./db.js";
@@ -125,6 +126,7 @@ app.route("/api/auth", authRouter);
 app.route("/api/trips", tripsRouter);
 app.route("/api/bookings", bookingsRouter);
 app.route("/api/reviews", reviewsRouter);
+app.route("/api/notifications", notificationsRouter);
 app.route("/api/users", usersRouter);
 
 /**

@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripsManagePanel/TripsManagePanel.tsx
-import { useMemo, type FC } from "react";
+import { useMemo, useEffect, useRef, type FC } from "react";
 import {
   Box,
   Button,
@@ -14,7 +14,7 @@ import { TripCard } from "@/components/TripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
-import { useMyTripsQuery } from "@/queries/useTripsQuery";
+import { useInfiniteMyTripsQuery } from "@/queries/useTripsQuery";
 
 export interface TripsManagePanelProps {
   id: string;
@@ -42,10 +42,32 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
     isError,
     error,
     refetch,
-  } = useMyTripsQuery();
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteMyTripsQuery();
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const myTrips = useMemo(() => {
-    const trips = (data ?? []) as Trip[];
+    const trips = data?.pages.flatMap((page) => page.items) ?? [];
 
     /**
      * Активные поездки показываем выше.
@@ -118,6 +140,8 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
                 hideSeats
               />
             ))}
+            <div ref={sentinelRef} style={{ height: 1 }} />
+            {isFetchingNextPage && <TripCardSkeleton />}
           </Box>
         )}
 

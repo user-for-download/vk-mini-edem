@@ -7,8 +7,10 @@ import {
   MODAL_DRIVER_PROFILE,
   MODAL_EDIT_PROFILE,
   MODAL_SELECT_REVIEW_TRIP,
+  MODAL_EDIT_TRIP,
 } from "@/consts/modals";
 import type { Trip } from "@/types";
+import { useModalStore } from "@/store/useModalStore";
 
 const SelectReviewTripModal = lazy(() =>
   import("@/modals/SelectReviewTripModal/SelectReviewTripModal").then((m) => ({
@@ -18,6 +20,11 @@ const SelectReviewTripModal = lazy(() =>
 const CreateTripModal = lazy(() =>
   import("@/modals/CreateTripModal/CreateTripModal").then((m) => ({
     default: m.CreateTripModal,
+  }))
+);
+const EditTripModal = lazy(() =>
+  import("@/modals/EditTripModal").then((m) => ({
+    default: m.EditTripModal,
   }))
 );
 const CreateReviewModal = lazy(() =>
@@ -74,31 +81,48 @@ export const AppModalRoot: FC<AppModalRootProps> = ({
   onTripCreated,
   onSelectReviewTrip,
 }) => {
+  const editTrip = useModalStore((state) => state.editTrip);
+  const setEditTrip = useModalStore((state) => state.setEditTrip);
+
+  const handleClose = () => {
+    if (activeModal === MODAL_EDIT_TRIP) {
+      setEditTrip(null);
+    }
+    onClose();
+  };
+
   return (
     <Suspense fallback={null}>
-      <ModalRoot activeModal={activeModal} onClose={onClose}>
+      <ModalRoot activeModal={activeModal} onClose={handleClose}>
         <SelectReviewTripModal
           id={MODAL_SELECT_REVIEW_TRIP}
-          onClose={onClose}
+          onClose={handleClose}
           onSelectTrip={onSelectReviewTrip ?? (() => {})}
         />
         <CreateTripModal
           id={MODAL_CREATE_TRIP}
-          onClose={onClose}
+          onClose={handleClose}
           onTripCreated={onTripCreated}
         />
+        {editTrip && (
+          <EditTripModal
+            id={MODAL_EDIT_TRIP}
+            trip={editTrip}
+            onClose={handleClose}
+          />
+        )}
         <CreateReviewModal
           id={MODAL_CREATE_REVIEW}
           trip={reviewTrip}
-          onClose={onClose}
+          onClose={handleClose}
         />
         <DriverProfileModal
           id={MODAL_DRIVER_PROFILE}
           driverId={driverId}
-          onClose={onClose}
+          onClose={handleClose}
         />
-        <CarFormModal id={MODAL_CAR_FORM} onClose={onClose} />
-        <EditProfileModal id={MODAL_EDIT_PROFILE} onClose={onClose} />
+        <CarFormModal id={MODAL_CAR_FORM} onClose={handleClose} />
+        <EditProfileModal id={MODAL_EDIT_PROFILE} onClose={handleClose} />
       </ModalRoot>
     </Suspense>
   );

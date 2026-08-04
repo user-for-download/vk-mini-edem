@@ -19,6 +19,9 @@ export interface User {
   reviewsCount: number;
   tripsCount: number;
   isVerified?: boolean;
+  notificationsEnabled?: boolean;
+  verificationStatus?: string;
+  verifiedAt?: string;
   car?: Car;
   about?: string;
   createdAt?: string;
@@ -80,6 +83,7 @@ export interface Booking {
    */
   canReview: boolean;
   hasReview: boolean;
+  historyCategory?: "completed" | "cancelled" | "other";
 }
 
 /**

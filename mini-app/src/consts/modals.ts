@@ -6,6 +6,7 @@ export const MODAL_CREATE_REVIEW = "modal-create-review";
 export const MODAL_DRIVER_PROFILE = "modal-driver-profile";
 export const MODAL_CAR_FORM = "modal-car-form";
 export const MODAL_EDIT_PROFILE = "modal-edit-profile";
+export const MODAL_EDIT_TRIP = "modal-edit-trip";
 
 /**
  * Модалка выбора поездки, о которой пользователь хочет оставить отзыв.

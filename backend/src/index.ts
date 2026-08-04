@@ -5,6 +5,7 @@ import { env } from "./env.js";
 import { logger } from "./logger.js";
 
 import { db } from "./db.js";
+import { startTripWorker, stopTripWorker } from "./workers/tripWorker.js";
 
 if (env.isProduction && env.ALLOW_DEV_AUTH) {
   throw new Error(
@@ -27,9 +28,12 @@ const server = serve({
   hostname: "0.0.0.0",
 });
 
-const SHUTDOWN_TIMEOUT_MS = 10_000;
+startTripWorker();
+
+const SHUTDOWN_TIMEOUT_MS = 20_000;
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutdown signal received");
+  stopTripWorker();
   server.close(async () => {
     logger.info("HTTP server closed");
     try {

@@ -9,6 +9,9 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserReviewsQuery, useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
+import { usersApi } from "@/api/users.api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export interface ProfilePanelProps {
   id: string;
@@ -42,6 +45,16 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
   const routeNavigator = useRouteNavigator();
+  const queryClient = useQueryClient();
+
+  const verifyMutation = useMutation({
+    mutationFn: () => usersApi.requestVerification(),
+    onSuccess: (data) => {
+      useAuthStore.setState({ user: data });
+      enqueueSnackbar({ type: "success", title: "Заявка отправлена", subtitle: "Рассмотрение займет до 24 часов", dedupeKey: "verify_ok" });
+    },
+    onError: () => enqueueSnackbar({ type: "error", title: "Ошибка", dedupeKey: "verify_error" })
+  });
 
   const {
     data: reviewsData,
@@ -78,10 +91,24 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
             <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
           </div>
-          {currentUser.isVerified && (
+          {currentUser.isVerified ? (
             <Caption level="1" style={{ color: "var(--carpool_accent)", marginTop: 4 }}>
               Личность подтверждена ВКонтакте
             </Caption>
+          ) : currentUser.verificationStatus === "pending" ? (
+            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginTop: 4 }}>
+              Заявка на верификацию на рассмотрении
+            </Caption>
+          ) : (
+            <Button 
+              size="s" 
+              mode="outline" 
+              onClick={() => verifyMutation.mutate()}
+              loading={verifyMutation.isPending}
+              style={{ marginTop: 8 }}
+            >
+              Пройти верификацию
+            </Button>
           )}
           <Spacing size={16} />
           <Button mode="secondary" size="m" onClick={onOpenEditProfile}>

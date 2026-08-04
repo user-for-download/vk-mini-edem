@@ -56,8 +56,12 @@ export const tripsApi = {
     });
   },
 
-  getMyTrips: (): Promise<MyTrip[]> => {
-    return apiClient.request<MyTrip[]>("/trips/my");
+  getMyTrips: (options?: { page?: number; limit?: number }): Promise<PaginatedTripsResponse> => {
+    const query = new URLSearchParams();
+    if (options?.page) query.set("page", options.page.toString());
+    if (options?.limit) query.set("limit", options.limit.toString());
+    const queryString = query.toString() ? `?${query.toString()}` : "";
+    return apiClient.request<PaginatedTripsResponse>(`/trips/my${queryString}`);
   },
 
   getTripById: (id: string): Promise<Trip> => {

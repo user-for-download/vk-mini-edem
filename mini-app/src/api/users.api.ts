@@ -29,4 +29,17 @@ export const usersApi = {
       body: JSON.stringify(data),
     });
   },
+
+  requestVerification: (): Promise<User> => {
+    return apiClient.request<User>("/users/me/request-verification", {
+      method: "POST",
+    });
+  },
+
+  updateNotificationSettings: (enabled: boolean): Promise<User> => {
+    return apiClient.request<User>("/users/me/notification-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ notificationsEnabled: enabled }),
+    });
+  },
 };

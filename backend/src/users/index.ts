@@ -17,6 +17,10 @@ const carFormSchema = z.object({
   plate: z.string().min(1).max(15),
 });
 
+const updateNotificationSettingsSchema = z.object({
+  notificationsEnabled: z.boolean().optional(),
+});
+
 export const usersRouter = new Hono<AuthEnv>();
 
 /**
@@ -26,6 +30,43 @@ usersRouter.get("/me", requireUser, async (c) => {
   const user = c.get("user");
 
   return c.json(serializeUser(user));
+});
+
+usersRouter.patch("/me/notification-settings", requireUser, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => ({}));
+  const parseResult = updateNotificationSettingsSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return c.json({ message: "Invalid payload" }, 400);
+  }
+
+  const updated = await db.user.update({
+    where: { id: user.id },
+    data: { notificationsEnabled: parseResult.data.notificationsEnabled ?? user.notificationsEnabled },
+    include: { car: true },
+  });
+
+  return c.json(serializeUser(updated));
+});
+
+usersRouter.post("/me/request-verification", requireUser, async (c) => {
+  const user = c.get("user");
+
+  if (user.verificationStatus === "pending") {
+    return c.json({ message: "Verification already requested" }, 400);
+  }
+  if (user.verificationStatus === "approved") {
+    return c.json({ message: "User already verified" }, 400);
+  }
+
+  const updated = await db.user.update({
+    where: { id: user.id },
+    data: { verificationStatus: "pending" },
+    include: { car: true },
+  });
+
+  return c.json(serializeUser(updated));
 });
 
 /**

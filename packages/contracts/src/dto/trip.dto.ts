@@ -29,3 +29,6 @@ export const tripFiltersDtoSchema = z.object({
 });
 
 export type TripFiltersDto = z.infer<typeof tripFiltersDtoSchema>;
+
+export const updateTripDtoSchema = createTripDtoSchema.partial();
+export type UpdateTripDto = z.infer<typeof updateTripDtoSchema>;

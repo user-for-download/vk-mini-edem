@@ -1,6 +1,6 @@
 // mini-app/src/components/AuthGate.tsx
 import { type FC, type PropsWithChildren, useEffect } from "react";
-import { ScreenSpinner } from "@vkontakte/vkui";
+import { ScreenSpinner, Placeholder, Button, Panel, View } from "@vkontakte/vkui";
 import { useAuthStore } from "@/store/useAuthStore";
 
 /**
@@ -19,6 +19,25 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
 
   if (status === "idle" || status === "initializing") {
     return <ScreenSpinner />;
+  }
+
+  if (status === "error" || status === "unauthenticated") {
+    return (
+      <View activePanel="auth-error">
+        <Panel id="auth-error">
+          <Placeholder
+            title="Ошибка авторизации"
+            action={
+              <Button size="m" onClick={() => void bootstrap()}>
+                Попробовать снова
+              </Button>
+            }
+          >
+            Не удалось проверить данные авторизации. Проверьте подключение к интернету.
+          </Placeholder>
+        </Panel>
+      </View>
+    );
   }
 
   return <>{children}</>;

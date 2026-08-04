@@ -13,7 +13,9 @@ import {
 } from "@vkontakte/vkui";
 import type { Trip, User, Role } from "@/types";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
-import { useCreateReviewMutation } from "@/queries/useReviewsQuery";
+import { useCreateReviewMutation, REVIEW_KEYS } from "@/queries/useReviewsQuery";
+import { ApiError } from "@/api/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface CreateReviewModalProps extends ModalCardProps {
   id: string;
@@ -121,6 +123,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
 
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const createReview = useCreateReviewMutation();
+  const queryClient = useQueryClient();
 
   const targetUser = target ?? trip?.driver ?? null;
 
@@ -174,12 +177,23 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
           onClose();
         },
         onError: (error) => {
-          enqueueSnackbar({
-            type: "error",
-            title: "Не удалось отправить отзыв",
-            subtitle: error instanceof Error ? error.message : undefined,
-            dedupeKey: "create_review_error",
-          });
+          if (error instanceof ApiError && error.code === 'ALREADY_REVIEWED') {
+            enqueueSnackbar({
+              type: "error",
+              title: "Вы уже оставили отзыв",
+              subtitle: "Нельзя оставить отзыв дважды",
+              dedupeKey: "create_review_error",
+            });
+            queryClient.invalidateQueries({ queryKey: REVIEW_KEYS.availableTrips() });
+            onClose();
+          } else {
+            enqueueSnackbar({
+              type: "error",
+              title: "Не удалось отправить отзыв",
+              subtitle: error instanceof Error ? error.message : undefined,
+              dedupeKey: "create_review_error",
+            });
+          }
         },
       }
     );

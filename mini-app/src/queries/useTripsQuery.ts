@@ -64,10 +64,25 @@ export function useMyTripsQuery(options?: { enabled?: boolean }) {
     queryKey: TRIP_KEYS.my(),
     queryFn: async () => {
       const res = await tripsApi.getMyTrips();
-      return res as unknown as Trip[];
+      return res.items as unknown as Trip[];
     },
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useInfiniteMyTripsQuery(options?: { enabled?: boolean }) {
+  return useInfiniteQuery({
+    queryKey: [...TRIP_KEYS.my(), "infinite"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const res = await tripsApi.getMyTrips({ page: pageParam as number, limit: 20 });
+      return { ...res, items: res.items as unknown as Trip[] };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined,
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
   });
 }
 

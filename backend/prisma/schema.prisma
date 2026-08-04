@@ -16,6 +16,9 @@ model User {
   reviewsCount Int       @default(0)
   tripsCount   Int       @default(0)
   isVerified   Boolean   @default(false)
+  notificationsEnabled Boolean @default(true)
+  verificationStatus   String  @default("none") // none, pending, approved, rejected
+  verifiedAt           DateTime?
   about        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -25,6 +28,21 @@ model User {
   bookings     Booking[] @relation("PassengerBookings")
   reviewsGiven Review[]  @relation("AuthorReviews")
   reviewsRecv  Review[]  @relation("TargetReviews")
+  notifications Notification[]
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // booking_created, booking_confirmed, trip_cancelled
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
 }
 
 model Car {

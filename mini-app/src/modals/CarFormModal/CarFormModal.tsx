@@ -15,6 +15,7 @@ import {
 } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi, type CarFormDto } from "@/api/users.api";
+import { ApiError } from "@/api/client";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -90,6 +91,10 @@ export const CarFormModal: FC<CarFormModalProps> = ({
 
       onClose();
     } catch (submitError) {
+      if (submitError instanceof ApiError && submitError.code === 'VALIDATION_FAILED') {
+        setError(`Ошибка валидации: ${submitError.message}`);
+        return;
+      }
       enqueueSnackbar({
         type: "error",
         title: "Не удалось сохранить автомобиль",
