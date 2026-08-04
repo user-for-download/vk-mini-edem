@@ -167,7 +167,7 @@ bookingsRouter.get("/my", async (c) => {
             : undefined,
         },
 
-        tags: safeParseTags(b.trip.tags),
+        tags: b.trip.tags,
         comment: b.trip.comment || undefined,
       },
     };
@@ -299,7 +299,7 @@ bookingsRouter.get("/history", async (c) => {
 
       driver: serializeUser(b.trip.driver),
 
-      tags: safeParseTags(b.trip.tags),
+      tags: b.trip.tags,
       comment: b.trip.comment || undefined,
     },
   };

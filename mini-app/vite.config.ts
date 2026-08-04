@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readFileSync } from "node:fs";
@@ -12,7 +11,7 @@ const pkg = JSON.parse(
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react()],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: {

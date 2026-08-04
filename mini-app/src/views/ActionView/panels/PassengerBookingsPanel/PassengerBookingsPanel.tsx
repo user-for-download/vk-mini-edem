@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel.tsx
-import { type FC, useMemo, useState } from "react";
+import { type FC, memo, useMemo, useState } from "react";
 import {
   Avatar,
   Box,
@@ -68,7 +68,7 @@ const BookingCard: FC<{
   booking: PassengerBooking;
   onOpenTrip: (trip: Trip) => void;
   onOpenReview: (trip: Trip) => void;
-}> = ({ booking, onOpenTrip, onOpenReview }) => {
+}> = memo(({ booking, onOpenTrip, onOpenReview }) => {
   const trip = booking.trip;
 
   return (
@@ -198,7 +198,9 @@ const BookingCard: FC<{
       </Box>
     </Card>
   );
-};
+});
+
+BookingCard.displayName = "BookingCard";
 
 /**
  * Экран пассажира:

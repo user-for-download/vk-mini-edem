@@ -1,5 +1,10 @@
 // mini-app/src/queries/useTripsQuery.ts
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { tripsApi, type SearchTripsFilters } from "../api/trips.api";
 import type { CreateTripDto } from "@edem/contracts";
 import type { Trip } from "@/types";
@@ -23,7 +28,8 @@ export function useTripsQuery(filters?: SearchTripsFilters) {
         items: res.items as unknown as Trip[],
       };
     },
-    staleTime: 30_000,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -35,6 +41,7 @@ export function useMyTripsQuery(options?: { enabled?: boolean }) {
       return res as unknown as Trip[];
     },
     enabled: options?.enabled ?? true,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -46,6 +53,7 @@ export function useTripDetailQuery(id: string) {
       return res as unknown as Trip;
     },
     enabled: Boolean(id),
+    placeholderData: keepPreviousData,
   });
 }
 

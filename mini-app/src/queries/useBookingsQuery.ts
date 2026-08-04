@@ -1,5 +1,10 @@
 // mini-app/src/queries/useBookingsQuery.ts
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { bookingsApi } from "../api/bookings.api";
 import { TRIP_KEYS } from "./useTripsQuery";
 import type {
@@ -22,6 +27,7 @@ export function useMyBookingsQuery() {
       const res = await bookingsApi.getUserBookings();
       return res as unknown as Booking[];
     },
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -40,6 +46,7 @@ export function useTripBookingsQuery(tripId: string) {
       return res as unknown as Booking[];
     },
     enabled: Boolean(tripId),
+    placeholderData: keepPreviousData,
   });
 }
 

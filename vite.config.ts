@@ -1,4 +1,3 @@
-import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
@@ -6,7 +5,7 @@ import { defineConfig } from 'vite';
 export default defineConfig(() => {
   return {
     root: './mini-app',
-    plugins: [react(), tailwindcss()],
+    plugins: [react()],
     resolve: {
       dedupe: ['react', 'react-dom'],
       alias: {

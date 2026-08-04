@@ -4,7 +4,11 @@ import { useGetPanelForView, useRouteNavigator } from "@vkontakte/vk-mini-apps-r
 import { PANEL_HOME, PANEL_TRIP_DETAILS } from "@/consts/panels";
 import { VIEW_HOME } from "@/consts/views";
 import type { Role, User } from "@/types";
-import { HomePanel } from "@/views/HomeView/panels/HomePanel/HomePanel";
+const HomePanel = lazy(() =>
+  import("@/views/HomeView/panels/HomePanel/HomePanel").then((m) => ({
+    default: m.HomePanel,
+  }))
+);
 
 const TripDetailsPanelWrapper = lazy(() =>
   import("@/panels/TripDetailsPanel/TripDetailsPanelWrapper").then((m) => ({

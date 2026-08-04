@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel.tsx
-import type { FC } from "react";
+import { type FC, memo } from "react";
 import {
   Avatar,
   Button,
@@ -38,7 +38,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 const BookingRequestRow: FC<{
   booking: Booking;
   onSetStatus: (bookingId: string, status: BookingStatus) => void;
-}> = ({ booking, onSetStatus }) => {
+}> = memo(({ booking, onSetStatus }) => {
   const statusColor =
     booking.status === "confirmed"
       ? "var(--carpool_accent)"
@@ -119,7 +119,9 @@ const BookingRequestRow: FC<{
       <Separator />
     </>
   );
-};
+});
+
+BookingRequestRow.displayName = "BookingRequestRow";
 
 export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   id,

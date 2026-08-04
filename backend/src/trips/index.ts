@@ -279,7 +279,7 @@ tripsRouter.post("/", requireUser, async (c) => {
       price: dto.price,
       seatsTotal: dto.seatsTotal,
       seatsAvailable: dto.seatsTotal,
-      tags: JSON.stringify(dto.tags),
+      tags: dto.tags,
       comment: dto.comment,
     },
     include: {

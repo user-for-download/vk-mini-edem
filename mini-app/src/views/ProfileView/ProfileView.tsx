@@ -11,7 +11,11 @@ import {
 } from "@/consts/panels";
 import { VIEW_PROFILE } from "@/consts/views";
 import type { Role, Trip } from "@/types";
-import { ProfilePanel } from "@/views/ProfileView/panels/ProfilePanel/ProfilePanel";
+const ProfilePanel = lazy(() =>
+  import("@/views/ProfileView/panels/ProfilePanel/ProfilePanel").then((m) => ({
+    default: m.ProfilePanel,
+  }))
+);
 
 const NotificationsPanel = lazy(() =>
   import("@/views/ProfileView/panels/NotificationsPanel/NotificationsPanel").then((m) => ({

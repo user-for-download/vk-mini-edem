@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper.tsx
-import { type FC } from "react";
+import { type FC, useCallback } from "react";
 import { useParams, useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import { TripRequestsPanel } from "@/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel";
 import { useTripDetailQuery } from "@/queries/useTripsQuery";
@@ -27,7 +27,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const updateBooking = useUpdateBookingStatusMutation();
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
 
-  const handleSetStatus = (bookingId: string, status: BookingStatus) => {
+  const handleSetStatus = useCallback((bookingId: string, status: BookingStatus) => {
     updateBooking.mutate(
       { id: bookingId, status },
       {
@@ -51,7 +51,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
         },
       }
     );
-  };
+  }, [updateBooking, enqueueSnackbar]);
 
   return (
     <TripRequestsPanel

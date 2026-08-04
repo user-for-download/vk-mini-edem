@@ -11,8 +11,17 @@ import {
 } from "@/consts/panels";
 import { VIEW_ACTION } from "@/consts/views";
 import type { Role, Trip, User } from "@/types";
-import { SearchPanel } from "@/views/ActionView/panels/SearchPanel/SearchPanel";
-import { TripsManagePanel } from "@/views/ActionView/panels/TripsManagePanel/TripsManagePanel";
+const SearchPanel = lazy(() =>
+  import("@/views/ActionView/panels/SearchPanel/SearchPanel").then((m) => ({
+    default: m.SearchPanel,
+  }))
+);
+
+const TripsManagePanel = lazy(() =>
+  import("@/views/ActionView/panels/TripsManagePanel/TripsManagePanel").then((m) => ({
+    default: m.TripsManagePanel,
+  }))
+);
 
 const TripRequestsPanelWrapper = lazy(() =>
   import("@/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper").then((m) => ({

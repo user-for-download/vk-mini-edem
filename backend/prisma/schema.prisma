@@ -51,7 +51,7 @@ model Trip {
   price           Int
   seatsTotal      Int
   seatsAvailable  Int
-  tags            String    // JSON or comma-separated list
+  tags            String[]  @default([])
   comment         String?
   status          String    @default("active") // active, cancelled, completed
   createdAt       DateTime  @default(now())

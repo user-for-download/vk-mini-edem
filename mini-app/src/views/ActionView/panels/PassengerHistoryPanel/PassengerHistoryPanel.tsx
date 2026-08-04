@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/PassengerHistoryPanel/PassengerHistoryPanel.tsx
-import { type FC, useMemo, useState } from "react";
+import { type FC, memo, useMemo, useState } from "react";
 import {
   Avatar,
   Box,
@@ -119,7 +119,7 @@ const HistoryCard: FC<{
   booking: Booking;
   onOpenTrip: (trip: Trip) => void;
   onOpenReview?: (trip: Trip) => void;
-}> = ({ booking, onOpenTrip, onOpenReview }) => {
+}> = memo(({ booking, onOpenTrip, onOpenReview }) => {
   const trip = booking.trip;
   const status = getStatusData(booking);
 
@@ -247,7 +247,9 @@ const HistoryCard: FC<{
       </Box>
     </Card>
   );
-};
+});
+
+HistoryCard.displayName = "HistoryCard";
 
 /**
  * Экран истории поездок пассажира.
