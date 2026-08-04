@@ -64,19 +64,19 @@ tripsRouter.get("/", async (c) => {
 
   if (q) {
     where.OR = [
-      { fromCity: { contains: q } },
-      { toCity: { contains: q } },
-      { fromAddress: { contains: q } },
-      { toAddress: { contains: q } },
+      { fromCity: { contains: q, mode: "insensitive" } },
+      { toCity: { contains: q, mode: "insensitive" } },
+      { fromAddress: { contains: q, mode: "insensitive" } },
+      { toAddress: { contains: q, mode: "insensitive" } },
     ];
   }
 
   if (fromCity) {
-    where.fromCity = { contains: fromCity };
+    where.fromCity = { contains: fromCity, mode: "insensitive" };
   }
 
   if (toCity) {
-    where.toCity = { contains: toCity };
+    where.toCity = { contains: toCity, mode: "insensitive" };
   }
 
   if (dateFrom) {
@@ -279,7 +279,7 @@ tripsRouter.post("/", requireUser, async (c) => {
       price: dto.price,
       seatsTotal: dto.seatsTotal,
       seatsAvailable: dto.seatsTotal,
-      tags: JSON.stringify(dto.tags),
+      tags: dto.tags,
       comment: dto.comment,
     },
     include: {
@@ -345,7 +345,7 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
         },
       },
       data: {
-        status: "declined",
+        status: "cancelled",
       },
     });
 

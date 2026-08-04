@@ -167,13 +167,7 @@ bookingsRouter.get("/my", async (c) => {
             : undefined,
         },
 
-        tags: (() => {
-          try {
-            return typeof b.trip.tags === 'string' ? JSON.parse(b.trip.tags) : (b.trip.tags || []);
-          } catch {
-            return [];
-          }
-        })(),
+        tags: b.trip.tags,
         comment: b.trip.comment || undefined,
       },
     };
@@ -192,10 +186,15 @@ bookingsRouter.get("/my", async (c) => {
  */
 bookingsRouter.get("/history", async (c) => {
   const user = c.get("user");
-
-  const bookings = await db.booking.findMany({
+  const now = new Date();
+  const history = await db.booking.findMany({
     where: {
       passengerId: user.id,
+      OR: [
+        { trip: { departureAt: { lte: now } } },
+        { trip: { status: { not: "active" } } },
+        { status: { in: ["declined", "cancelled"] } },
+      ],
     },
     include: {
       trip: {
@@ -213,22 +212,12 @@ bookingsRouter.get("/history", async (c) => {
         },
       },
     },
+    orderBy: {
+      trip: {
+        departureAt: "desc",
+      },
+    },
   });
-
-  const now = new Date();
-
-  const history = bookings.filter((booking) => {
-    const tripIsPast = booking.trip.departureAt <= now;
-    const tripIsNotActive = booking.trip.status !== "active";
-    const bookingIsDeclined = booking.status === "declined";
-
-    return tripIsPast || tripIsNotActive || bookingIsDeclined;
-  });
-
-  history.sort(
-    (a, b) =>
-      b.trip.departureAt.getTime() - a.trip.departureAt.getTime()
-  );
 
   if (history.length === 0) {
     return c.json([]);
@@ -269,7 +258,7 @@ bookingsRouter.get("/history", async (c) => {
     return {
       id: b.id,
       seat: b.seat,
-      status: b.status as "pending" | "confirmed" | "declined",
+      status: b.status as "pending" | "confirmed" | "declined" | "cancelled",
       comment: b.comment || undefined,
 
       canReview,
@@ -277,45 +266,39 @@ bookingsRouter.get("/history", async (c) => {
 
       passenger: serializeUser(b.passenger),
 
-    trip: {
-      id: b.trip.id,
-      fromCity: b.trip.fromCity,
-      fromAddress: b.trip.fromAddress,
-      toCity: b.trip.toCity,
-      toAddress: b.trip.toAddress,
+      trip: {
+        id: b.trip.id,
+        fromCity: b.trip.fromCity,
+        fromAddress: b.trip.fromAddress,
+        toCity: b.trip.toCity,
+        toAddress: b.trip.toAddress,
 
-      date: new Date(b.trip.departureAt).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "long",
-        weekday: "short",
-      }),
-      time: new Date(b.trip.departureAt).toLocaleTimeString("ru-RU", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+        date: new Date(b.trip.departureAt).toLocaleDateString("ru-RU", {
+          day: "numeric",
+          month: "long",
+          weekday: "short",
+        }),
+        time: new Date(b.trip.departureAt).toLocaleTimeString("ru-RU", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
 
-      durationMinutes: b.trip.durationMinutes,
-      distanceKm: b.trip.distanceKm,
-      price: b.trip.price,
-      seatsTotal: b.trip.seatsTotal,
-      seatsAvailable: b.trip.seatsAvailable,
+        durationMinutes: b.trip.durationMinutes,
+        distanceKm: b.trip.distanceKm,
+        price: b.trip.price,
+        seatsTotal: b.trip.seatsTotal,
+        seatsAvailable: b.trip.seatsAvailable,
 
-      status: b.trip.status as "active" | "cancelled" | "completed",
-      departureAt: b.trip.departureAt.toISOString(),
+        status: b.trip.status as "active" | "cancelled" | "completed",
+        departureAt: b.trip.departureAt.toISOString(),
 
-      driver: serializeUser(b.trip.driver),
+        driver: serializeUser(b.trip.driver),
 
-      tags: (() => {
-        try {
-          return typeof b.trip.tags === 'string' ? JSON.parse(b.trip.tags) : (b.trip.tags || []);
-        } catch {
-          return [];
-        }
-      })(),
-      comment: b.trip.comment || undefined,
-    },
-  };
-});
+        tags: b.trip.tags,
+        comment: b.trip.comment || undefined,
+      },
+    };
+  });
 
   return c.json(formatted);
 });
@@ -515,6 +498,12 @@ bookingsRouter.patch("/:id/status", async (c) => {
   }
 
   const newStatus = parseResult.data.status;
+
+  // Водитель может только подтвердить или отклонить.
+  // «cancelled» устанавливается пассажиром или при отмене поездки.
+  if (newStatus !== "confirmed" && newStatus !== "declined") {
+    return c.json({ message: "Driver can only confirm or decline bookings" }, 400);
+  }
 
   try {
     const updated = await db.$transaction(async (tx) => {
@@ -740,7 +729,7 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       await tx.booking.update({
         where: { id: booking.id },
         data: {
-          status: "declined",
+          status: "cancelled",
         },
       });
     });

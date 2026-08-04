@@ -8,7 +8,7 @@ import {
   useUpdateBookingStatusMutation,
 } from "@/queries/useBookingsQuery";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
-import type { BookingStatus } from "@/types";
+import type { DriverBookingAction } from "@edem/contracts";
 
 export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const params = useParams<"tripId">();
@@ -27,7 +27,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const updateBooking = useUpdateBookingStatusMutation();
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
 
-  const handleSetStatus = useCallback((bookingId: string, status: BookingStatus) => {
+  const handleSetStatus = useCallback((bookingId: string, status: DriverBookingAction) => {
     updateBooking.mutate(
       { id: bookingId, status },
       {

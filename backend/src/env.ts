@@ -93,7 +93,7 @@ export const env = {
   ALLOW_DEV_AUTH: (() => {
     if (isProduction) return false;
     if (process.env.VITEST) return true;
-    return process.env.ALLOW_DEV_AUTH !== "false";
+    return process.env.ALLOW_DEV_AUTH === "true";
   })(),
 
   /**

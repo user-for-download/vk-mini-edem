@@ -44,7 +44,7 @@ describe("auth bootstrap", () => {
       headers: JSON_HEADERS,
       body: JSON.stringify({
         vkUserId: 111111,
-        sign: "test-sign",
+        sign: "dev-sign",
         ts: Date.now(),
       }),
     });
@@ -89,7 +89,7 @@ describe("trips", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: JSON.stringify(["Есть багаж"]),
+        tags: ["Есть багаж"],
       },
     });
 
@@ -106,7 +106,7 @@ describe("trips", () => {
         price: 800,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: JSON.stringify([]),
+        tags: [],
         status: "cancelled",
       },
     });
@@ -161,7 +161,7 @@ describe("bookings smoke", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 2,
-        tags: JSON.stringify([]),
+        tags: [],
       },
     });
 

@@ -44,9 +44,14 @@ async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string; ts:
 
   const ts = Date.now();
 
-  let sign =
-    launchParams.vk_sign ||
-    (import.meta.env.DEV ? "dev-sign" : "vk-mini-app-sign");
+  let sign: string;
+  if (launchParams.vk_sign) {
+    sign = launchParams.vk_sign;
+  } else if (import.meta.env.DEV) {
+    sign = "dev-sign";
+  } else {
+    throw new Error("VK sign is missing");
+  }
 
   if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
     try {

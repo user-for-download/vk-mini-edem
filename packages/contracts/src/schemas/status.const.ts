@@ -8,6 +8,7 @@ export const BOOKING_STATUS = {
   PENDING: "pending",
   CONFIRMED: "confirmed",
   DECLINED: "declined",
+  CANCELLED: "cancelled",
 } as const;
 
 export type TripStatusValue = (typeof TRIP_STATUS)[keyof typeof TRIP_STATUS];

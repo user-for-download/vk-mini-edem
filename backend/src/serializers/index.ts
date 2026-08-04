@@ -43,16 +43,6 @@ export type ReviewWithAuthor = Prisma.ReviewGetPayload<{
   };
 }>;
 
-export function safeParseTags(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === "string");
-  } catch {
-    return [];
-  }
-}
-
 export function formatDateRu(date: Date): string {
   return date.toLocaleDateString("ru-RU", {
     day: "numeric",
@@ -111,13 +101,7 @@ export function serializeTrip(
     seatsTotal: trip.seatsTotal,
     seatsAvailable: trip.seatsAvailable,
     driver: serializeUser(trip.driver),
-    tags: (() => {
-      try {
-        return typeof trip.tags === 'string' ? JSON.parse(trip.tags) : (trip.tags || []);
-      } catch {
-        return [];
-      }
-    })(),
+    tags: trip.tags,
     comment: trip.comment ?? undefined,
     status: trip.status as TripStatus,
     bookedSeats: options?.bookedSeats ?? [],

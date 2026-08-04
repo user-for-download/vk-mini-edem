@@ -25,7 +25,8 @@ jobs:
 
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/edem_test
+      # Append ?statement_cache_size=0 to disable Prisma's prepared statement caching
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/edem_test?statement_cache_size=0
       JWT_SECRET: ci-jwt-secret
       VK_APP_SECRET: ci-vk-secret
       ALLOW_DEV_AUTH: "true"

@@ -10,6 +10,7 @@ import { TRIP_KEYS } from "./useTripsQuery";
 import type {
   BookingStatus,
   CreateBookingDto,
+  DriverBookingAction,
 } from "@edem/contracts";
 import type { Booking } from "@/types";
 
@@ -35,7 +36,14 @@ export function useMyBookingsQuery() {
  * История поездок пассажира.
  */
 export function usePassengerHistoryQuery() {
-  return useMyBookingsQuery();
+  return useQuery({
+    queryKey: BOOKING_KEYS.history(),
+    queryFn: async () => {
+      const res = await bookingsApi.getHistory();
+      return res as unknown as Booking[];
+    },
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useTripBookingsQuery(tripId: string) {
@@ -66,7 +74,7 @@ export function useUpdateBookingStatusMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: BookingStatus }) =>
+    mutationFn: ({ id, status }: { id: string; status: DriverBookingAction }) =>
       bookingsApi.updateBookingStatus(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: BOOKING_KEYS.all });
