@@ -54,7 +54,7 @@ export const HomePanel: FC<HomePanelProps> = ({
     enabled: role === "driver",
   });
 
-  const allTrips = tripsData ?? [];
+  const allTrips = tripsData?.items ?? [];
 
   const nearbyTrips = allTrips
     .filter((trip) => trip.driver.id !== currentUser.id)

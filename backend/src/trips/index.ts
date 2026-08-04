@@ -132,7 +132,14 @@ tripsRouter.get("/", async (c) => {
   const q = c.req.query("q");
   const fromCity = c.req.query("fromCity");
   const toCity = c.req.query("toCity");
+  const dateFrom = c.req.query("dateFrom");
   const maxPrice = c.req.query("maxPrice");
+  const pageParam = c.req.query("page");
+  const limitParam = c.req.query("limit");
+
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
+  const skip = (page - 1) * limit;
 
   const where: Prisma.TripWhereInput = {
     status: "active",
@@ -155,6 +162,16 @@ tripsRouter.get("/", async (c) => {
     where.toCity = { contains: toCity };
   }
 
+  if (dateFrom) {
+    const parsedDate = new Date(dateFrom);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      where.departureAt = {
+        ...(where.departureAt as object),
+        gte: parsedDate,
+      };
+    }
+  }
+
   if (maxPrice) {
     const parsedMaxPrice = Number.parseInt(maxPrice, 10);
 
@@ -165,31 +182,43 @@ tripsRouter.get("/", async (c) => {
     where.price = { lte: parsedMaxPrice };
   }
 
-  const trips = await db.trip.findMany({
-    where,
-    include: {
-      driver: {
-        include: {
-          car: true,
+  const [trips, total] = await Promise.all([
+    db.trip.findMany({
+      where,
+      include: {
+        driver: {
+          include: {
+            car: true,
+          },
         },
       },
-    },
-    orderBy: {
-      departureAt: "asc",
-    },
-  });
+      orderBy: {
+        departureAt: "asc",
+      },
+      skip,
+      take: limit,
+    }),
+    db.trip.count({ where }),
+  ]);
 
   const bookedSeatsMap = await getActiveBookingSeatsByTripIds(
     trips.map((trip) => trip.id)
   );
 
-  return c.json(
-    trips.map((trip) =>
+  return c.json({
+    items: trips.map((trip) =>
       serializeTrip(trip, {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
       })
-    )
-  );
+    ),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    },
+  });
 });
 
 /**

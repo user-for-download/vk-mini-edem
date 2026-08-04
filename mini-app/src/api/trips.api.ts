@@ -4,7 +4,20 @@ import type { Trip, CreateTripDto, TripFiltersDto } from "@edem/contracts";
 
 export type SearchTripsFilters = TripFiltersDto & {
   q?: string;
+  page?: number;
+  limit?: number;
 };
+
+export interface PaginatedTripsResponse {
+  items: Trip[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
 
 export type MyTrip = Trip & {
   bookedSeats?: number[];
@@ -12,7 +25,7 @@ export type MyTrip = Trip & {
 };
 
 export const tripsApi = {
-  getTrips: (filters?: SearchTripsFilters): Promise<Trip[]> => {
+  getTrips: (filters?: SearchTripsFilters): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
 
     if (filters?.q) query.set("q", filters.q);
@@ -20,10 +33,12 @@ export const tripsApi = {
     if (filters?.toCity) query.set("toCity", filters.toCity);
     if (filters?.dateFrom) query.set("dateFrom", filters.dateFrom);
     if (filters?.maxPrice) query.set("maxPrice", filters.maxPrice.toString());
+    if (filters?.page) query.set("page", filters.page.toString());
+    if (filters?.limit) query.set("limit", filters.limit.toString());
 
     const queryString = query.toString() ? `?${query.toString()}` : "";
 
-    return apiClient.request<Trip[]>(`/trips${queryString}`);
+    return apiClient.request<PaginatedTripsResponse>(`/trips${queryString}`);
   },
 
   getMyTrips: (): Promise<MyTrip[]> => {

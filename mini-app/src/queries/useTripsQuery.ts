@@ -18,7 +18,10 @@ export function useTripsQuery(filters?: SearchTripsFilters) {
     queryKey: TRIP_KEYS.list(filters),
     queryFn: async () => {
       const res = await tripsApi.getTrips(filters);
-      return res as unknown as Trip[];
+      return {
+        ...res,
+        items: res.items as unknown as Trip[],
+      };
     },
     staleTime: 30_000,
   });

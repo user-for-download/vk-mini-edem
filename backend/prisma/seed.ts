@@ -1,9 +1,10 @@
+// backend/prisma/seed.ts
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding database...");
+  console.log("Seeding database with rich mock data...");
 
   // Clean old records
   await prisma.review.deleteMany();
@@ -76,7 +77,43 @@ async function main() {
     },
   });
 
+  const user4 = await prisma.user.create({
+    data: {
+      id: "u-4",
+      vkUserId: 100004,
+      name: "Елена Смирнова",
+      avatar: "https://i.pravatar.cc/200?img=45",
+      rating: 4.7,
+      reviewsCount: 9,
+      tripsCount: 14,
+      isVerified: false,
+      about: "Пассажир, часто езжу по делам в соседние города.",
+    },
+  });
+
   // Create Trips
+  // Past trip (completed, for reviews)
+  const tripPast = await prisma.trip.create({
+    data: {
+      id: "t-past",
+      driverId: user1.id,
+      fromCity: "Москва",
+      fromAddress: "м. Калужская",
+      toCity: "Тула",
+      toAddress: "Центр",
+      departureAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      durationMinutes: 140,
+      distanceKm: 185,
+      price: 650,
+      seatsTotal: 4,
+      seatsAvailable: 0,
+      status: "completed",
+      tags: JSON.stringify(["Тихая поездка", "С остановками"]),
+      comment: "Отличная поездка в Тулу и обратно.",
+    },
+  });
+
+  // Future active trips
   const trip1 = await prisma.trip.create({
     data: {
       id: "t-1",
@@ -85,7 +122,7 @@ async function main() {
       fromAddress: "м. Тёплый Стан",
       toCity: "Санкт-Петербург",
       toAddress: "м. Московская",
-      departureAt: new Date("2025-08-10T09:30:00Z"),
+      departureAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // in 3 days
       durationMinutes: 470,
       distanceKm: 705,
       price: 1450,
@@ -104,7 +141,7 @@ async function main() {
       fromAddress: "м. ВДНХ",
       toCity: "Ярославль",
       toAddress: "Ж/д вокзал Главный",
-      departureAt: new Date("2025-08-10T14:00:00Z"),
+      departureAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // in 5 days
       durationMinutes: 210,
       distanceKm: 265,
       price: 750,
@@ -115,7 +152,37 @@ async function main() {
     },
   });
 
+  const trip3 = await prisma.trip.create({
+    data: {
+      id: "t-3",
+      driverId: user3.id,
+      fromCity: "Нижний Новгород",
+      fromAddress: "Московский вокзал",
+      toCity: "Москва",
+      toAddress: "м. Нижняя Масловка",
+      departureAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // in 2 days
+      durationMinutes: 320,
+      distanceKm: 420,
+      price: 1100,
+      seatsTotal: 4,
+      seatsAvailable: 3,
+      tags: JSON.stringify(["Только девушки", "С остановками"]),
+      comment: "Комфортный кроссовер, климат-контроль.",
+    },
+  });
+
   // Create Bookings
+  await prisma.booking.create({
+    data: {
+      id: "b-past",
+      tripId: tripPast.id,
+      passengerId: user4.id,
+      seat: 1,
+      status: "confirmed",
+      comment: "Спасибо за поездку!",
+    },
+  });
+
   await prisma.booking.create({
     data: {
       id: "b-1",
@@ -131,10 +198,21 @@ async function main() {
     data: {
       id: "b-2",
       tripId: trip2.id,
-      passengerId: user3.id,
+      passengerId: user4.id,
+      seat: 2,
+      status: "pending",
+      comment: "Возьмете небольшую сумку?",
+    },
+  });
+
+  await prisma.booking.create({
+    data: {
+      id: "b-3",
+      tripId: trip3.id,
+      passengerId: user2.id,
       seat: 1,
       status: "confirmed",
-      comment: "Тестовая поездка для отзыва.",
+      comment: "Отлично, едем!",
     },
   });
 
@@ -148,11 +226,24 @@ async function main() {
       rating: 5,
       text: "Отличный водитель, доехали комфортно и точно в срок!",
       tripRoute: "Москва → Санкт-Петербург",
-      tripId: trip1.id,
+      tripId: tripPast.id,
     },
   });
 
-  console.log("Seeding complete!");
+  await prisma.review.create({
+    data: {
+      id: "r-2",
+      authorId: user4.id,
+      targetUserId: user2.id,
+      targetRole: "driver",
+      rating: 5,
+      text: "Прекрасная поездка, очень приятный водитель.",
+      tripRoute: "Москва → Ярославль",
+      tripId: tripPast.id,
+    },
+  });
+
+  console.log("Seeding rich mock data complete!");
 }
 
 main()

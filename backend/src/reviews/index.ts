@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { createReviewDtoSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
+import { logger } from "../logger.js";
 
 type ReviewWithAuthor = Prisma.ReviewGetPayload<{
   include: {
@@ -436,8 +437,22 @@ reviewsRouter.post("/", requireUser, async (c) => {
     return c.json({ message: "Trip is cancelled" }, 400);
   }
 
-  if (trip.departureAt > new Date()) {
-    return c.json({ message: "Trip has not started yet" }, 400);
+  const now = new Date();
+  const isTripCompleted = trip.status === "completed";
+  const isTripPast = trip.departureAt <= now;
+
+  if (!isTripCompleted && !isTripPast) {
+    return c.json(
+      { message: "Trip has not started or completed yet" },
+      400
+    );
+  }
+
+  if (trip.status === "active" && isTripPast) {
+    logger.warn(
+      { tripId: trip.id },
+      "Review for non-completed past trip"
+    );
   }
 
   /**
@@ -549,7 +564,14 @@ reviewsRouter.post("/", requireUser, async (c) => {
 
     return c.json(serializeReview(review), 201);
   } catch (error) {
-    console.error("[Reviews] Create review failed:", error);
+    logger.error(
+      {
+        err: error,
+        endpoint: "POST /api/reviews",
+      },
+      "review_create_failed"
+    );
+
     return c.json({ message: "Internal server error" }, 500);
   }
 });

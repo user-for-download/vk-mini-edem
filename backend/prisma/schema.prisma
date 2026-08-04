@@ -60,6 +60,10 @@ model Trip {
   driver          User      @relation("DriverTrips", fields: [driverId], references: [id])
   bookings        Booking[]
   reviews         Review[]
+
+  @@index([status, departureAt(sort: Asc)])
+  @@index([driverId, status])
+  @@index([fromCity, toCity, status])
 }
 
 model Booking {
@@ -73,6 +77,10 @@ model Booking {
 
   trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   passenger   User     @relation("PassengerBookings", fields: [passengerId], references: [id])
+
+  @@index([tripId, status])
+  @@index([passengerId, status])
+  @@index([tripId, seat, status])
 }
 
 model Review {
@@ -90,4 +98,7 @@ model Review {
 
   author       User     @relation("AuthorReviews", fields: [authorId], references: [id])
   targetUser   User     @relation("TargetReviews", fields: [targetUserId], references: [id])
+
+  @@index([targetUserId, createdAt(sort: Desc)])
+  @@index([authorId, tripId])
 }

@@ -40,6 +40,10 @@ export async function signRefreshToken(userId: string): Promise<string> {
 export async function verifyAccessToken(token: string): Promise<string> {
   // Support mock access tokens in test/development if ALLOW_DEV_AUTH is true
   if (env.ALLOW_DEV_AUTH && token.startsWith("mock-access-token-")) {
+    console.warn(
+      "[Auth] DEV mock access token accepted. NODE_ENV:",
+      env.NODE_ENV
+    );
     return token.replace("mock-access-token-", "");
   }
 
@@ -58,6 +62,10 @@ export async function verifyAccessToken(token: string): Promise<string> {
 
 export async function verifyRefreshToken(token: string): Promise<string> {
   if (env.ALLOW_DEV_AUTH && token.startsWith("mock-refresh-token-")) {
+    console.warn(
+      "[Auth] DEV mock refresh token accepted. NODE_ENV:",
+      env.NODE_ENV
+    );
     return token.replace("mock-refresh-token-", "");
   }
 

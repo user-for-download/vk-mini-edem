@@ -87,14 +87,14 @@ export const env = {
     : process.env.CORS_ORIGINS ?? "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001",
 
   /**
-   * Dev-имитация разрешена только в development.
-   *
-   * По умолчанию в dev она включена, но ее можно выключить:
-   * ALLOW_DEV_AUTH=false
+   * Dev-имитация разрешена только в development/test (если ALLOW_DEV_AUTH=true).
+   * В production всегда false.
    */
-  ALLOW_DEV_AUTH: isProduction
-    ? false
-    : process.env.ALLOW_DEV_AUTH !== "false",
+  ALLOW_DEV_AUTH: (() => {
+    if (isProduction) return false;
+    if (process.env.VITEST) return true;
+    return process.env.ALLOW_DEV_AUTH !== "false";
+  })(),
 
   /**
    * JWT TTL.

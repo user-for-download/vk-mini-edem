@@ -86,6 +86,14 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const canBook = !isOwnTrip && isTripActive && !noSeats;
 
+  const departureTime = trip.departureAt ? Date.parse(trip.departureAt) : null;
+
+  const canCompleteTrip =
+    isOwnTrip &&
+    isTripActive &&
+    departureTime !== null &&
+    departureTime <= Date.now();
+
   const handleFooterClick = () => {
     if (!canBook) {
       return;
@@ -165,7 +173,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   };
 
   const handleCompleteTrip = () => {
-    if (!isOwnTrip || !isTripActive) {
+    if (!canCompleteTrip) {
       return;
     }
 
@@ -326,11 +334,24 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                 mode="primary"
                 stretched
                 loading={isCompletingTrip}
-                disabled={isCompletingTrip || isCancellingTrip}
+                disabled={!canCompleteTrip || isCompletingTrip || isCancellingTrip}
                 onClick={handleCompleteTrip}
               >
                 Завершить поездку
               </Button>
+
+              {!canCompleteTrip && (
+                <Caption
+                  level="1"
+                  style={{
+                    color: "var(--vkui--color_text_secondary)",
+                    marginTop: 8,
+                    textAlign: "center",
+                  }}
+                >
+                  Завершение будет доступно после времени отправления
+                </Caption>
+              )}
 
               <Spacing size={12} />
 

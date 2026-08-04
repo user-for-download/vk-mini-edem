@@ -6,6 +6,7 @@ import {
 } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
+import { logger } from "../logger.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
 
@@ -576,7 +577,14 @@ bookingsRouter.post("/", async (c) => {
       return c.json({ message: error.message }, error.status);
     }
 
-    console.error(error);
+    logger.error(
+      {
+        err: error,
+        endpoint: "POST /api/bookings",
+      },
+      "booking_create_failed"
+    );
+
     return c.json({ message: "Internal server error" }, 500);
   }
 });
@@ -599,40 +607,40 @@ bookingsRouter.patch("/:id/status", async (c) => {
 
   const newStatus = parseResult.data.status;
 
-  const booking = await db.booking.findUnique({
-    where: { id },
-    include: {
-      trip: {
+  try {
+    const updated = await db.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id },
         include: {
-          driver: {
+          trip: {
+            include: {
+              driver: {
+                include: {
+                  car: true,
+                },
+              },
+            },
+          },
+          passenger: {
             include: {
               car: true,
             },
           },
         },
-      },
-      passenger: {
-        include: {
-          car: true,
-        },
-      },
-    },
-  });
+      });
 
-  if (!booking) {
-    return c.json({ message: "Booking not found" }, 404);
-  }
+      if (!booking) {
+        throw new BookingError("Booking not found", 404);
+      }
 
-  if (booking.trip.driverId !== user.id) {
-    return c.json({ message: "Forbidden" }, 403);
-  }
+      if (booking.trip.driverId !== user.id) {
+        throw new BookingError("Forbidden", 403);
+      }
 
-  if (booking.status === newStatus) {
-    return c.json(serializeBooking(booking));
-  }
+      if (booking.status === newStatus) {
+        return booking;
+      }
 
-  try {
-    const updated = await db.$transaction(async (tx) => {
       const trip = await tx.trip.findUnique({
         where: { id: booking.tripId },
       });
@@ -753,7 +761,14 @@ bookingsRouter.patch("/:id/status", async (c) => {
       return c.json({ message: error.message }, error.status);
     }
 
-    console.error(error);
+    logger.error(
+      {
+        err: error,
+        endpoint: "PATCH /api/bookings/:id/status",
+      },
+      "booking_status_update_failed"
+    );
+
     return c.json({ message: "Internal server error" }, 500);
   }
 });
@@ -796,6 +811,13 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
         throw new BookingError("Trip is not active", 400);
       }
 
+      if (booking.trip.departureAt <= new Date()) {
+        throw new BookingError(
+          "Cannot cancel booking after trip departure",
+          400
+        );
+      }
+
       await tx.trip.update({
         where: { id: booking.tripId },
         data: {
@@ -820,7 +842,14 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       return c.json({ message: error.message }, error.status);
     }
 
-    console.error("[Bookings] Cancel booking failed:", error);
+    logger.error(
+      {
+        err: error,
+        endpoint: "PATCH /api/bookings/:id/cancel",
+      },
+      "booking_cancel_failed"
+    );
+
     return c.json({ message: "Internal server error" }, 500);
   }
 });

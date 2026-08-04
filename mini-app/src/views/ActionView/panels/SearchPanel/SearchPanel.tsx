@@ -122,7 +122,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
   } = useTripsQuery(filters);
 
   const results = useMemo(() => {
-    const trips = data ?? [];
+    const trips = data?.items ?? [];
 
     /**
      * Исключаем собственные поездки текущего пользователя,

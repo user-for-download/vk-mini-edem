@@ -29,6 +29,10 @@ export function verifyVkSignature(payload: VkAuthPayload): boolean {
    * - sign === "dev-sign" или "test-sign".
    */
   if (env.ALLOW_DEV_AUTH && (payload.sign === "dev-sign" || payload.sign === "test-sign")) {
+    console.warn(
+      "[Auth] DEV signature bypass accepted. NODE_ENV:",
+      env.NODE_ENV
+    );
     return true;
   }
 

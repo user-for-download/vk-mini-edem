@@ -58,8 +58,16 @@ async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string; ts:
   }
 
   if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
-    // Fallback in dev/mock environment if VK bridge doesn't supply id
-    vkUserId = 100001;
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[Auth] DEV fallback: vkUserId not available, using mock 100001"
+      );
+      vkUserId = 100001;
+    } else {
+      throw new Error(
+        "Не удалось получить идентификатор пользователя ВКонтакте"
+      );
+    }
   }
 
   return {
@@ -113,7 +121,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         apiClient.setToken(null);
 
         set({
-          status: "error",
+          status: "unauthenticated",
           user: null,
           session: null,
         });
