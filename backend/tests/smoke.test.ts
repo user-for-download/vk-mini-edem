@@ -89,7 +89,7 @@ describe("trips", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: ["Есть багаж"],
+        tags: JSON.stringify(["Есть багаж"]),
       },
     });
 
@@ -106,7 +106,7 @@ describe("trips", () => {
         price: 800,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: [],
+        tags: JSON.stringify([]),
         status: "cancelled",
       },
     });
@@ -115,16 +115,18 @@ describe("trips", () => {
 
     expect(response.status).toBe(200);
 
-    const trips = (await response.json()) as Array<{
-      fromCity: string;
-      toCity: string;
-      status: string;
-    }>;
+    const body = (await response.json()) as {
+      items: Array<{
+        fromCity: string;
+        toCity: string;
+        status: string;
+      }>;
+    };
 
-    expect(trips.length).toBe(1);
-    expect(trips[0].fromCity).toBe("Москва");
-    expect(trips[0].toCity).toBe("Тула");
-    expect(trips[0].status).toBe("active");
+    expect(body.items.length).toBe(1);
+    expect(body.items[0].fromCity).toBe("Москва");
+    expect(body.items[0].toCity).toBe("Тула");
+    expect(body.items[0].status).toBe("active");
   });
 });
 
@@ -161,7 +163,7 @@ describe("bookings smoke", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 2,
-        tags: [],
+        tags: JSON.stringify([]),
       },
     });
 

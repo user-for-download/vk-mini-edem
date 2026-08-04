@@ -101,7 +101,7 @@ export function serializeTrip(
     seatsTotal: trip.seatsTotal,
     seatsAvailable: trip.seatsAvailable,
     driver: serializeUser(trip.driver),
-    tags: trip.tags,
+    tags: JSON.parse(trip.tags || "[]"),
     comment: trip.comment ?? undefined,
     status: trip.status as TripStatus,
     bookedSeats: options?.bookedSeats ?? [],
