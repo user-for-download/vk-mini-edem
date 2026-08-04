@@ -1,0 +1,93 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  vkUserId     Int?      @unique
+  name         String
+  avatar       String
+  rating       Float     @default(5.0)
+  reviewsCount Int       @default(0)
+  tripsCount   Int       @default(0)
+  isVerified   Boolean   @default(false)
+  about        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  car          Car?
+  driverTrips  Trip[]    @relation("DriverTrips")
+  bookings     Booking[] @relation("PassengerBookings")
+  reviewsGiven Review[]  @relation("AuthorReviews")
+  reviewsRecv  Review[]  @relation("TargetReviews")
+}
+
+model Car {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  model     String
+  color     String
+  plate     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Trip {
+  id              String    @id @default(uuid())
+  driverId        String
+  fromCity        String
+  fromAddress     String
+  toCity          String
+  toAddress       String
+  departureAt     DateTime
+  durationMinutes Int
+  distanceKm      Float
+  price           Int
+  seatsTotal      Int
+  seatsAvailable  Int
+  tags            String    // JSON or comma-separated list
+  comment         String?
+  status          String    @default("active") // active, cancelled, completed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  driver          User      @relation("DriverTrips", fields: [driverId], references: [id])
+  bookings        Booking[]
+  reviews         Review[]
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  tripId      String
+  passengerId String
+  seat        Int
+  status      String   @default("pending") // pending, confirmed, declined
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  passenger   User     @relation("PassengerBookings", fields: [passengerId], references: [id])
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  authorId     String
+  targetUserId String
+  targetRole   String   // passenger, driver
+  rating       Int
+  text         String
+  tripRoute    String
+  createdAt    DateTime @default(now())
+
+  tripId       String?
+  trip         Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  author       User     @relation("AuthorReviews", fields: [authorId], references: [id])
+  targetUser   User     @relation("TargetReviews", fields: [targetUserId], references: [id])
+}

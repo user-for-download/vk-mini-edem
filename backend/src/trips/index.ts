@@ -1,0 +1,504 @@
+// backend/src/trips/index.ts
+import { Hono } from "hono";
+import type { Prisma } from "@prisma/client";
+import { createTripDtoSchema } from "@edem/contracts";
+import { db } from "../db.js";
+import { requireUser, type AuthEnv } from "../auth/middleware.js";
+
+type UserWithCar = Prisma.UserGetPayload<{
+  include: {
+    car: true;
+  };
+}>;
+
+type TripWithDriver = Prisma.TripGetPayload<{
+  include: {
+    driver: {
+      include: {
+        car: true;
+      };
+    };
+  };
+}>;
+
+function safeParseTags(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return [];
+  }
+}
+
+function serializeUser(user: UserWithCar) {
+  return {
+    id: user.id,
+    name: user.name,
+    avatar: user.avatar,
+    rating: user.rating,
+    reviewsCount: user.reviewsCount,
+    tripsCount: user.tripsCount,
+    isVerified: user.isVerified,
+    car: user.car
+      ? {
+          model: user.car.model,
+          color: user.car.color,
+          plate: user.car.plate,
+        }
+      : undefined,
+    about: user.about ?? undefined,
+  };
+}
+
+function serializeTrip(
+  trip: TripWithDriver,
+  options?: {
+    bookedSeats?: number[];
+    pendingRequestsCount?: number;
+  }
+) {
+  return {
+    id: trip.id,
+    fromCity: trip.fromCity,
+    fromAddress: trip.fromAddress,
+    toCity: trip.toCity,
+    toAddress: trip.toAddress,
+    date: new Date(trip.departureAt).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      weekday: "short",
+    }),
+    time: new Date(trip.departureAt).toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    durationMinutes: trip.durationMinutes,
+    distanceKm: trip.distanceKm,
+    price: trip.price,
+    seatsTotal: trip.seatsTotal,
+    seatsAvailable: trip.seatsAvailable,
+    driver: serializeUser(trip.driver),
+    tags: safeParseTags(trip.tags),
+    comment: trip.comment ?? undefined,
+    status: trip.status as "active" | "cancelled" | "completed",
+
+    bookedSeats: options?.bookedSeats ?? [],
+    pendingRequestsCount: options?.pendingRequestsCount,
+  };
+}
+
+async function getActiveBookingSeatsByTripIds(
+  tripIds: string[]
+): Promise<Map<string, number[]>> {
+  const map = new Map<string, number[]>();
+
+  if (tripIds.length === 0) {
+    return map;
+  }
+
+  const bookings = await db.booking.findMany({
+    where: {
+      tripId: {
+        in: tripIds,
+      },
+      status: {
+        in: ["pending", "confirmed"],
+      },
+    },
+    select: {
+      tripId: true,
+      seat: true,
+    },
+  });
+
+  for (const booking of bookings) {
+    const seats = map.get(booking.tripId) ?? [];
+    seats.push(booking.seat);
+    map.set(booking.tripId, seats);
+  }
+
+  return map;
+}
+
+export const tripsRouter = new Hono<AuthEnv>();
+
+/**
+ * Публичный список активных поездок.
+ */
+tripsRouter.get("/", async (c) => {
+  const q = c.req.query("q");
+  const fromCity = c.req.query("fromCity");
+  const toCity = c.req.query("toCity");
+  const maxPrice = c.req.query("maxPrice");
+
+  const where: Prisma.TripWhereInput = {
+    status: "active",
+  };
+
+  if (q) {
+    where.OR = [
+      { fromCity: { contains: q } },
+      { toCity: { contains: q } },
+      { fromAddress: { contains: q } },
+      { toAddress: { contains: q } },
+    ];
+  }
+
+  if (fromCity) {
+    where.fromCity = { contains: fromCity };
+  }
+
+  if (toCity) {
+    where.toCity = { contains: toCity };
+  }
+
+  if (maxPrice) {
+    const parsedMaxPrice = Number.parseInt(maxPrice, 10);
+
+    if (Number.isNaN(parsedMaxPrice)) {
+      return c.json({ message: "Invalid maxPrice" }, 400);
+    }
+
+    where.price = { lte: parsedMaxPrice };
+  }
+
+  const trips = await db.trip.findMany({
+    where,
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+    orderBy: {
+      departureAt: "asc",
+    },
+  });
+
+  const bookedSeatsMap = await getActiveBookingSeatsByTripIds(
+    trips.map((trip) => trip.id)
+  );
+
+  return c.json(
+    trips.map((trip) =>
+      serializeTrip(trip, {
+        bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
+      })
+    )
+  );
+});
+
+/**
+ * Поездки текущего пользователя как водителя.
+ * Важно: маршрут должен быть объявлен до /:id.
+ */
+tripsRouter.get("/my", requireUser, async (c) => {
+  const user = c.get("user");
+
+  const trips = await db.trip.findMany({
+    where: {
+      driverId: user.id,
+    },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+    orderBy: {
+      departureAt: "desc",
+    },
+  });
+
+  if (trips.length === 0) {
+    return c.json([]);
+  }
+
+  const tripIds = trips.map((trip) => trip.id);
+
+  const bookings = await db.booking.findMany({
+    where: {
+      tripId: {
+        in: tripIds,
+      },
+    },
+    select: {
+      tripId: true,
+      seat: true,
+      status: true,
+    },
+  });
+
+  const bookedSeatsMap = new Map<string, number[]>();
+  const pendingCountMap = new Map<string, number>();
+
+  for (const booking of bookings) {
+    if (booking.status === "pending") {
+      pendingCountMap.set(
+        booking.tripId,
+        (pendingCountMap.get(booking.tripId) ?? 0) + 1
+      );
+    }
+
+    if (booking.status === "pending" || booking.status === "confirmed") {
+      const seats = bookedSeatsMap.get(booking.tripId) ?? [];
+      seats.push(booking.seat);
+      bookedSeatsMap.set(booking.tripId, seats);
+    }
+  }
+
+  return c.json(
+    trips.map((trip) =>
+      serializeTrip(trip, {
+        bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
+        pendingRequestsCount: pendingCountMap.get(trip.id) ?? 0,
+      })
+    )
+  );
+});
+
+/**
+ * Детали поездки.
+ * Возвращаем bookedSeats, чтобы фронт мог корректно рисовать SeatScheme.
+ */
+tripsRouter.get("/:id", async (c) => {
+  const id = c.req.param("id");
+
+  const trip = await db.trip.findUnique({
+    where: { id },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+  });
+
+  if (!trip) {
+    return c.json({ message: "Trip not found" }, 404);
+  }
+
+  const activeBookings = await db.booking.findMany({
+    where: {
+      tripId: trip.id,
+      status: {
+        in: ["pending", "confirmed"],
+      },
+    },
+    select: {
+      seat: true,
+    },
+  });
+
+  return c.json(
+    serializeTrip(trip, {
+      bookedSeats: activeBookings.map((booking) => booking.seat),
+    })
+  );
+});
+
+/**
+ * Создание поездки текущим пользователем.
+ */
+tripsRouter.post("/", requireUser, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parseResult = createTripDtoSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return c.json(
+      { message: "Invalid payload", errors: parseResult.error.format() },
+      400
+    );
+  }
+
+  const dto = parseResult.data;
+  const driver = c.get("user");
+
+  const created = await db.trip.create({
+    data: {
+      driverId: driver.id,
+      fromCity: dto.fromCity,
+      fromAddress: dto.fromAddress,
+      toCity: dto.toCity,
+      toAddress: dto.toAddress,
+      departureAt: new Date(dto.departureAt),
+      durationMinutes: dto.durationMinutes,
+      distanceKm: dto.distanceKm,
+      price: dto.price,
+      seatsTotal: dto.seatsTotal,
+      seatsAvailable: dto.seatsTotal,
+      tags: JSON.stringify(dto.tags),
+      comment: dto.comment,
+    },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+  });
+
+  return c.json(
+    serializeTrip(created, {
+      bookedSeats: [],
+      pendingRequestsCount: 0,
+    }),
+    201
+  );
+});
+
+/**
+ * Отмена поездки водителем.
+ *
+ * Логика:
+ * - отменить может только водитель поездки;
+ * - отменить можно только active поездку;
+ * - все pending/confirmed брони становятся declined;
+ * - seatsAvailable обнуляется, так как поездка больше не доступна для бронирования.
+ */
+tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+
+  const trip = await db.trip.findUnique({
+    where: { id },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+  });
+
+  if (!trip) {
+    return c.json({ message: "Trip not found" }, 404);
+  }
+
+  if (trip.driverId !== user.id) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  if (trip.status !== "active") {
+    return c.json({ message: "Trip is not active" }, 400);
+  }
+
+  const updated = await db.$transaction(async (tx) => {
+    await tx.booking.updateMany({
+      where: {
+        tripId: trip.id,
+        status: {
+          in: ["pending", "confirmed"],
+        },
+      },
+      data: {
+        status: "declined",
+      },
+    });
+
+    return tx.trip.update({
+      where: { id: trip.id },
+      data: {
+        status: "cancelled",
+        seatsAvailable: 0,
+      },
+      include: {
+        driver: {
+          include: {
+            car: true,
+          },
+        },
+      },
+    });
+  });
+
+  return c.json(
+    serializeTrip(updated, {
+      bookedSeats: [],
+      pendingRequestsCount: 0,
+    })
+  );
+});
+
+/**
+ * Завершение поездки водителем.
+ *
+ * Правила:
+ * - завершить может только водитель поездки;
+ * - поездка должна быть active;
+ * - по умолчанию завершить можно только поездку, которая уже началась;
+ * - force=1 позволяет завершить поездку раньше (полезно для dev/тестирования);
+ * - pending-заявки отклоняются;
+ * - confirmed-заявки остаются как история.
+ */
+tripsRouter.patch("/:id/complete", requireUser, async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const force = c.req.query("force") === "1";
+
+  const trip = await db.trip.findUnique({
+    where: { id },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+  });
+
+  if (!trip) {
+    return c.json({ message: "Trip not found" }, 404);
+  }
+
+  if (trip.driverId !== user.id) {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
+  if (trip.status !== "active") {
+    return c.json({ message: "Trip is not active" }, 400);
+  }
+
+  if (!force && trip.departureAt > new Date()) {
+    return c.json({ message: "Trip has not started yet" }, 400);
+  }
+
+  const updated = await db.$transaction(async (tx) => {
+    await tx.booking.updateMany({
+      where: {
+        tripId: trip.id,
+        status: "pending",
+      },
+      data: {
+        status: "declined",
+      },
+    });
+
+    return tx.trip.update({
+      where: { id: trip.id },
+      data: {
+        status: "completed",
+        seatsAvailable: 0,
+      },
+      include: {
+        driver: {
+          include: {
+            car: true,
+          },
+        },
+      },
+    });
+  });
+
+  return c.json(
+    serializeTrip(updated, {
+      bookedSeats: [],
+      pendingRequestsCount: 0,
+    })
+  );
+});
