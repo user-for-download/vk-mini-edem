@@ -1,13 +1,15 @@
-// mini-app/src/views/ActionView/panels/SearchPanel/SearchPanel.tsx
-import { useEffect, useMemo, useState, type FC } from "react";
-import { Box, Button, Group, Header, Panel, Search, Spacing } from "@vkontakte/vkui";
+import { useEffect, useMemo, useState, useRef, type FC } from "react";
+import { Box, Button, Caption, Group, Header, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
+import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { TagsScroll } from "@/components/TagsScroll";
+import { TRIP_TAGS } from "@/consts/tags";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useTripsQuery } from "@/queries/useTripsQuery";
+import { useInfiniteTripsQuery } from "@/queries/useTripsQuery";
 import type { SearchTripsFilters } from "@/api/trips.api";
 
 export interface SearchPanelProps {
@@ -15,16 +17,6 @@ export interface SearchPanelProps {
   onOpenTrip: (trip: Trip) => void;
 }
 
-/**
- * Ищем разделитель маршрута.
- *
- * Поддерживаем:
- * - стрелку: Москва → Тула
- * - тире/длинное тире с пробелами: Москва - Тула, Москва — Тула
- *
- * Важно: обычный дефис без пробелов не считаем разделителем,
- * чтобы не ломать названия городов вроде «Санкт-Петербург».
- */
 const ROUTE_SEPARATOR_REGEX = /→|\s+[-—–]\s+/;
 
 function useDebouncedValue<T>(value: T, delay = 400): T {
@@ -50,10 +42,6 @@ function parseSearchQuery(raw: string): SearchTripsFilters {
     return {};
   }
 
-  /**
-   * Если пользователь ввел маршрут с разделителем,
-   * разделяем на fromCity и toCity.
-   */
   if (ROUTE_SEPARATOR_REGEX.test(trimmed)) {
     const normalized = trimmed.replace(/\s+[-—–]\s+/g, "→");
     const parts = normalized.split("→").map((part) => part.trim());
@@ -74,62 +62,54 @@ function parseSearchQuery(raw: string): SearchTripsFilters {
     return filters;
   }
 
-  /**
-   * Если разделителя нет, отправляем единый поисковый запрос q.
-   *
-   * Например:
-   * - Москва
-   * - Санкт-Петербург
-   * - м. Тёплый Стан
-   */
   return {
     q: trimmed,
   };
 }
 
-/**
- * Реальный поиск поездок через GET /api/trips.
- *
- * Поддерживает:
- * - пустой запрос: показывает все активные поездки;
- * - одиночный запрос: отправляет q;
- * - маршрут с разделителем: отправляет fromCity/toCity.
- */
 export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
   const currentUser = useCurrentUser();
 
   const [searchValue, setSearchValue] = useState("");
-
+  const [selectedTags, setSelectedTags] = useState<TripTag[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchValue = useDebouncedValue(searchValue, 400);
 
   const filters = useMemo(() => {
     const parsedFilters = parseSearchQuery(debouncedSearchValue);
-
-    if (Object.keys(parsedFilters).length === 0) {
-      return undefined;
-    }
-
-    return parsedFilters;
-  }, [debouncedSearchValue]);
+    const result: SearchTripsFilters = { ...parsedFilters };
+    if (selectedTags.length > 0) result.tags = selectedTags;
+    if (dateFrom) result.dateFrom = dateFrom;
+    if (dateTo) result.dateTo = dateTo;
+    return Object.keys(result).length > 0 ? result : undefined;
+  }, [debouncedSearchValue, selectedTags, dateFrom, dateTo]);
 
   const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching,
-  } = useTripsQuery(filters);
+    data, isLoading, isError, error, refetch, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage,
+  } = useInfiniteTripsQuery(filters);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const results = useMemo(() => {
-    const trips = data?.items ?? [];
-
-    /**
-     * Исключаем собственные поездки текущего пользователя,
-     * если он является водителем.
-     */
-    return trips.filter((trip) => trip.driver.id !== currentUser.id);
-  }, [data, currentUser.id]);
+    const trips = data?.pages.flatMap((page) => page.items) ?? [];
+    return trips.filter((trip) => trip.driver.id !== currentUser?.id);
+  }, [data, currentUser?.id]);
 
   return (
     <Panel id={id}>
@@ -143,17 +123,31 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
             onChange={(e) => setSearchValue(e.target.value)}
           />
         </Box>
+        <Box padding="system" style={{ paddingTop: 0 }}>
+          <TagsScroll tags={TRIP_TAGS} selected={selectedTags} onChange={(next) => setSelectedTags(next as TripTag[])} />
+        </Box>
+        <Box padding="system" style={{ paddingTop: 0 }}>
+          <Button size="s" mode="tertiary" onClick={() => setShowFilters(!showFilters)}>
+            {showFilters ? "Скрыть фильтры" : "Больше фильтров"}
+          </Button>
+        </Box>
+        {showFilters && (
+          <Box padding="system" style={{ paddingTop: 0 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата от</Caption>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата до</Caption>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+            </div>
+          </Box>
+        )}
       </Group>
 
-      <Group
-        header={
-          !isLoading && !isError ? (
-            <Header size="s">
-              {isFetching ? "Ищем поездки..." : `Найдено поездок: ${results.length}`}
-            </Header>
-          ) : undefined
-        }
-      >
+      <Group>
         {isLoading && results.length === 0 && (
           <Box
             padding="system"
@@ -185,7 +179,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
           />
         )}
 
-        {!isLoading && !isError && results.length > 0 && (
+        {results.length > 0 && (
           <Box
             padding="system"
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -194,6 +188,8 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
             {results.map((trip) => (
               <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
             ))}
+            <div ref={sentinelRef} style={{ height: 1 }} />
+            {isFetchingNextPage && <TripCardSkeleton />}
           </Box>
         )}
 

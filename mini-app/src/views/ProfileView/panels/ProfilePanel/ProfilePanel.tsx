@@ -41,6 +41,16 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 }) => {
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
+
+  if (!currentUser) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader>Профиль</AppPanelHeader>
+        <Box padding="system"><Text>Загрузка профиля...</Text></Box>
+      </Panel>
+    );
+  }
+
   const routeNavigator = useRouteNavigator();
 
   const {

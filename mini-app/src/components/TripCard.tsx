@@ -1,5 +1,5 @@
 // mini-app/src/components/TripCard.tsx
-import { type FC } from "react";
+import { type FC, type KeyboardEvent } from "react";
 import { Avatar, Box, Card, Caption, Spacing, Text, Title } from "@vkontakte/vkui";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -18,11 +18,31 @@ export const TripCard: FC<TripCardProps> = ({
   requestsCount = 0,
   hideSeats = false,
 }) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen?.(trip);
+    }
+  };
+
+  const isInteractive = Boolean(onOpen);
+
   return (
     <Card
       mode="shadow"
-      onClick={() => onOpen?.(trip)}
-      style={{ cursor: "pointer" }}
+      onClick={isInteractive ? () => onOpen?.(trip) : undefined}
+      onKeyDown={isInteractive ? handleKeyDown : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      role={isInteractive ? "button" : undefined}
+      aria-label={
+        isInteractive
+          ? `Поездка ${trip.fromCity} — ${trip.toCity}, ${trip.date} в ${trip.time}, ${trip.price} рублей`
+          : undefined
+      }
+      style={{
+        cursor: isInteractive ? "pointer" : "default",
+        outline: "none",
+      }}
     >
       <Box padding="system">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>

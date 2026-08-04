@@ -6,6 +6,9 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeTrip, serializeReview, type TripWithDriver } from "../serializers/index.js";
+import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { ERROR_CODES } from "../errors.js";
+import { logBusinessEvent } from "../logger/business.js";
 
 export const reviewsRouter = new Hono<AuthEnv>();
 
@@ -120,7 +123,7 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
 /**
  * Публичный список отзывов о пользователе.
  */
-reviewsRouter.get("/user/:userId", async (c) => {
+reviewsRouter.get("/user/:userId", publicReadLimiter, async (c) => {
   const userId = c.req.param("userId");
 
   const targetUser = await db.user.findUnique({
@@ -159,7 +162,7 @@ reviewsRouter.get("/user/:userId", async (c) => {
  * - нельзя оставить повторный отзыв тому же пользователю по той же поездке;
  * - после создания отзыва пересчитываются rating и reviewsCount.
  */
-reviewsRouter.post("/", requireUser, async (c) => {
+reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = createReviewDtoSchema.safeParse(body);
 
@@ -175,7 +178,7 @@ reviewsRouter.post("/", requireUser, async (c) => {
   const author = c.get("user");
 
   if (author.id === targetUserId) {
-    return c.json({ message: "Cannot review yourself" }, 400);
+    return c.json({ code: ERROR_CODES.SELF_REVIEW, message: "Cannot review yourself" }, 400);
   }
 
   const [targetUser, trip] = await Promise.all([
@@ -188,15 +191,15 @@ reviewsRouter.post("/", requireUser, async (c) => {
   ]);
 
   if (!targetUser) {
-    return c.json({ message: "Target user not found" }, 404);
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Target user not found" }, 404);
   }
 
   if (!trip) {
-    return c.json({ message: "Trip not found" }, 404);
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
   }
 
   if (trip.status === "cancelled") {
-    return c.json({ message: "Trip is cancelled" }, 400);
+    return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is cancelled" }, 400);
   }
 
   const now = new Date();
@@ -233,7 +236,7 @@ reviewsRouter.post("/", requireUser, async (c) => {
 
     if (!authorBooking) {
       return c.json(
-        { message: "You did not participate in this trip" },
+        { code: ERROR_CODES.NOT_PARTICIPANT, message: "You did not participate in this trip" },
         403
       );
     }
@@ -255,7 +258,7 @@ reviewsRouter.post("/", requireUser, async (c) => {
 
     if (!targetBooking) {
       return c.json(
-        { message: "Target user did not participate in this trip" },
+        { code: ERROR_CODES.VALIDATION_FAILED, message: "Target user did not participate in this trip" },
         400
       );
     }
@@ -277,13 +280,14 @@ reviewsRouter.post("/", requireUser, async (c) => {
 
   if (existingReview) {
     return c.json(
-      { message: "You already reviewed this user for this trip" },
+      { code: ERROR_CODES.ALREADY_REVIEWED, message: "You already reviewed this user for this trip" },
       409
     );
   }
 
   try {
     const review = await db.$transaction(async (tx) => {
+      // ... transaction logic
       const created = await tx.review.create({
         data: {
           authorId: author.id,
@@ -322,6 +326,14 @@ reviewsRouter.post("/", requireUser, async (c) => {
       });
 
       return created;
+    });
+
+    logBusinessEvent("review.created", {
+      reviewId: review.id,
+      authorId: author.id,
+      targetUserId,
+      rating,
+      tripId: trip.id,
     });
 
     return c.json(serializeReview(review), 201);

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import vkBridge, { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
+import { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
+import { bridge } from "@/helpers/bridge";
 import type { User } from "@/types";
 import { authApi } from "@/api/auth.api";
 import { apiClient } from "@/api/client";
@@ -55,7 +56,7 @@ async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string; ts:
 
   if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
     try {
-      const userInfo = await vkBridge.send("VKWebAppGetUserInfo");
+      const userInfo = await bridge.send("VKWebAppGetUserInfo");
       vkUserId = Number(userInfo.id);
     } catch {
       // ignore

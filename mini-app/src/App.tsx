@@ -28,8 +28,12 @@ import { HomeView } from "@/views/HomeView/HomeView";
 import { ActionView } from "@/views/ActionView/ActionView";
 import { ProfileView } from "@/views/ProfileView/ProfileView";
 import { useSwipeBackSync } from "@/hooks/useSwipeBackSync";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { parseDeepLink } from "@/helpers/deepLink";
 
 export default function App() {
+  const { isOnline, wasOffline } = useOnlineStatus();
   const [role, setRole] = useState<Role>(() => {
     try {
       const storedRole = localStorage.getItem("edem-role");
@@ -52,6 +56,20 @@ export default function App() {
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
 
+  useEffect(() => {
+    const deepLink = parseDeepLink();
+
+    if (deepLink.tripId) {
+      routeNavigator.push(`/trips/${deepLink.tripId}`);
+      return;
+    }
+
+    if (deepLink.openHistory) {
+      routeNavigator.push("/bookings/history");
+      return;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeModal = routerModal || searchParams.get("modal") || null;
 
   const driverId = searchParams.get("driverId");
@@ -64,10 +82,9 @@ export default function App() {
 
   const closeModal = () => {
     setReviewTripState(null);
-    if (searchParams.has("modal")) {
+    if (searchParams.has("driverId") || searchParams.has("tripId")) {
       setSearchParams(
         (prev) => {
-          prev.delete("modal");
           prev.delete("driverId");
           prev.delete("tripId");
           return prev;
@@ -112,47 +129,27 @@ export default function App() {
 
   const openReviewForTrip = (trip: Trip) => {
     setReviewTripState(trip);
-    setSearchParams(
-      (prev) => {
-        prev.set("modal", MODAL_CREATE_REVIEW);
-        prev.set("tripId", trip.id);
-        return prev;
-      },
-      { replace: true }
-    );
+    setSearchParams((prev) => { prev.set("tripId", trip.id); return prev; }, { replace: true });
     routeNavigator.showModal(MODAL_CREATE_REVIEW);
   };
 
   const handleSelectReviewTrip = (trip: Trip) => {
     setReviewTripState(trip);
-    setSearchParams(
-      (prev) => {
-        prev.set("tripId", trip.id);
-        return prev;
-      },
-      { replace: true }
-    );
+    setSearchParams((prev) => { prev.set("tripId", trip.id); return prev; }, { replace: true });
     routeNavigator.showModal(MODAL_CREATE_REVIEW);
   };
 
   const openCarForm = () => {
-    setSearchParams((prev) => {
-      prev.set("modal", MODAL_CAR_FORM);
-      return prev;
-    });
     routeNavigator.showModal(MODAL_CAR_FORM);
   };
 
   const openEditProfile = () => {
-    setSearchParams((prev) => {
-      prev.set("modal", MODAL_EDIT_PROFILE);
-      return prev;
-    });
     routeNavigator.showModal(MODAL_EDIT_PROFILE);
   };
 
   return (
     <>
+      <OfflineBanner isOnline={isOnline} wasOffline={wasOffline} />
       <SplitLayout
         popout={routerPopout}
       >

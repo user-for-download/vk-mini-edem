@@ -1,7 +1,6 @@
 // mini-app/src/components/SeatScheme.tsx
 import { type FC } from "react";
-import { Button } from "@vkontakte/vkui";
-import { Icon28UserOutline } from "@vkontakte/icons";
+import { Caption } from "@vkontakte/vkui";
 
 export interface SeatSchemeProps {
   seatsTotal: number;
@@ -10,34 +9,59 @@ export interface SeatSchemeProps {
   onSelect: (seat: number | null) => void;
 }
 
-export const SeatScheme: FC<SeatSchemeProps> = ({
-  seatsTotal,
-  takenSeats,
-  selectedSeat,
-  onSelect,
-}) => {
-  return (
-    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-      {Array.from({ length: seatsTotal }, (_, i) => {
-        const seat = i + 1;
-        const isTaken = takenSeats.includes(seat);
-        const isSelected = selectedSeat === seat;
+export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, selectedSeat, onSelect }) => {
+  const frontSeats = seatsTotal >= 2 ? [1] : [];
+  const backSeats = seatsTotal >= 2
+    ? Array.from({ length: seatsTotal - 1 }, (_, i) => i + 2)
+    : Array.from({ length: seatsTotal }, (_, i) => i + 1);
 
-        return (
-          <Button
-            key={seat}
-            size="m"
-            mode={isSelected ? "primary" : isTaken ? "tertiary" : "secondary"}
-            disabled={isTaken}
-            before={<Icon28UserOutline />}
-            onClick={() => onSelect(isSelected ? null : seat)}
-            aria-label={isTaken ? `Место ${seat} занято` : `Выбрать место ${seat}`}
-            style={{ minWidth: 72 }}
-          >
-            {seat}
-          </Button>
-        );
-      })}
+  const renderSeat = (seat: number) => {
+    const isTaken = takenSeats.includes(seat);
+    const isSelected = selectedSeat === seat;
+    let className = "SeatScheme__seat";
+    if (isTaken) className += " SeatScheme__seat--taken";
+    if (isSelected) className += " SeatScheme__seat--selected";
+
+    return (
+      <button
+        key={seat}
+        type="button"
+        className={className}
+        disabled={isTaken}
+        onClick={() => onSelect(isSelected ? null : seat)}
+        aria-label={isTaken ? `Место ${seat} занято` : `Выбрать место ${seat}`}
+        aria-pressed={isSelected}
+      >
+        {seat}
+      </button>
+    );
+  };
+
+  return (
+    <div className="SeatScheme" role="radiogroup" aria-label="Выбор места">
+      <div className="SeatScheme__row">
+        <div className="SeatScheme__seat SeatScheme__seat--driver" aria-label="Водитель">🚗</div>
+        {frontSeats.map(renderSeat)}
+      </div>
+      {backSeats.length > 0 && (
+        <div className="SeatScheme__row SeatScheme__row--back">
+          {backSeats.map(renderSeat)}
+        </div>
+      )}
+      <div className="SeatScheme__legend">
+        <div className="SeatScheme__legendItem">
+          <div className="SeatScheme__legendDot" style={{ background: "var(--carpool_accent)" }} />
+          <Caption level="1">Выбрано</Caption>
+        </div>
+        <div className="SeatScheme__legendItem">
+          <div className="SeatScheme__legendDot" style={{ background: "var(--vkui--color_background_secondary)" }} />
+          <Caption level="1">Свободно</Caption>
+        </div>
+        <div className="SeatScheme__legendItem">
+          <div className="SeatScheme__legendDot" style={{ background: "var(--vkui--color_text_secondary)", opacity: 0.5 }} />
+          <Caption level="1">Занято</Caption>
+        </div>
+      </div>
     </div>
   );
 };

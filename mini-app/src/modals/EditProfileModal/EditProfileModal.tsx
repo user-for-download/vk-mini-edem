@@ -32,8 +32,8 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({
 }) => {
   const currentUser = useCurrentUser();
 
-  const [name, setName] = useState(currentUser.name);
-  const [about, setAbout] = useState(currentUser.about ?? "");
+  const [name, setName] = useState(currentUser?.name ?? "");
+  const [about, setAbout] = useState(currentUser?.about ?? "");
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -40,6 +40,18 @@ export const HomePanel: FC<HomePanelProps> = ({
 }) => {
   const currentUser = useCurrentUser();
 
+  if (!currentUser) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader>Едем</AppPanelHeader>
+        <Box padding="system" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <TripCardSkeleton />
+          <TripCardSkeleton />
+        </Box>
+      </Panel>
+    );
+  }
+
   const {
     data: tripsData,
     isLoading: tripsLoading,

@@ -1,6 +1,6 @@
 // mini-app/src/hooks/useSwipeBackSync.ts
 import { useEffect } from "react";
-import vkBridge from "@vkontakte/vk-bridge";
+import { bridge } from "@/helpers/bridge";
 import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 
 /**
@@ -10,7 +10,7 @@ export function useSwipeBackSync() {
   const routeNavigator = useRouteNavigator();
 
   useEffect(() => {
-    if (!vkBridge.isWebView?.()) {
+    if (!bridge.isWebView?.()) {
       return;
     }
 

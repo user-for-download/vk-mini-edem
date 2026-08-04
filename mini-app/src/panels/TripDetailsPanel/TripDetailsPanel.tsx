@@ -14,6 +14,7 @@ import {
   Panel,
   PanelHeaderBack,
   Paragraph,
+  ScreenSpinner,
   Separator,
   Spacing,
   Text,
@@ -58,6 +59,15 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
+
+  if (!currentUser) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}>Поездка</AppPanelHeader>
+        <ScreenSpinner state="loading" />
+      </Panel>
+    );
+  }
 
   const createBooking = useCreateBookingMutation();
   const cancelTrip = useCancelTripMutation();

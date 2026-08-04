@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeUser } from "../serializers/index.js";
+import { publicReadLimiter } from "../middleware/rateLimit.js";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -131,7 +132,7 @@ usersRouter.patch("/me/car", requireUser, async (c) => {
 /**
  * Публичный профиль пользователя.
  */
-usersRouter.get("/:id", async (c) => {
+usersRouter.get("/:id", publicReadLimiter, async (c) => {
   const id = c.req.param("id");
 
   const user = await db.user.findUnique({

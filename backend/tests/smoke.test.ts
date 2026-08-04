@@ -89,7 +89,7 @@ describe("trips", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: JSON.stringify(["Есть багаж"]),
+        tags: ["Есть багаж"],
       },
     });
 
@@ -106,7 +106,7 @@ describe("trips", () => {
         price: 800,
         seatsTotal: 3,
         seatsAvailable: 3,
-        tags: JSON.stringify([]),
+        tags: [],
         status: "cancelled",
       },
     });
@@ -163,7 +163,7 @@ describe("bookings smoke", () => {
         price: 700,
         seatsTotal: 3,
         seatsAvailable: 2,
-        tags: JSON.stringify([]),
+        tags: [],
       },
     });
 

@@ -4,9 +4,13 @@ import type { Trip, CreateTripDto, TripFiltersDto } from "@edem/contracts";
 
 export type SearchTripsFilters = TripFiltersDto & {
   q?: string;
+  tags?: string[];
+  dateTo?: string;
   page?: number;
   limit?: number;
 };
+
+export type UpdateTripDto = Partial<CreateTripDto>;
 
 export interface PaginatedTripsResponse {
   items: Trip[];
@@ -32,13 +36,24 @@ export const tripsApi = {
     if (filters?.fromCity) query.set("fromCity", filters.fromCity);
     if (filters?.toCity) query.set("toCity", filters.toCity);
     if (filters?.dateFrom) query.set("dateFrom", filters.dateFrom);
+    if (filters?.dateTo) query.set("dateTo", filters.dateTo);
     if (filters?.maxPrice) query.set("maxPrice", filters.maxPrice.toString());
+    if (filters?.tags && filters.tags.length > 0) {
+      query.set("tags", filters.tags.join(","));
+    }
     if (filters?.page) query.set("page", filters.page.toString());
     if (filters?.limit) query.set("limit", filters.limit.toString());
 
     const queryString = query.toString() ? `?${query.toString()}` : "";
 
     return apiClient.request<PaginatedTripsResponse>(`/trips${queryString}`);
+  },
+
+  updateTrip: (id: string, data: UpdateTripDto): Promise<Trip> => {
+    return apiClient.request<Trip>(`/trips/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   },
 
   getMyTrips: (): Promise<MyTrip[]> => {

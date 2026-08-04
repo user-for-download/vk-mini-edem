@@ -1,5 +1,6 @@
 // backend/src/middleware/rateLimit.ts
 import type { Context, Next } from "hono";
+import { ERROR_CODES } from "../errors.js";
 
 interface RateLimiterOptions {
   windowMs: number;
@@ -57,7 +58,7 @@ export function createRateLimiter(options: RateLimiterOptions) {
     );
 
     if (bucket.timestamps.length >= options.max) {
-      return c.json({ message: "Too many requests" }, 429);
+      return c.json({ code: ERROR_CODES.RATE_LIMITED, message: "Too many requests" }, 429);
     }
 
     bucket.timestamps.push(now);
@@ -66,3 +67,25 @@ export function createRateLimiter(options: RateLimiterOptions) {
     return next();
   };
 }
+
+// ─── Пресеты лимитеров ──────────────────────────────────────────────────────
+
+/**
+ * Лимитер для публичных GET-эндпоинтов (поиск, профили, отзывы).
+ * 100 запросов в минуту с одного IP.
+ */
+export const publicReadLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 100,
+  keyPrefix: "public-read",
+});
+
+/**
+ * Лимитер для мутаций (создание поездок, броней, отзывов).
+ * 30 запросов в минуту с одного IP.
+ */
+export const mutationLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyPrefix: "mutation",
+});

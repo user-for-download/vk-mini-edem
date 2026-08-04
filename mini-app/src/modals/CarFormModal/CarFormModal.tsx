@@ -32,9 +32,9 @@ export const CarFormModal: FC<CarFormModalProps> = ({
   const currentUser = useCurrentUser();
 
   const [values, setValues] = useState<CarFormDto>({
-    model: currentUser.car?.model ?? "",
-    color: currentUser.car?.color ?? "",
-    plate: currentUser.car?.plate ?? "",
+    model: currentUser?.car?.model ?? "",
+    color: currentUser?.car?.color ?? "",
+    plate: currentUser?.car?.plate ?? "",
   });
 
   const [error, setError] = useState<string | null>(null);

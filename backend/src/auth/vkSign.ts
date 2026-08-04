@@ -1,6 +1,7 @@
 // backend/src/auth/vkSign.ts
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env.js";
+import { logger } from "../logger.js";
 
 const MAX_SIGN_AGE_MS = 5 * 60 * 1000;
 
@@ -32,9 +33,9 @@ export function verifyVkSignature(payload: VkAuthPayload): boolean {
     env.ALLOW_DEV_AUTH &&
     payload.sign === "dev-sign"
   ) {
-    console.warn(
-      "[Auth] DEV signature bypass accepted. NODE_ENV:",
-      env.NODE_ENV
+    logger.warn(
+      { env: env.NODE_ENV },
+      "[Auth] DEV signature bypass accepted"
     );
     return true;
   }

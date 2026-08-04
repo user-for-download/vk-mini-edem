@@ -2,8 +2,9 @@ import type { FC, PropsWithChildren } from "react";
 import { AdaptivityProvider, AppRoot, ConfigProvider } from "@vkontakte/vkui";
 import { RouterProvider } from "@vkontakte/vk-mini-apps-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import vkBridge, { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
+import { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
 import { useAppearance, useInsets, useAdaptivity } from "@vkontakte/vk-bridge-react";
+import { bridge } from "@/helpers/bridge";
 
 import { transformVKBridgeAdaptivity } from "@/helpers/transformVKBridgeAdaptivity";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -13,9 +14,15 @@ import { router } from "@/router";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        if (error instanceof Error && error.message.startsWith("HTTP error 4")) {
+          return false;
+        }
+        return failureCount < 2;
+      },
       refetchOnWindowFocus: false,
       staleTime: 60_000,
+      refetchOnReconnect: true,
     },
     mutations: {
       retry: 0,
@@ -34,8 +41,8 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
     <ConfigProvider
       colorScheme={vkBridgeColorScheme}
       platform={vk_platform === "desktop_web" ? "vkcom" : undefined}
-      isWebView={vkBridge.isWebView()}
-      hasCustomPanelHeaderAfter={vkBridge.isWebView()}
+      isWebView={bridge.isWebView()}
+      hasCustomPanelHeaderAfter={bridge.isWebView()}
     >
       <AdaptivityProvider {...vkBridgeAdaptivityProps}>
         <RouterProvider router={router}>

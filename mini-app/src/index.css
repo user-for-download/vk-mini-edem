@@ -7,7 +7,7 @@
 
 html {
   height: 100%;
-  overflow-y: overlay;
+  overflow-y: auto;
 }
 
 body, #root {
@@ -246,4 +246,11 @@ body {
 .BookingCollapse__inner {
   overflow: hidden;
   min-height: 0;
+}
+
+/* ---------- TripCard focus ---------- */
+.vkuiCard[role="button"]:focus-visible {
+  outline: 2px solid var(--carpool_accent);
+  outline-offset: 2px;
+  border-radius: 12px;
 }

@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: edem
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edem -d edem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://edem:${POSTGRES_PASSWORD}@db:5432/edem?schema=public&connection_limit=10
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      VK_APP_SECRET: ${VK_APP_SECRET:?VK_APP_SECRET is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ALLOW_DEV_AUTH: "false"
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

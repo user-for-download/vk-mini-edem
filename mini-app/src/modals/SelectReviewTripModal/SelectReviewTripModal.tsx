@@ -14,6 +14,7 @@ import {
 import { Icon24Cancel } from "@vkontakte/icons";
 import type { Trip } from "@/types";
 import { TripCard } from "@/components/TripCard";
+import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useAvailableReviewTripsQuery, useMyReviewsQuery } from "@/queries/useReviewsQuery";
 
@@ -74,10 +75,12 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
       {...restProps}
     >
       {isLoading && (
-        <Box padding="system">
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-            Загружаем поездки, доступные для отзыва...
-          </Text>
+        <Box
+          padding="system"
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          <TripCardSkeleton />
+          <TripCardSkeleton />
         </Box>
       )}
 

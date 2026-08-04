@@ -1,12 +1,14 @@
-import type { FC } from "react";
+import { useState, type FC } from "react";
 import {
   Avatar,
   Box,
+  Button,
   ModalCard,
   ModalCardProps,
   Separator,
   Spacing,
   Text,
+  ScreenSpinner,
 } from "@vkontakte/vkui";
 import { useSearchParams } from "@vkontakte/vk-mini-apps-router";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -35,6 +37,8 @@ export interface DriverProfileModalProps extends ModalCardProps {
  * - GET /api/users/:id
  * - GET /api/reviews/user/:userId
  */
+const REVIEWS_PAGE_SIZE = 5;
+
 export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   id,
   driverId: driverIdProp,
@@ -42,6 +46,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   ...restProps
 }) => {
   const [searchParams] = useSearchParams();
+  const [visibleReviewsCount, setVisibleReviewsCount] = useState(REVIEWS_PAGE_SIZE);
 
   const driverId = driverIdProp || searchParams.get("driverId") || "";
 
@@ -65,13 +70,10 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         id={id}
         onClose={onClose}
         title="Профиль водителя"
-        description="Загрузка профиля..."
         {...restProps}
       >
-        <Box padding="system" style={{ paddingTop: 0 }}>
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-            Загружаем данные водителя.
-          </Text>
+        <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
+          <ScreenSpinner state="loading" />
         </Box>
       </ModalCard>
     );
@@ -95,7 +97,9 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
     );
   }
 
-  const driverReviews = (reviews ?? []).slice(0, 2);
+  const allReviews = reviews ?? [];
+  const driverReviews = allReviews.slice(0, visibleReviewsCount);
+  const hasMoreReviews = allReviews.length > visibleReviewsCount;
 
   return (
     <ModalCard
@@ -149,6 +153,17 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
               <ReviewCard key={review.id} review={review} />
             ))}
           </div>
+          {hasMoreReviews && (
+            <Box padding="system" style={{ textAlign: "center" }}>
+              <Button
+                size="s"
+                mode="tertiary"
+                onClick={() => setVisibleReviewsCount((prev) => prev + REVIEWS_PAGE_SIZE)}
+              >
+                Показать ещё ({allReviews.length - visibleReviewsCount})
+              </Button>
+            </Box>
+          )}
         </>
       )}
     </ModalCard>

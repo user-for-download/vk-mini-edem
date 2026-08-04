@@ -10,7 +10,7 @@ import {
   Spacing,
   Text,
 } from "@vkontakte/vkui";
-import vkBridge from "@vkontakte/vk-bridge";
+import { bridge } from "@/helpers/bridge";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 
 export interface SupportPanelProps {
@@ -59,8 +59,8 @@ const FAQ_ITEMS = [
 
 function openExternalUrl(url: string) {
   try {
-    if (vkBridge.isWebView()) {
-      void (vkBridge.send as any)("VKWebAppOpenUrl", { url });
+    if (bridge.isWebView()) {
+      void (bridge.send as any)("VKWebAppOpenUrl", { url });
       return;
     }
   } catch {

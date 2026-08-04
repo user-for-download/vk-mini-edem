@@ -6,6 +6,9 @@ import { db } from "../db.js";
 import { logger } from "../logger.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeTrip } from "../serializers/index.js";
+import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { ERROR_CODES } from "../errors.js";
+import { logBusinessEvent } from "../logger/business.js";
 
 async function getActiveBookingSeatsByTripIds(
   tripIds: string[]
@@ -45,12 +48,14 @@ export const tripsRouter = new Hono<AuthEnv>();
 /**
  * Публичный список активных поездок.
  */
-tripsRouter.get("/", async (c) => {
+tripsRouter.get("/", publicReadLimiter, async (c) => {
   const q = c.req.query("q");
   const fromCity = c.req.query("fromCity");
   const toCity = c.req.query("toCity");
   const dateFrom = c.req.query("dateFrom");
+  const dateTo = c.req.query("dateTo");
   const maxPrice = c.req.query("maxPrice");
+  const tagsParam = c.req.query("tags");
   const pageParam = c.req.query("page");
   const limitParam = c.req.query("limit");
 
@@ -86,6 +91,24 @@ tripsRouter.get("/", async (c) => {
         ...(where.departureAt as object),
         gte: parsedDate,
       };
+    }
+  }
+
+  if (dateTo) {
+    const parsedDateTo = new Date(dateTo);
+    if (!Number.isNaN(parsedDateTo.getTime())) {
+      parsedDateTo.setHours(23, 59, 59, 999);
+      where.departureAt = {
+        ...(where.departureAt as object),
+        lte: parsedDateTo,
+      };
+    }
+  }
+
+  if (tagsParam) {
+    const tags = tagsParam.split(",").filter(Boolean);
+    if (tags.length > 0) {
+      where.tags = { hasEvery: tags };
     }
   }
 
@@ -212,7 +235,7 @@ tripsRouter.get("/my", requireUser, async (c) => {
  * Детали поездки.
  * Возвращаем bookedSeats, чтобы фронт мог корректно рисовать SeatScheme.
  */
-tripsRouter.get("/:id", async (c) => {
+tripsRouter.get("/:id", publicReadLimiter, async (c) => {
   const id = c.req.param("id");
 
   const trip = await db.trip.findUnique({
@@ -252,7 +275,7 @@ tripsRouter.get("/:id", async (c) => {
 /**
  * Создание поездки текущим пользователем.
  */
-tripsRouter.post("/", requireUser, async (c) => {
+tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = createTripDtoSchema.safeParse(body);
 
@@ -265,6 +288,23 @@ tripsRouter.post("/", requireUser, async (c) => {
 
   const dto = parseResult.data;
   const driver = c.get("user");
+
+  // Водитель должен иметь автомобиль
+  if (!driver.car) {
+    return c.json(
+      { code: ERROR_CODES.NO_CAR, message: "You must add a car before creating a trip" },
+      400
+    );
+  }
+
+  // Валидация: поездка не может быть в прошлом
+  const departureDate = new Date(dto.departureAt);
+  if (departureDate <= new Date()) {
+    return c.json(
+      { code: ERROR_CODES.TRIP_IN_PAST, message: "Departure time must be in the future" },
+      400
+    );
+  }
 
   const created = await db.trip.create({
     data: {
@@ -279,7 +319,7 @@ tripsRouter.post("/", requireUser, async (c) => {
       price: dto.price,
       seatsTotal: dto.seatsTotal,
       seatsAvailable: dto.seatsTotal,
-      tags: JSON.stringify(dto.tags),
+      tags: dto.tags,
       comment: dto.comment,
     },
     include: {
@@ -291,6 +331,13 @@ tripsRouter.post("/", requireUser, async (c) => {
     },
   });
 
+  logBusinessEvent("trip.created", {
+    tripId: created.id,
+    driverId: driver.id,
+    fromCity: dto.fromCity,
+    toCity: dto.toCity,
+  });
+
   return c.json(
     serializeTrip(created, {
       bookedSeats: [],
@@ -298,6 +345,67 @@ tripsRouter.post("/", requireUser, async (c) => {
     }),
     201
   );
+});
+
+tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => ({}));
+  
+  const updateTripSchema = createTripDtoSchema.partial();
+  const parseResult = updateTripSchema.safeParse(body);
+  if (!parseResult.success) {
+    return c.json({ message: "Invalid payload", errors: parseResult.error.format() }, 400);
+  }
+
+  const dto = parseResult.data;
+  const trip = await db.trip.findUnique({ where: { id } });
+
+  if (!trip) return c.json({ message: "Trip not found" }, 404);
+  if (trip.driverId !== user.id) return c.json({ message: "Forbidden" }, 403);
+  if (trip.status !== "active") return c.json({ message: "Trip is not active" }, 400);
+
+  if (dto.departureAt) {
+    const newDepartureAt = new Date(dto.departureAt);
+    if (newDepartureAt <= new Date()) {
+      return c.json({ message: "Departure time must be in the future" }, 400);
+    }
+  }
+
+  if (dto.seatsTotal !== undefined) {
+    const activeBookingsCount = await db.booking.count({
+      where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+    });
+    if (dto.seatsTotal < activeBookingsCount) {
+      return c.json({ message: `Cannot reduce seats below ${activeBookingsCount}` }, 400);
+    }
+  }
+
+  const updateData: Record<string, unknown> = {};
+  if (dto.fromCity !== undefined) updateData.fromCity = dto.fromCity;
+  if (dto.fromAddress !== undefined) updateData.fromAddress = dto.fromAddress;
+  if (dto.toCity !== undefined) updateData.toCity = dto.toCity;
+  if (dto.toAddress !== undefined) updateData.toAddress = dto.toAddress;
+  if (dto.departureAt !== undefined) updateData.departureAt = new Date(dto.departureAt);
+  if (dto.durationMinutes !== undefined) updateData.durationMinutes = dto.durationMinutes;
+  if (dto.distanceKm !== undefined) updateData.distanceKm = dto.distanceKm;
+  if (dto.price !== undefined) updateData.price = dto.price;
+  if (dto.tags !== undefined) updateData.tags = dto.tags;
+  if (dto.comment !== undefined) updateData.comment = dto.comment;
+
+  if (dto.seatsTotal !== undefined) {
+    const seatsDiff = dto.seatsTotal - trip.seatsTotal;
+    updateData.seatsTotal = dto.seatsTotal;
+    updateData.seatsAvailable = Math.max(0, trip.seatsAvailable + seatsDiff);
+  }
+
+  const updated = await db.trip.update({
+    where: { id },
+    data: updateData,
+    include: { driver: { include: { car: true } } },
+  });
+
+  return c.json(serializeTrip(updated));
 });
 
 /**
@@ -363,6 +471,11 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
         },
       },
     });
+  });
+
+  logBusinessEvent("trip.cancelled", {
+    tripId: trip.id,
+    driverId: user.id,
   });
 
   return c.json(
@@ -480,6 +593,12 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
         },
       },
     });
+  });
+
+  logBusinessEvent("trip.completed", {
+    tripId: trip.id,
+    driverId: user.id,
+    passengersCount: passengerIds.length,
   });
 
   return c.json(

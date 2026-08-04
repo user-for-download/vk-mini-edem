@@ -12,17 +12,12 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeBooking, serializeUser } from "../serializers/index.js";
+import { mutationLimiter } from "../middleware/rateLimit.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
 
-class BookingError extends Error {
-  status: HttpStatus;
+import { logBusinessEvent } from "../logger/business.js";
 
-  constructor(message: string, status: HttpStatus = 400) {
-    super(message);
-    this.status = status;
-  }
-}
 
 export const bookingsRouter = new Hono<AuthEnv>();
 
@@ -356,7 +351,7 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
  * Статус всегда pending.
  * Pending сразу удерживает место.
  */
-bookingsRouter.post("/", async (c) => {
+bookingsRouter.post("/", mutationLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = createBookingDtoSchema.safeParse(body);
 
@@ -377,23 +372,23 @@ bookingsRouter.post("/", async (c) => {
       });
 
       if (!trip) {
-        throw new BookingError("Trip not found", 404);
+        throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
       }
 
       if (trip.status !== "active") {
-        throw new BookingError("Trip is not active", 400);
+        throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
       }
 
       if (trip.driverId === passenger.id) {
-        throw new BookingError("Driver cannot book own trip", 400);
+        throw new BookingError("Driver cannot book own trip", 400, ERROR_CODES.FORBIDDEN);
       }
 
       if (seat > trip.seatsTotal) {
-        throw new BookingError("Seat is out of range", 400);
+        throw new BookingError("Seat is out of range", 400, ERROR_CODES.VALIDATION_FAILED);
       }
 
       if (trip.seatsAvailable <= 0) {
-        throw new BookingError("Not enough available seats", 400);
+        throw new BookingError("Not enough available seats", 400, ERROR_CODES.CONFLICT);
       }
 
       const seatConflict = await tx.booking.findFirst({
@@ -407,7 +402,7 @@ bookingsRouter.post("/", async (c) => {
       });
 
       if (seatConflict) {
-        throw new BookingError("Seat is already reserved", 409);
+        throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
       }
 
       const passengerConflict = await tx.booking.findFirst({
@@ -423,7 +418,8 @@ bookingsRouter.post("/", async (c) => {
       if (passengerConflict) {
         throw new BookingError(
           "You already have an active booking for this trip",
-          409
+          409,
+          ERROR_CODES.ALREADY_BOOKED
         );
       }
 
@@ -463,10 +459,20 @@ bookingsRouter.post("/", async (c) => {
       return created;
     });
 
+    logBusinessEvent("booking.created", {
+      bookingId: booking.id,
+      tripId,
+      passengerId: passenger.id,
+      seat,
+    });
+
     return c.json(serializeBooking(booking), 201);
   } catch (error) {
     if (error instanceof BookingError) {
-      return c.json({ message: error.message }, error.status);
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status
+      );
     }
 
     logger.error(
@@ -528,11 +534,11 @@ bookingsRouter.patch("/:id/status", async (c) => {
       });
 
       if (!booking) {
-        throw new BookingError("Booking not found", 404);
+        throw new BookingError("Booking not found", 404, ERROR_CODES.NOT_FOUND);
       }
 
       if (booking.trip.driverId !== user.id) {
-        throw new BookingError("Forbidden", 403);
+        throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
       }
 
       if (booking.status === newStatus) {
@@ -544,7 +550,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
       });
 
       if (!trip) {
-        throw new BookingError("Trip not found", 404);
+        throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
       }
 
       const oldStatus = booking.status;
@@ -568,7 +574,8 @@ bookingsRouter.patch("/:id/status", async (c) => {
         if (confirmedConflict) {
           throw new BookingError(
             "Another passenger is already confirmed for this seat",
-            409
+            409,
+            ERROR_CODES.SEAT_TAKEN
           );
         }
       }
@@ -579,11 +586,11 @@ bookingsRouter.patch("/:id/status", async (c) => {
        */
       if (isActiveBookingStatus(newStatus) && !isActiveBookingStatus(oldStatus)) {
         if (trip.status !== "active") {
-          throw new BookingError("Trip is not active", 400);
+          throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
         }
 
         if (trip.seatsAvailable <= 0) {
-          throw new BookingError("Not enough available seats", 400);
+          throw new BookingError("Not enough available seats", 400, ERROR_CODES.CONFLICT);
         }
 
         const activeConflict = await tx.booking.findFirst({
@@ -600,7 +607,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
         });
 
         if (activeConflict) {
-          throw new BookingError("Seat is already reserved", 409);
+          throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
         }
 
         await tx.trip.update({
@@ -653,10 +660,21 @@ bookingsRouter.patch("/:id/status", async (c) => {
       return updatedBooking;
     });
 
+    logBusinessEvent("booking.status_changed", {
+      bookingId: id,
+      tripId: updated.tripId,
+      oldStatus: booking.status,
+      newStatus,
+      driverId: user.id,
+    });
+
     return c.json(serializeBooking(updated));
   } catch (error) {
     if (error instanceof BookingError) {
-      return c.json({ message: error.message }, error.status);
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status
+      );
     }
 
     logger.error(
@@ -694,25 +712,26 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       });
 
       if (!booking) {
-        throw new BookingError("Booking not found", 404);
+        throw new BookingError("Booking not found", 404, ERROR_CODES.NOT_FOUND);
       }
 
       if (booking.passengerId !== user.id) {
-        throw new BookingError("Forbidden", 403);
+        throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
       }
 
       if (booking.status !== "pending" && booking.status !== "confirmed") {
-        throw new BookingError("Booking is already cancelled", 400);
+        throw new BookingError("Booking is already cancelled", 400, ERROR_CODES.CONFLICT);
       }
 
       if (booking.trip.status !== "active") {
-        throw new BookingError("Trip is not active", 400);
+        throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
       }
 
       if (booking.trip.departureAt <= new Date()) {
         throw new BookingError(
           "Cannot cancel booking after trip departure",
-          400
+          400,
+          ERROR_CODES.TRIP_IN_PAST
         );
       }
 
@@ -734,10 +753,18 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       });
     });
 
+    logBusinessEvent("booking.cancelled", {
+      bookingId: id,
+      passengerId: user.id,
+    });
+
     return c.json({ success: true });
   } catch (error) {
     if (error instanceof BookingError) {
-      return c.json({ message: error.message }, error.status);
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status
+      );
     }
 
     logger.error(

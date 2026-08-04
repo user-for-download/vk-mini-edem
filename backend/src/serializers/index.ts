@@ -43,19 +43,23 @@ export type ReviewWithAuthor = Prisma.ReviewGetPayload<{
   };
 }>;
 
+const dateFmt = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "long",
+  weekday: "short",
+});
+
+const timeFmt = new Intl.DateTimeFormat("ru-RU", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 export function formatDateRu(date: Date): string {
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    weekday: "short",
-  });
+  return dateFmt.format(date);
 }
 
 export function formatTimeRu(date: Date): string {
-  return date.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return timeFmt.format(date);
 }
 
 export function serializeUser(user: UserWithCar) {
@@ -101,7 +105,7 @@ export function serializeTrip(
     seatsTotal: trip.seatsTotal,
     seatsAvailable: trip.seatsAvailable,
     driver: serializeUser(trip.driver),
-    tags: JSON.parse(trip.tags || "[]"),
+    tags: trip.tags,
     comment: trip.comment ?? undefined,
     status: trip.status as TripStatus,
     bookedSeats: options?.bookedSeats ?? [],
