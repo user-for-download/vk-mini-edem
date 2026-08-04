@@ -108,7 +108,7 @@ async function main() {
       seatsTotal: 4,
       seatsAvailable: 0,
       status: "completed",
-      tags: ["Тихая поездка", "С остановками"],
+      tags: JSON.stringify(["Тихая поездка", "С остановками"]),
       comment: "Отличная поездка в Тулу и обратно.",
     },
   });
@@ -128,7 +128,7 @@ async function main() {
       price: 1450,
       seatsTotal: 4,
       seatsAvailable: 2,
-      tags: ["Есть багаж", "Тихая поездка"],
+      tags: JSON.stringify(["Есть багаж", "Тихая поездка"]),
       comment: "Останавливаюсь один раз на заправке. В машине не курят.",
     },
   });
@@ -147,7 +147,7 @@ async function main() {
       price: 750,
       seatsTotal: 3,
       seatsAvailable: 1,
-      tags: ["Можно с животными", "Есть багаж"],
+      tags: JSON.stringify(["Можно с животными", "Есть багаж"]),
       comment: "Еду с небольшой собачкой в переноске.",
     },
   });
@@ -166,7 +166,7 @@ async function main() {
       price: 1100,
       seatsTotal: 4,
       seatsAvailable: 3,
-      tags: ["Только девушки", "С остановками"],
+      tags: JSON.stringify(["Только девушки", "С остановками"]),
       comment: "Комфортный кроссовер, климат-контроль.",
     },
   });

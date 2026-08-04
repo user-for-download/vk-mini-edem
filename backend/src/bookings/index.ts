@@ -167,7 +167,13 @@ bookingsRouter.get("/my", async (c) => {
             : undefined,
         },
 
-        tags: b.trip.tags,
+        tags: (() => {
+          try {
+            return typeof b.trip.tags === 'string' ? JSON.parse(b.trip.tags) : (b.trip.tags || []);
+          } catch {
+            return [];
+          }
+        })(),
         comment: b.trip.comment || undefined,
       },
     };
@@ -299,7 +305,13 @@ bookingsRouter.get("/history", async (c) => {
 
       driver: serializeUser(b.trip.driver),
 
-      tags: b.trip.tags,
+      tags: (() => {
+        try {
+          return typeof b.trip.tags === 'string' ? JSON.parse(b.trip.tags) : (b.trip.tags || []);
+        } catch {
+          return [];
+        }
+      })(),
       comment: b.trip.comment || undefined,
     },
   };

@@ -41,7 +41,7 @@ CREATE TABLE "Trip" (
     "price" INTEGER NOT NULL,
     "seatsTotal" INTEGER NOT NULL,
     "seatsAvailable" INTEGER NOT NULL,
-    "tags" TEXT NOT NULL,
+    "tags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "comment" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

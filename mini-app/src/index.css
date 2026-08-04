@@ -1,15 +1,192 @@
+/* Один акцент поверх нативной палитры VKUI — только для маршрута, рейтинга и выбранного места.
+   Всё остальное намеренно остаётся нативным цветом платформы (vkBase/vkIOS/vkCom). */
 :root {
-  --carpool_accent: #2787f5;
+  --carpool_accent: #2bb673;
+  --carpool_accent_soft: #e3f6ec;
+}
+
+html {
+  height: 100%;
+  overflow-y: overlay;
+}
+
+body, #root {
+  height: 100%;
 }
 
 body {
   margin: 0;
+  width: 100vw;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* TagsScroll styles */
+/* ---------- RouteLine — сигнатурный элемент: маршрут «точка — пунктир — точка» ---------- */
+.RouteLine {
+  display: flex;
+  gap: 12px;
+}
+
+.RouteLine__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 10px;
+  flex-shrink: 0;
+  padding-top: 6px;
+}
+
+.RouteLine__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--carpool_accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px var(--carpool_accent_soft);
+}
+
+.RouteLine__dot--end {
+  background: var(--vkui--color_icon_secondary, #99a2ad);
+  box-shadow: none;
+  width: 7px;
+  height: 7px;
+}
+
+.RouteLine__line {
+  flex: 1;
+  width: 2px;
+  min-height: 22px;
+  margin: 4px 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--carpool_accent) 0,
+    var(--carpool_accent) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+  opacity: 0.55;
+}
+
+.RouteLine__stops {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.RouteLine__stop {
+  min-width: 0;
+}
+
+.RouteLine__city {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.RouteLine__address {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- RatingBadge ---------- */
+.RatingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.RatingBadge__star {
+  flex-shrink: 0;
+  color: var(--carpool_accent);
+}
+
+.RatingBadge__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- SeatScheme — схема салона автомобиля ---------- */
+.SeatScheme {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--vkui--color_background_secondary, #f5f5f7);
+}
+
+.SeatScheme__row {
+  display: flex;
+  gap: 10px;
+}
+
+.SeatScheme__row--back {
+  padding-left: 0;
+}
+
+.SeatScheme__seat {
+  flex: 1;
+  height: 56px;
+  border-radius: 12px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--vkui--color_background_content, #fff);
+  color: var(--vkui--color_text_primary, #000);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: inset 0 0 0 1px var(--vkui--color_separator_primary, #e4e5e7);
+}
+
+.SeatScheme__seat--driver {
+  cursor: default;
+  color: var(--vkui--color_text_secondary, #818c99);
+  background: var(--vkui--color_background_secondary, #f0f0f2);
+  box-shadow: none;
+}
+
+.SeatScheme__seat--taken {
+  cursor: not-allowed;
+  color: var(--vkui--color_text_secondary, #818c99);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.SeatScheme__seat--selected {
+  background: var(--carpool_accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+.SeatScheme__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.SeatScheme__legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.SeatScheme__legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ---------- TagsScroll ---------- */
 .TagsScroll__list {
   display: flex;
   gap: 8px;
@@ -23,40 +200,50 @@ body {
 }
 
 .TagsScroll__pill {
-  padding: 6px 14px;
+  flex-shrink: 0;
+  border: none;
   border-radius: 100px;
-  border: 1px solid var(--vkui--color_separator_primary, #dce1e6);
-  background: var(--vkui--color_background_content, #ffffff);
-  color: var(--vkui--color_text_primary, #000000);
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 500;
-  white-space: nowrap;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.TagsScroll__pill:hover {
-  background: var(--vkui--color_background_secondary, #f2f3f5);
+  white-space: nowrap;
+  background: var(--vkui--color_background_secondary, #f0f0f2);
+  color: var(--vkui--color_text_primary, #000);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .TagsScroll__pill--active {
   background: var(--carpool_accent);
-  color: #ffffff;
-  border-color: var(--carpool_accent);
+  color: #fff;
 }
 
-/* BookingCollapse styles */
+/* ---------- EmptyState ---------- */
+.EmptyState__mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 4px;
+  background: var(--carpool_accent_soft);
+  color: var(--carpool_accent);
+}
+
+/* ---------- BookingCollapse — раскрывающийся блок бронирования на странице поездки ---------- */
 .BookingCollapse {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease-out;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
 }
 
 .BookingCollapse--open {
-  max-height: 600px;
-  transition: max-height 0.3s ease-in;
+  grid-template-rows: 1fr;
 }
 
 .BookingCollapse__inner {
-  padding-bottom: 8px;
+  overflow: hidden;
+  min-height: 0;
 }
