@@ -3,10 +3,15 @@ import type { Prisma } from "@prisma/client";
 import {
   createBookingDtoSchema,
   updateBookingStatusDtoSchema,
+  TRIP_STATUS,
+  BOOKING_STATUS,
+  ACTIVE_BOOKING_STATUSES,
+  isActiveBookingStatus,
 } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
+import { serializeBooking } from "../serializers/index.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
 
@@ -17,114 +22,6 @@ class BookingError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-type UserWithCar = Prisma.UserGetPayload<{
-  include: {
-    car: true;
-  };
-}>;
-
-type TripWithDriver = Prisma.TripGetPayload<{
-  include: {
-    driver: {
-      include: {
-        car: true;
-      };
-    };
-  };
-}>;
-
-type BookingWithRelations = Prisma.BookingGetPayload<{
-  include: {
-    trip: {
-      include: {
-        driver: {
-          include: {
-            car: true;
-          };
-        };
-      };
-    };
-    passenger: {
-      include: {
-        car: true;
-      };
-    };
-  };
-}>;
-
-function isActiveStatus(status: string): boolean {
-  return status === "pending" || status === "confirmed";
-}
-
-function safeParseTags(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === "string");
-  } catch {
-    return [];
-  }
-}
-
-function serializeUser(user: UserWithCar) {
-  return {
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    rating: user.rating,
-    reviewsCount: user.reviewsCount,
-    tripsCount: user.tripsCount,
-    isVerified: user.isVerified,
-    car: user.car
-      ? {
-          model: user.car.model,
-          color: user.car.color,
-          plate: user.car.plate,
-        }
-      : undefined,
-    about: user.about ?? undefined,
-  };
-}
-
-function serializeTrip(trip: TripWithDriver) {
-  return {
-    id: trip.id,
-    fromCity: trip.fromCity,
-    fromAddress: trip.fromAddress,
-    toCity: trip.toCity,
-    toAddress: trip.toAddress,
-    date: new Date(trip.departureAt).toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-      weekday: "short",
-    }),
-    time: new Date(trip.departureAt).toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    durationMinutes: trip.durationMinutes,
-    distanceKm: trip.distanceKm,
-    price: trip.price,
-    seatsTotal: trip.seatsTotal,
-    seatsAvailable: trip.seatsAvailable,
-    driver: serializeUser(trip.driver),
-    tags: safeParseTags(trip.tags),
-    comment: trip.comment ?? undefined,
-    status: trip.status as "active" | "cancelled" | "completed",
-  };
-}
-
-function serializeBooking(booking: BookingWithRelations) {
-  return {
-    id: booking.id,
-    seat: booking.seat,
-    status: booking.status as "pending" | "confirmed" | "declined",
-    comment: booking.comment ?? undefined,
-    passenger: serializeUser(booking.passenger),
-    trip: serializeTrip(booking.trip),
-  };
 }
 
 export const bookingsRouter = new Hono<AuthEnv>();
@@ -679,7 +576,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
        * Если бронь переходит из неактивного состояния в активное,
        * нужно снова удержать место.
        */
-      if (isActiveStatus(newStatus) && !isActiveStatus(oldStatus)) {
+      if (isActiveBookingStatus(newStatus) && !isActiveBookingStatus(oldStatus)) {
         if (trip.status !== "active") {
           throw new BookingError("Trip is not active", 400);
         }
@@ -693,7 +590,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
             tripId: booking.tripId,
             seat: booking.seat,
             status: {
-              in: ["pending", "confirmed"],
+              in: [...ACTIVE_BOOKING_STATUSES],
             },
             id: {
               not: booking.id,
@@ -717,7 +614,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
        * Если активная бронь становится неактивной,
        * освобождаем место.
        */
-      if (!isActiveStatus(newStatus) && isActiveStatus(oldStatus)) {
+      if (!isActiveBookingStatus(newStatus) && isActiveBookingStatus(oldStatus)) {
         await tx.trip.update({
           where: { id: booking.tripId },
           data: {

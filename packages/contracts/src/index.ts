@@ -3,6 +3,7 @@ export * from "./schemas/user.schema.js";
 export * from "./schemas/trip.schema.js";
 export * from "./schemas/booking.schema.js";
 export * from "./schemas/review.schema.js";
+export * from "./schemas/status.const.js";
 
 // DTO
 export * from "./dto/auth.dto.js";

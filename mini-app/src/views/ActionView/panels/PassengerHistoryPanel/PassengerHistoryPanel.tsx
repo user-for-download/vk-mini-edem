@@ -22,7 +22,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
-import { usePassengerHistoryQuery } from "@/queries/useBookingsQuery";
+import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
 
 export interface PassengerHistoryPanelProps {
   id: string;
@@ -270,7 +270,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
     isError,
     error,
     refetch,
-  } = usePassengerHistoryQuery();
+  } = useMyBookingsQuery();
 
   const historyItems = data ?? [];
 

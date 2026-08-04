@@ -29,10 +29,7 @@ export function useMyBookingsQuery() {
  * История поездок пассажира.
  */
 export function usePassengerHistoryQuery() {
-  return useQuery({
-    queryKey: BOOKING_KEYS.history(),
-    queryFn: () => bookingsApi.getHistory(),
-  });
+  return useMyBookingsQuery();
 }
 
 export function useTripBookingsQuery(tripId: string) {

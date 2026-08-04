@@ -1,94 +1,11 @@
 // backend/src/trips/index.ts
 import { Hono } from "hono";
 import type { Prisma } from "@prisma/client";
-import { createTripDtoSchema } from "@edem/contracts";
+import { createTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
+import { logger } from "../logger.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
-
-type UserWithCar = Prisma.UserGetPayload<{
-  include: {
-    car: true;
-  };
-}>;
-
-type TripWithDriver = Prisma.TripGetPayload<{
-  include: {
-    driver: {
-      include: {
-        car: true;
-      };
-    };
-  };
-}>;
-
-function safeParseTags(value: string): string[] {
-  try {
-    const parsed = JSON.parse(value || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === "string");
-  } catch {
-    return [];
-  }
-}
-
-function serializeUser(user: UserWithCar) {
-  return {
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    rating: user.rating,
-    reviewsCount: user.reviewsCount,
-    tripsCount: user.tripsCount,
-    isVerified: user.isVerified,
-    car: user.car
-      ? {
-          model: user.car.model,
-          color: user.car.color,
-          plate: user.car.plate,
-        }
-      : undefined,
-    about: user.about ?? undefined,
-    createdAt: user.createdAt ? user.createdAt.toISOString() : undefined,
-  };
-}
-
-function serializeTrip(
-  trip: TripWithDriver,
-  options?: {
-    bookedSeats?: number[];
-    pendingRequestsCount?: number;
-  }
-) {
-  return {
-    id: trip.id,
-    fromCity: trip.fromCity,
-    fromAddress: trip.fromAddress,
-    toCity: trip.toCity,
-    toAddress: trip.toAddress,
-    date: new Date(trip.departureAt).toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-      weekday: "short",
-    }),
-    time: new Date(trip.departureAt).toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    departureAt: trip.departureAt.toISOString(),
-    durationMinutes: trip.durationMinutes,
-    distanceKm: trip.distanceKm,
-    price: trip.price,
-    seatsTotal: trip.seatsTotal,
-    seatsAvailable: trip.seatsAvailable,
-    driver: serializeUser(trip.driver),
-    tags: safeParseTags(trip.tags),
-    comment: trip.comment ?? undefined,
-    status: trip.status as "active" | "cancelled" | "completed",
-
-    bookedSeats: options?.bookedSeats ?? [],
-    pendingRequestsCount: options?.pendingRequestsCount,
-  };
-}
+import { serializeTrip } from "../serializers/index.js";
 
 async function getActiveBookingSeatsByTripIds(
   tripIds: string[]
@@ -105,7 +22,7 @@ async function getActiveBookingSeatsByTripIds(
         in: tripIds,
       },
       status: {
-        in: ["pending", "confirmed"],
+        in: [...ACTIVE_BOOKING_STATUSES],
       },
     },
     select: {

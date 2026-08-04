@@ -3,12 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
-
-type UserWithCar = Prisma.UserGetPayload<{
-  include: {
-    car: true;
-  };
-}>;
+import { serializeUser } from "../serializers/index.js";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -20,27 +15,6 @@ const carFormSchema = z.object({
   color: z.string().min(1).max(30),
   plate: z.string().min(1).max(15),
 });
-
-function serializeUser(user: UserWithCar) {
-  return {
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    rating: user.rating,
-    reviewsCount: user.reviewsCount,
-    tripsCount: user.tripsCount,
-    isVerified: user.isVerified,
-    car: user.car
-      ? {
-          model: user.car.model,
-          color: user.car.color,
-          plate: user.car.plate,
-        }
-      : undefined,
-    about: user.about ?? undefined,
-    createdAt: user.createdAt.toISOString(),
-  };
-}
 
 export const usersRouter = new Hono<AuthEnv>();
 

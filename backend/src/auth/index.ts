@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { env } from "../env.js";
+import { serializeUser } from "../serializers/index.js";
 
 import { verifyVkSignature } from "./vkSign.js";
 import {
@@ -19,40 +20,6 @@ const authRateLimiter = createRateLimiter({
   max: env.AUTH_RATE_MAX,
   keyPrefix: "auth",
 });
-
-function serializeUser(user: {
-  id: string;
-  name: string;
-  avatar: string;
-  rating: number;
-  reviewsCount: number;
-  tripsCount: number;
-  isVerified: boolean;
-  about: string | null;
-  car: {
-    model: string;
-    color: string;
-    plate: string;
-  } | null;
-}) {
-  return {
-    id: user.id,
-    name: user.name,
-    avatar: user.avatar,
-    rating: user.rating,
-    reviewsCount: user.reviewsCount,
-    tripsCount: user.tripsCount,
-    isVerified: user.isVerified,
-    car: user.car
-      ? {
-          model: user.car.model,
-          color: user.car.color,
-          plate: user.car.plate,
-        }
-      : undefined,
-    about: user.about || undefined,
-  };
-}
 
 authRouter.post("/vk", authRateLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
