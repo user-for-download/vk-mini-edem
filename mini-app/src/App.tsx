@@ -70,7 +70,7 @@ export default function App() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeModal = routerModal || searchParams.get("modal") || null;
+  const activeModal = routerModal || null;
 
   const driverId = searchParams.get("driverId");
 

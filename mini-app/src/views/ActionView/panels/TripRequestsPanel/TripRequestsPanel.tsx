@@ -25,7 +25,7 @@ export interface TripRequestsPanelProps {
   isLoading: boolean;
   isError: boolean;
   onBack: () => void;
-  onSetStatus: (bookingId: string, status: BookingStatus) => void;
+  onSetStatus: (bookingId: string, status: "confirmed" | "declined") => void;
   onRetry: () => void;
 }
 
@@ -33,6 +33,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   pending: "Ждёт решения",
   confirmed: "Подтверждено",
   declined: "Отклонено",
+  cancelled: "Отменена",
 };
 
 const BookingRequestRow: FC<{

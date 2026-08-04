@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Prisma } from "@prisma/client";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   createBookingDtoSchema,
   updateBookingStatusDtoSchema,
@@ -11,10 +11,22 @@ import {
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
-import { serializeBooking, serializeUser } from "../serializers/index.js";
+import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
 import { mutationLimiter } from "../middleware/rateLimit.js";
+import { ERROR_CODES } from "../errors.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
+
+class BookingError extends Error {
+  statusCode: HttpStatus;
+  code: string;
+
+  constructor(message: string, statusCode: HttpStatus = 400, code: string = ERROR_CODES.VALIDATION_FAILED) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 import { logBusinessEvent } from "../logger/business.js";
 
@@ -99,7 +111,7 @@ bookingsRouter.get("/my", async (c) => {
     return {
       id: b.id,
       seat: b.seat,
-      status: b.status as "pending" | "confirmed" | "declined",
+      status: b.status as "pending" | "confirmed" | "declined" | "cancelled",
       comment: b.comment || undefined,
 
       /**
@@ -124,15 +136,8 @@ bookingsRouter.get("/my", async (c) => {
         fromAddress: b.trip.fromAddress,
         toCity: b.trip.toCity,
         toAddress: b.trip.toAddress,
-        date: new Date(b.trip.departureAt).toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "long",
-          weekday: "short",
-        }),
-        time: new Date(b.trip.departureAt).toLocaleTimeString("ru-RU", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        date: formatDateRu(b.trip.departureAt),
+        time: formatTimeRu(b.trip.departureAt),
         durationMinutes: b.trip.durationMinutes,
         distanceKm: b.trip.distanceKm,
         price: b.trip.price,
@@ -268,15 +273,8 @@ bookingsRouter.get("/history", async (c) => {
         toCity: b.trip.toCity,
         toAddress: b.trip.toAddress,
 
-        date: new Date(b.trip.departureAt).toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "long",
-          weekday: "short",
-        }),
-        time: new Date(b.trip.departureAt).toLocaleTimeString("ru-RU", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        date: formatDateRu(b.trip.departureAt),
+        time: formatTimeRu(b.trip.departureAt),
 
         durationMinutes: b.trip.durationMinutes,
         distanceKm: b.trip.distanceKm,
@@ -471,7 +469,7 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.status
+        error.statusCode as ContentfulStatusCode
       );
     }
 
@@ -511,6 +509,8 @@ bookingsRouter.patch("/:id/status", async (c) => {
     return c.json({ message: "Driver can only confirm or decline bookings" }, 400);
   }
 
+  let oldStatus = "";
+
   try {
     const updated = await db.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
@@ -544,6 +544,8 @@ bookingsRouter.patch("/:id/status", async (c) => {
       if (booking.status === newStatus) {
         return booking;
       }
+      
+      oldStatus = booking.status;
 
       const trip = await tx.trip.findUnique({
         where: { id: booking.tripId },
@@ -552,8 +554,6 @@ bookingsRouter.patch("/:id/status", async (c) => {
       if (!trip) {
         throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
       }
-
-      const oldStatus = booking.status;
 
       /**
        * Если бронь становится confirmed, проверяем,
@@ -663,7 +663,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
     logBusinessEvent("booking.status_changed", {
       bookingId: id,
       tripId: updated.tripId,
-      oldStatus: booking.status,
+      oldStatus,
       newStatus,
       driverId: user.id,
     });
@@ -673,7 +673,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.status
+        error.statusCode as ContentfulStatusCode
       );
     }
 
@@ -763,7 +763,7 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.status
+        error.statusCode as ContentfulStatusCode
       );
     }
 

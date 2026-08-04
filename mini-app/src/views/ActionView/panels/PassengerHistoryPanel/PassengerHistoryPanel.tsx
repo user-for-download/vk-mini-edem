@@ -55,7 +55,7 @@ function getHistoryCategory(booking: Booking): HistoryCategory {
     departureAt?: string;
   };
 
-  if (trip.status === "cancelled" || booking.status === "declined") {
+  if (trip.status === "cancelled" || booking.status === "declined" || booking.status === "cancelled") {
     return "cancelled";
   }
 

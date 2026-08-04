@@ -33,26 +33,18 @@ export interface PassengerBookingsPanelProps {
 }
 
 function getStatusLabel(booking: PassengerBooking): string {
-  if (booking.trip.status === "cancelled") {
-    return "Поездка отменена";
-  }
-
-  if (booking.status === "pending") {
-    return "Ждёт подтверждения";
-  }
-
-  if (booking.status === "confirmed") {
-    return booking.scope === "active" ? "Подтверждена" : "Завершена";
-  }
-
+  if (booking.trip.status === "cancelled") return "Поездка отменена";
+  if (booking.status === "cancelled") return "Отменена вами";
+  if (booking.status === "pending") return "Ждёт подтверждения";
+  if (booking.status === "confirmed") return booking.scope === "active" ? "Подтверждена" : "Завершена";
   return "Отклонена";
 }
 
 function getStatusColor(booking: PassengerBooking): string {
-  if (booking.trip.status === "cancelled") {
+  if (booking.trip.status === "cancelled" || booking.status === "cancelled") {
     return "var(--vkui--color_text_negative)";
   }
-
+  // ... остальное без изменений
   if (booking.status === "pending") {
     return "var(--vkui--color_text_accent, #3f8ae0)";
   }

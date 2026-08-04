@@ -579,7 +579,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
     }
 
     // 5. Update trip status
-    return tx.trip.update({
+    const updated = await tx.trip.update({
       where: { id: trip.id },
       data: {
         status: "completed",
@@ -593,12 +593,14 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
         },
       },
     });
-  });
 
-  logBusinessEvent("trip.completed", {
-    tripId: trip.id,
-    driverId: user.id,
-    passengersCount: passengerIds.length,
+    logBusinessEvent("trip.completed", {
+      tripId: trip.id,
+      driverId: user.id,
+      passengersCount: passengerIds.length,
+    });
+
+    return updated;
   });
 
   return c.json(

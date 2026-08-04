@@ -124,17 +124,19 @@ export function serializeBooking(booking: BookingWithRelations) {
   };
 }
 
+const reviewDateFmt = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
 export function serializeReview(review: ReviewWithAuthor) {
   return {
     id: review.id,
     targetRole: review.targetRole as "passenger" | "driver",
     rating: review.rating,
     text: review.text,
-    date: review.createdAt.toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }),
+    date: reviewDateFmt.format(review.createdAt),
     tripRoute: review.tripRoute,
     author: {
       id: review.author.id,
