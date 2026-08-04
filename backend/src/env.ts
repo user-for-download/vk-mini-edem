@@ -60,13 +60,9 @@ export const env = {
   NODE_ENV,
   isProduction,
 
-  PORT: intEnv(
-    "BACKEND_PORT",
-    intEnv(
-      "PORT",
-      isProduction ? 3000 : 3001
-    )
-  ),
+  PORT: isProduction
+    ? intEnv("PORT", 3000)
+    : intEnv("BACKEND_PORT", 3001),
 
   /**
    * DATABASE_URL обязателен всегда.

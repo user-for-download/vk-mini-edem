@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --carpool_accent: #2787f5;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* TagsScroll styles */
+.TagsScroll__list {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.TagsScroll__list::-webkit-scrollbar {
+  display: none;
+}
+
+.TagsScroll__pill {
+  padding: 6px 14px;
+  border-radius: 100px;
+  border: 1px solid var(--vkui--color_separator_primary, #dce1e6);
+  background: var(--vkui--color_background_content, #ffffff);
+  color: var(--vkui--color_text_primary, #000000);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.TagsScroll__pill:hover {
+  background: var(--vkui--color_background_secondary, #f2f3f5);
+}
+
+.TagsScroll__pill--active {
+  background: var(--carpool_accent);
+  color: #ffffff;
+  border-color: var(--carpool_accent);
+}
+
+/* BookingCollapse styles */
+.BookingCollapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.BookingCollapse--open {
+  max-height: 600px;
+  transition: max-height 0.3s ease-in;
+}
+
+.BookingCollapse__inner {
+  padding-bottom: 8px;
+}

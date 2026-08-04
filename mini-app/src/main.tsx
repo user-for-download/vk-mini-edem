@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import vkBridge from "@vkontakte/vk-bridge";
 import "@vkontakte/vkui/dist/vkui.css";
+import "@/index.css";
 
 
 import "@/helpers/sentry";
