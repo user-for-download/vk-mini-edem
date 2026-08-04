@@ -1,6 +1,6 @@
 // mini-app/src/components/RouteLine.tsx
 import { type FC } from "react";
-import { Text, Subhead } from "@vkontakte/vkui";
+import { Text, Subhead, classNames } from "@vkontakte/vkui";
 
 export interface RoutePoint {
   city: string;
@@ -10,30 +10,34 @@ export interface RoutePoint {
 export interface RouteLineProps {
   from: RoutePoint;
   to: RoutePoint;
+  className?: string;
 }
 
-export const RouteLine: FC<RouteLineProps> = ({ from, to }) => {
+export const RouteLine: FC<RouteLineProps> = ({ from, to, className }) => {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, paddingTop: 6 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--carpool_accent)" }} />
-        <div style={{ width: 2, flex: 1, minHeight: 20, background: "var(--vkui--color_separator_primary)" }} />
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--vkui--color_text_negative)" }} />
+    <div className={classNames("RouteLine", className)}>
+      <div className="RouteLine__rail">
+        <div className="RouteLine__dot" />
+        <div className="RouteLine__line" />
+        <div className="RouteLine__dot RouteLine__dot--end" />
       </div>
-      <div style={{ flex: 1 }}>
-        <Text weight="2">{from.city}</Text>
-        {from.address && (
-          <Subhead style={{ color: "var(--vkui--color_text_secondary)" }}>
-            {from.address}
-          </Subhead>
-        )}
-        <div style={{ height: 8 }} />
-        <Text weight="2">{to.city}</Text>
-        {to.address && (
-          <Subhead style={{ color: "var(--vkui--color_text_secondary)" }}>
-            {to.address}
-          </Subhead>
-        )}
+      <div className="RouteLine__stops">
+        <div className="RouteLine__stop">
+          <Text weight="2" className="RouteLine__city">{from.city}</Text>
+          {from.address && (
+            <Subhead className="RouteLine__address" style={{ color: "var(--vkui--color_text_secondary)" }}>
+              {from.address}
+            </Subhead>
+          )}
+        </div>
+        <div className="RouteLine__stop">
+          <Text weight="2" className="RouteLine__city">{to.city}</Text>
+          {to.address && (
+            <Subhead className="RouteLine__address" style={{ color: "var(--vkui--color_text_secondary)" }}>
+              {to.address}
+            </Subhead>
+          )}
+        </div>
       </div>
     </div>
   );
