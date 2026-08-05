@@ -377,10 +377,11 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
   const passenger = c.get("user");
 
   try {
-    const booking = await db.$transaction(async (tx) => {
-      const trip = await tx.trip.findUnique({
-        where: { id: tripId },
-      });
+    const booking = await db.$transaction(
+      async (tx) => {
+        const trip = await tx.trip.findUnique({
+          where: { id: tripId },
+        });
 
       if (!trip) {
         throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
@@ -468,7 +469,9 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
       });
 
       return created;
-    });
+      },
+      { isolationLevel: "Serializable" }
+    );
 
     logBusinessEvent("booking.created", {
       bookingId: booking.id,
@@ -500,6 +503,19 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.SEAT_TAKEN, message: "Место только что заняли" },
+        409
+      );
+    }
+
+    // Serializable: гонка двух броней на одно место — транзакция не смогла
+    // подтвердиться (write conflict / deadlock). Клиент видит 409 и может
+    // повторить бронь — место при этом гарантированно занято одной из сторон.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
     ) {
       return c.json(
         { code: ERROR_CODES.SEAT_TAKEN, message: "Место только что заняли" },

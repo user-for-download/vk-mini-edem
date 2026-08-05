@@ -139,6 +139,14 @@ app.route("/api/v1/users", usersRouter);
 app.get("/ws", createWsHandler(upgradeWebSocket));
 app.get("/api/v1/ws", createWsHandler(upgradeWebSocket));
 
+// Legacy fallback для клиентов с закэшированным JS (удалить через 2 недели после деплоя)
+app.route("/api/auth", authRouter);
+app.route("/api/trips", tripsRouter);
+app.route("/api/bookings", bookingsRouter);
+app.route("/api/reviews", reviewsRouter);
+app.route("/api/notifications", notificationsRouter);
+app.route("/api/users", usersRouter);
+
 if (env.isProduction) {
   const distPath = path.resolve(process.cwd(), "mini-app/dist");
   app.use("/*", serveStatic({ root: path.relative(process.cwd(), distPath) }));

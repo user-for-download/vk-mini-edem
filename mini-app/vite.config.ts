@@ -48,6 +48,23 @@ export default defineConfig(() => {
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
           navigateFallback: "/index.html",
           runtimeCaching: [
+            // Публичный список поездок (GET без авторизации) — офлайн-доступ к
+            // ранее загруженным результатам поиска. Авторизованные эндпоинты
+            // намеренно НЕ кэшируются: в общем браузере кэш может отдать
+            // данные другого пользователя.
+            {
+              urlPattern: /\/api\/v1\/trips(\?|$)/,
+              handler: "NetworkFirst",
+              method: "GET",
+              options: {
+                cacheName: "api-get-cache",
+                networkTimeoutSeconds: 5,
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60,
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/i\.pravatar\.cc\/.*/,
               handler: "CacheFirst",

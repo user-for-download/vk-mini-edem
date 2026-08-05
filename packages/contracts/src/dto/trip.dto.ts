@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tripTagSchema } from "../schemas/trip.schema.js";
+import { tripTagSchema, tripSchema } from "../schemas/trip.schema.js";
 
 export const createTripDtoSchema = z.object({
   fromCity: z.string().min(1).max(100),
@@ -32,3 +32,18 @@ export type TripFiltersDto = z.infer<typeof tripFiltersDtoSchema>;
 
 export const updateTripDtoSchema = createTripDtoSchema.partial();
 export type UpdateTripDto = z.infer<typeof updateTripDtoSchema>;
+
+export const paginationSchema = z.object({
+  page: z.number(),
+  limit: z.number(),
+  total: z.number(),
+  totalPages: z.number(),
+  hasMore: z.boolean(),
+});
+
+export const paginatedTripsResponseSchema = z.object({
+  items: z.array(tripSchema),
+  pagination: paginationSchema,
+});
+
+export type PaginatedTripsResponse = z.infer<typeof paginatedTripsResponseSchema>;

@@ -83,10 +83,23 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${this.token}`;
     }
 
-    return fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      return await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new ApiError("Таймаут запроса", "REQUEST_TIMEOUT", 408);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   /**
@@ -112,20 +125,27 @@ class ApiClient {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: this.refreshTokenValue }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken: this.refreshTokenValue }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        return false;
+        if (!response.ok) {
+          return false;
+        }
+
+        const data = await response.json();
+        this.token = data.accessToken;
+        this.refreshTokenValue = data.refreshToken;
+        return true;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const data = await response.json();
-      this.token = data.accessToken;
-      this.refreshTokenValue = data.refreshToken;
-      return true;
     } catch {
       return false;
     }

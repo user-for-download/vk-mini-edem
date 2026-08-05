@@ -16,6 +16,7 @@ export type Notification = z.infer<typeof notificationSchema>;
 export const notificationsPageSchema = z.object({
   items: z.array(notificationSchema),
   nextCursor: z.string().nullable(),
+  unreadCount: z.number().optional(),
 });
 
 export type NotificationsPage = z.infer<typeof notificationsPageSchema>;

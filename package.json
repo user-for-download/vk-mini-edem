@@ -49,7 +49,6 @@
     "react-router-dom": "^7.18.2",
     "vite": "^6.2.3",
     "vitest": "^4.1.10",
-    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

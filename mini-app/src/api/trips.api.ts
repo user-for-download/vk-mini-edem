@@ -1,6 +1,13 @@
 // mini-app/src/api/trips.api.ts
 import { apiClient } from "./client";
-import type { Trip, CreateTripDto, TripFiltersDto } from "@edem/contracts";
+import {
+  paginatedTripsResponseSchema,
+  tripSchema,
+  type Trip,
+  type CreateTripDto,
+  type TripFiltersDto,
+  type PaginatedTripsResponse,
+} from "@edem/contracts";
 
 export type SearchTripsFilters = TripFiltersDto & {
   q?: string;
@@ -11,17 +18,6 @@ export type SearchTripsFilters = TripFiltersDto & {
 };
 
 export type UpdateTripDto = Partial<CreateTripDto>;
-
-export interface PaginatedTripsResponse {
-  items: Trip[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasMore: boolean;
-  };
-}
 
 export type MyTrip = Trip & {
   bookedSeats?: number[];
@@ -46,14 +42,22 @@ export const tripsApi = {
 
     const queryString = query.toString() ? `?${query.toString()}` : "";
 
-    return apiClient.request<PaginatedTripsResponse>(`/trips${queryString}`);
+    return apiClient.request<PaginatedTripsResponse>(
+      `/trips${queryString}`,
+      {},
+      paginatedTripsResponseSchema
+    );
   },
 
   updateTrip: (id: string, data: UpdateTripDto): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
+    return apiClient.request<Trip>(
+      `/trips/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+      tripSchema
+    );
   },
 
   getMyTrips: (options?: { page?: number; limit?: number }): Promise<PaginatedTripsResponse> => {
@@ -61,29 +65,33 @@ export const tripsApi = {
     if (options?.page) query.set("page", options.page.toString());
     if (options?.limit) query.set("limit", options.limit.toString());
     const queryString = query.toString() ? `?${query.toString()}` : "";
-    return apiClient.request<PaginatedTripsResponse>(`/trips/my${queryString}`);
+    return apiClient.request<PaginatedTripsResponse>(
+      `/trips/my${queryString}`,
+      {},
+      paginatedTripsResponseSchema
+    );
   },
 
   getTripById: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}`);
+    return apiClient.request<Trip>(`/trips/${id}`, {}, tripSchema);
   },
 
   createTrip: (data: CreateTripDto): Promise<Trip> => {
     return apiClient.request<Trip>("/trips", {
       method: "POST",
       body: JSON.stringify(data),
-    });
+    }, tripSchema);
   },
 
   cancelTrip: (id: string): Promise<Trip> => {
     return apiClient.request<Trip>(`/trips/${id}/cancel`, {
       method: "PATCH",
-    });
+    }, tripSchema);
   },
 
   completeTrip: (id: string): Promise<Trip> => {
     return apiClient.request<Trip>(`/trips/${id}/complete`, {
       method: "PATCH",
-    });
+    }, tripSchema);
   },
 };
