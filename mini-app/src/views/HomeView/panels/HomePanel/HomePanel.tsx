@@ -75,7 +75,7 @@ export const HomePanel: FC<HomePanelProps> = ({
   const myTrips = myTripsData ?? [];
 
   const activeOwnTrip =
-    myTrips.find((trip) => trip.status === "active") ?? myTrips[0] ?? null;
+    myTrips.find((trip) => trip.status === "active") ?? null;
 
   return (
     <Panel id={id}>

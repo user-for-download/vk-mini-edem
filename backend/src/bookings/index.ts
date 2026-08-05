@@ -193,8 +193,8 @@ bookingsRouter.get("/history", async (c) => {
       passengerId: user.id,
       OR: [
         { trip: { departureAt: { lte: now } } },
-        { trip: { status: { not: "active" } } },
-        { status: { in: ["declined", "cancelled"] } },
+        { trip: { status: { in: ["cancelled", "completed"] } } },
+        { status: "declined" },
       ],
     },
     include: {
@@ -257,7 +257,7 @@ bookingsRouter.get("/history", async (c) => {
       !hasReview;
 
     let historyCategory: "completed" | "cancelled" | "other" = "other";
-    if (b.trip.status === "cancelled" || b.status === "declined" || b.status === "cancelled") {
+    if (b.trip.status === "cancelled" || b.status === "declined") {
       historyCategory = "cancelled";
     } else if (b.status === "confirmed" && (b.trip.status === "completed" || tripIsCompleted)) {
       historyCategory = "completed";

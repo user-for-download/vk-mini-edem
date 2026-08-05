@@ -201,19 +201,28 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Group>
 
       <Group header={<Header size="s">Поездки и брони</Header>}>
+        {role === "driver" && (
+          <SimpleCell
+            chevron="always"
+            onClick={() => routeNavigator.push("/trips/my")}
+            subtitle="Ваши опубликованные маршруты (активные и архив)"
+          >
+            Мои поездки (водитель)
+          </SimpleCell>
+        )}
         <SimpleCell
           chevron="always"
           onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
-          subtitle="Просмотр активных броней и управления ими"
+          subtitle="Поездки, на которые вы забронировали место"
         >
-          Мои брони
+          Мои брони (пассажир)
         </SimpleCell>
         <SimpleCell
           chevron="always"
           onClick={() => (onOpenHistory ? onOpenHistory() : routeNavigator.push("/bookings/history"))}
-          subtitle="Просмотр завершенных и отмененных поездок"
+          subtitle="Завершенные и отмененные брони"
         >
-          История поездок
+          История поездок (пассажир)
         </SimpleCell>
         <SimpleCell
           chevron="always"
