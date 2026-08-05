@@ -385,6 +385,38 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         </Card>
       </Group>
 
+      {isOwnTrip && (
+        <Group header={<Header size="s">Заявки пассажиров ({tripBookings?.length ?? 0})</Header>}>
+          {isLoadingBookings && (
+            <Box padding="system">
+              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                Загрузка заявок...
+              </Text>
+            </Box>
+          )}
+
+          {!isLoadingBookings && tripBookings && tripBookings.length === 0 && (
+            <Box padding="system">
+              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                На эту поездку пока нет заявок.
+              </Text>
+            </Box>
+          )}
+
+          {!isLoadingBookings && tripBookings && tripBookings.length > 0 && (
+            <Box aria-live="polite" aria-label={`Список заявок, ${tripBookings.length}`}>
+              {tripBookings.map((booking) => (
+                <BookingRequestRow
+                  key={booking.id}
+                  booking={booking}
+                  onSetStatus={handleSetBookingStatus}
+                />
+              ))}
+            </Box>
+          )}
+        </Group>
+      )}
+
       {canBook && (
         <>
           <div
@@ -530,38 +562,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </>
           )}
         </Box>
-      )}
-
-      {isOwnTrip && (
-        <Group header={<Header size="s">Заявки пассажиров ({tripBookings?.length ?? 0})</Header>}>
-          {isLoadingBookings && (
-            <Box padding="system">
-              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-                Загрузка заявок...
-              </Text>
-            </Box>
-          )}
-
-          {!isLoadingBookings && tripBookings && tripBookings.length === 0 && (
-            <Box padding="system">
-              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-                На эту поездку пока нет заявок.
-              </Text>
-            </Box>
-          )}
-
-          {!isLoadingBookings && tripBookings && tripBookings.length > 0 && (
-            <Box aria-live="polite" aria-label={`Список заявок, ${tripBookings.length}`}>
-              {tripBookings.map((booking) => (
-                <BookingRequestRow
-                  key={booking.id}
-                  booking={booking}
-                  onSetStatus={handleSetBookingStatus}
-                />
-              ))}
-            </Box>
-          )}
-        </Group>
       )}
 
       {!isOwnTrip && hasActiveBooking && myBooking && (
