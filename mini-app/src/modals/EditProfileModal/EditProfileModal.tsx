@@ -8,28 +8,22 @@ import {
   Input,
   ModalPage,
   ModalPageHeader,
-  ModalPageProps,
   PanelHeaderButton,
   Separator,
   Textarea,
   Box,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi } from "@/api/users.api";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
-export interface EditProfileModalProps extends ModalPageProps {
-  id: string;
-  onClose: () => void;
-}
+export interface EditProfileModalProps
+  extends CustomModalProps<OpenModalPageProps, object> {}
 
-export const EditProfileModal: FC<EditProfileModalProps> = ({
-  id,
-  onClose,
-  ...restProps
-}) => {
+export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close }) => {
   const currentUser = useCurrentUser();
 
   const [name, setName] = useState(currentUser?.name ?? "");
@@ -72,7 +66,7 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({
         dedupeKey: "profile_update_success",
       });
 
-      onClose();
+      close();
     } catch (submitError) {
       enqueueSnackbar({
         type: "error",
@@ -88,13 +82,12 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({
 
   return (
     <ModalPage
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       settlingHeight={100}
       header={
         <ModalPageHeader
           after={
-            <PanelHeaderButton onClick={onClose} aria-label="Закрыть">
+            <PanelHeaderButton onClick={close} aria-label="Закрыть">
               <Icon24Cancel />
             </PanelHeaderButton>
           }
@@ -102,7 +95,6 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({
           Редактирование профиля
         </ModalPageHeader>
       }
-      {...restProps}
     >
       <Group header={<Header size="s">Основная информация</Header>}>
         <FormItem top="Имя">

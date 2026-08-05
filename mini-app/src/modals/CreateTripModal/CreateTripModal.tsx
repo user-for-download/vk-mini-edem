@@ -9,13 +9,13 @@ import {
   Header,
   Input,
   ModalPage,
-  ModalPageProps,
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
   Textarea,
   Caption,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import type { CreateTripDto, TripTag } from "@edem/contracts";
 import { TRIP_TAGS } from "@/consts/tags";
@@ -30,22 +30,13 @@ import {
   isFormValid,
 } from "./validation";
 
-export interface CreateTripModalProps extends ModalPageProps {
-  id: string;
-  onClose: () => void;
-
-  /**
-   * Вызывается после успешного создания поездки.
-   * Если не передан, модалка просто закроется через onClose.
-   */
-  onTripCreated?: () => void;
-}
+export interface CreateTripModalProps
+  extends CustomModalProps<OpenModalPageProps, { onTripCreated: () => void }> {}
 
 export const CreateTripModal: FC<CreateTripModalProps> = ({
-  id,
-  onClose,
+  modalProps,
+  close,
   onTripCreated,
-  ...restProps
 }) => {
   const [values, setValues] = useState<TripFormValues>(initialFormValues);
   const [errors, setErrors] = useState<TripFormErrors>({});
@@ -153,7 +144,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
         if (onTripCreated) {
           onTripCreated();
         } else {
-          onClose();
+          close();
         }
       },
       onError: (error) => {
@@ -170,7 +161,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
     selectedTags,
     createTrip,
     enqueueSnackbar,
-    onClose,
+    close,
     onTripCreated,
     resetForm,
   ]);
@@ -180,13 +171,12 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
 
   return (
     <ModalPage
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       settlingHeight={100}
       header={
         <ModalPageHeader
           after={
-            <PanelHeaderButton onClick={onClose} aria-label="Закрыть">
+            <PanelHeaderButton onClick={close} aria-label="Закрыть">
               <Icon24Cancel />
             </PanelHeaderButton>
           }
@@ -194,7 +184,6 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
           Новая поездка
         </ModalPageHeader>
       }
-      {...restProps}
     >
       <Group header={<Header size="s">Маршрут</Header>}>
         <FormLayoutGroup>

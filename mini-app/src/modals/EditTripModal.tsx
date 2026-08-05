@@ -9,13 +9,13 @@ import {
   Header,
   Input,
   ModalPage,
-  ModalPageProps,
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
   Textarea,
   Caption,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import type { UpdateTripDto, TripTag } from "@edem/contracts";
 import type { Trip } from "@/types";
@@ -30,17 +30,13 @@ import {
   isFormValid,
 } from "./CreateTripModal/validation";
 
-export interface EditTripModalProps extends ModalPageProps {
-  id: string;
-  trip: Trip;
-  onClose: () => void;
-}
+export interface EditTripModalProps
+  extends CustomModalProps<OpenModalPageProps, { trip: Trip }> {}
 
 export const EditTripModal: FC<EditTripModalProps> = ({
-  id,
+  modalProps,
+  close,
   trip,
-  onClose,
-  ...restProps
 }) => {
   const [values, setValues] = useState<TripFormValues>(() => {
     // extract date and time from departureAt (assuming UTC or Local? For now just split 'T')
@@ -161,7 +157,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
           dedupeKey: "edit_trip_success",
         });
 
-        onClose();
+                close();
       },
       onError: (error) => {
         enqueueSnackbar({
@@ -178,7 +174,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     trip.id,
     updateTrip,
     enqueueSnackbar,
-    onClose,
+    close,
   ]);
 
   const showError = (field: keyof TripFormValues): string | undefined =>
@@ -186,13 +182,12 @@ export const EditTripModal: FC<EditTripModalProps> = ({
 
   return (
     <ModalPage
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       settlingHeight={100}
       header={
         <ModalPageHeader
           after={
-            <PanelHeaderButton onClick={onClose} aria-label="Закрыть">
+            <PanelHeaderButton onClick={close} aria-label="Закрыть">
               <Icon24Cancel />
             </PanelHeaderButton>
           }
@@ -200,7 +195,6 @@ export const EditTripModal: FC<EditTripModalProps> = ({
           Новая поездка
         </ModalPageHeader>
       }
-      {...restProps}
     >
       <Group header={<Header size="s">Маршрут</Header>}>
         <FormLayoutGroup>

@@ -1,0 +1,22 @@
+# Local development stack: PostgreSQL only.
+# Usage: docker compose -f docker-compose.local.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edem_local}
+      POSTGRES_DB: edem
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edem -d edem"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata_local:

@@ -33,10 +33,25 @@ export default defineConfig(() => {
         output: {
           manualChunks(id) {
             if (id.includes("node_modules")) {
-              if (id.includes("@vkontakte/icons") || id.includes("@vkontakte/vkui")) {
+              // VKUI + его транзитивные зависимости, чтобы чанк был самодостаточным
+              if (
+                id.includes("@vkontakte/vkui") ||
+                id.includes("@vkontakte/icons") ||
+                id.includes("@vkontakte/vkjs") ||
+                id.includes("@vkontakte/vkui-date-fns-tz") ||
+                id.includes("@vkontakte/vkui-floating-ui") ||
+                id.includes("@floating-ui") ||
+                id.includes("/@swc/helpers") ||
+                id.includes("/clsx/")
+              ) {
                 return "vkui-vendor";
               }
-              if (id.includes("/node_modules/react/") || id.includes("/node_modules/react-dom/")) {
+              // React + его зависимости (scheduler), чтобы чанк был самодостаточным
+              if (
+                id.includes("/node_modules/react/") ||
+                id.includes("/node_modules/react-dom/") ||
+                id.includes("/node_modules/scheduler/")
+              ) {
                 return "react-vendor";
               }
               return "vendor";

@@ -1,6 +1,6 @@
 // mini-app/src/components/TripCard.tsx
 import { type FC, type KeyboardEvent } from "react";
-import { Avatar, Card, Caption, Spacing, Text, Title, Div, Subhead, Separator, ContentBadge } from "@vkontakte/vkui";
+import { Avatar, Card, Caption, Spacing, Text, Title, Box, Subhead, Separator, ContentBadge } from "@vkontakte/vkui";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
 import type { Trip } from "@/types";
@@ -57,7 +57,7 @@ export const TripCard: FC<TripCardProps> = ({
         outline: "none",
       }}
     >
-      <Div>
+      <Box padding="system">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <Subhead weight="2" style={{ color: "var(--vkui--color_text_secondary)" }}>
             {trip.date} · {trip.time}
@@ -119,7 +119,7 @@ export const TripCard: FC<TripCardProps> = ({
             )}
           </div>
         </div>
-      </Div>
+      </Box>
     </Card>
   );
 };

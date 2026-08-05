@@ -6,24 +6,22 @@ import {
   Caption,
   FormItem,
   ModalCard,
-  ModalCardProps,
   Text,
   Textarea,
   Title,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import type { Trip, User, Role } from "@/types";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCreateReviewMutation, REVIEW_KEYS } from "@/queries/useReviewsQuery";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 
-export interface CreateReviewModalProps extends ModalCardProps {
-  id: string;
-  trip: Trip | null;
-  target?: User | null;
-  targetRole?: Role | null;
-  onClose: () => void;
-}
+export interface CreateReviewModalProps
+  extends CustomModalProps<
+    OpenModalCardProps,
+    { trip: Trip | null; target?: User | null; targetRole?: Role | null }
+  > {}
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -109,12 +107,11 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
 };
 
 export const CreateReviewModal: FC<CreateReviewModalProps> = ({
-  id,
+  modalProps,
+  close,
   trip,
   target,
   targetRole,
-  onClose,
-  ...restProps
 }) => {
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
@@ -174,7 +171,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
 
           setText("");
           setRating(5);
-          onClose();
+          close();
         },
         onError: (error) => {
           if (error instanceof ApiError && error.code === 'ALREADY_REVIEWED') {
@@ -185,7 +182,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
               dedupeKey: "create_review_error",
             });
             queryClient.invalidateQueries({ queryKey: REVIEW_KEYS.availableTrips() });
-            onClose();
+            close();
           } else {
             enqueueSnackbar({
               type: "error",
@@ -215,8 +212,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
 
   return (
     <ModalCard
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       title={targetUser?.name ? `Отзыв о ${targetUser.name}` : "Оставить отзыв"}
       description={
         trip ? `${trip.fromCity} → ${trip.toCity}, ${trip.date}` : undefined
@@ -233,7 +229,6 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
           Отправить отзыв
         </Button>
       }
-      {...restProps}
     >
       <Box padding="system" style={{ paddingTop: 0 }}>
         <Title

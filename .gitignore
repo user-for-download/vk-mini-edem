@@ -9,3 +9,7 @@ coverage/
 backend/.env
 *.db
 *.db-journal
+.opencode/
+prc.json
+assets/
+dump/

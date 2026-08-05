@@ -137,6 +137,7 @@ app.route("/api/reviews", reviewsRouter);
 app.route("/api/notifications", notificationsRouter);
 app.route("/api/users", usersRouter);
 app.get("/ws", createWsHandler(upgradeWebSocket));
+app.get("/api/ws", createWsHandler(upgradeWebSocket));
 
 if (env.isProduction) {
   const distPath = path.resolve(process.cwd(), "mini-app/dist");

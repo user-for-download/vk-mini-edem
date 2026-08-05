@@ -4,30 +4,19 @@ import {
   Box,
   Button,
   ModalCard,
-  ModalCardProps,
   Separator,
   Spacing,
   Text,
   ScreenSpinner,
 } from "@vkontakte/vkui";
-import { useSearchParams } from "@vkontakte/vk-mini-apps-router";
+import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import { RatingBadge } from "@/components/RatingBadge";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useUserQuery } from "@/queries/useUsersQuery";
 import { useUserReviewsQuery } from "@/queries/useReviewsQuery";
 
-export interface DriverProfileModalProps extends ModalCardProps {
-  id: string;
-
-  /**
-   * Id водителя.
-   *
-   * Если не передан явно, берем из search params: driverId.
-   */
-  driverId?: string | null;
-
-  onClose: () => void;
-}
+export interface DriverProfileModalProps
+  extends CustomModalProps<OpenModalCardProps, { driverId: string }> {}
 
 /**
  * Публичный профиль водителя.
@@ -40,15 +29,13 @@ export interface DriverProfileModalProps extends ModalCardProps {
 const REVIEWS_PAGE_SIZE = 5;
 
 export const DriverProfileModal: FC<DriverProfileModalProps> = ({
-  id,
+  modalProps,
+  close,
   driverId: driverIdProp,
-  onClose,
-  ...restProps
 }) => {
-  const [searchParams] = useSearchParams();
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(REVIEWS_PAGE_SIZE);
 
-  const driverId = driverIdProp || searchParams.get("driverId") || "";
+  const driverId = driverIdProp || "";
 
   const {
     data: driver,
@@ -67,10 +54,8 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   if (isLoadingDriver) {
     return (
       <ModalCard
-        id={id}
-        onClose={onClose}
+        {...modalProps}
         title="Профиль водителя"
-        {...restProps}
       >
         <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
           <ScreenSpinner state="loading" />
@@ -82,11 +67,9 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   if (isDriverError || !driver) {
     return (
       <ModalCard
-        id={id}
-        onClose={onClose}
+        {...modalProps}
         title="Профиль не найден"
         description="Не удалось загрузить данные водителя"
-        {...restProps}
       >
         <Box padding="system" style={{ paddingTop: 0 }}>
           <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
@@ -103,11 +86,9 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
 
   return (
     <ModalCard
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       title={driver.name}
       description={driver.isVerified ? "Личность подтверждена" : undefined}
-      {...restProps}
     >
       <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
         <Avatar src={driver.avatar} size={72} style={{ margin: "0 auto 12px" }} />

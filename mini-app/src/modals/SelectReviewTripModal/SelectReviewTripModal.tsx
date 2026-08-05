@@ -6,11 +6,11 @@ import {
   Group,
   Header,
   ModalPage,
-  ModalPageProps,
   ModalPageHeader,
   PanelHeaderButton,
   Text,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import type { Trip } from "@/types";
 import { TripCard } from "@/components/TripCard";
@@ -18,11 +18,8 @@ import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useAvailableReviewTripsQuery, useMyReviewsQuery } from "@/queries/useReviewsQuery";
 
-export interface SelectReviewTripModalProps extends ModalPageProps {
-  id: string;
-  onClose: () => void;
-  onSelectTrip: (trip: Trip) => void;
-}
+export interface SelectReviewTripModalProps
+  extends CustomModalProps<OpenModalPageProps, { onSelectTrip: (trip: Trip) => void }> {}
 
 /**
  * Модалка выбора поездки для отзыва.
@@ -31,10 +28,9 @@ export interface SelectReviewTripModalProps extends ModalPageProps {
  * с дополнительной фильтрацией по уже оставленным отзывам.
  */
 export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
-  id,
-  onClose,
+  modalProps,
+  close,
   onSelectTrip,
-  ...restProps
 }) => {
   const {
     data: reviewableTrips = [],
@@ -58,13 +54,12 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
 
   return (
     <ModalPage
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       settlingHeight={100}
       header={
         <ModalPageHeader
           after={
-            <PanelHeaderButton onClick={onClose} aria-label="Закрыть">
+            <PanelHeaderButton onClick={close} aria-label="Закрыть">
               <Icon24Cancel />
             </PanelHeaderButton>
           }
@@ -72,7 +67,6 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
           Выберите поездку
         </ModalPageHeader>
       }
-      {...restProps}
     >
       {isLoading && (
         <Box

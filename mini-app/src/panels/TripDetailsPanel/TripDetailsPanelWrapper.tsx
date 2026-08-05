@@ -1,15 +1,11 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanelWrapper.tsx
 import { type FC } from "react";
-import {
-  useParams,
-  useRouteNavigator,
-  useSearchParams,
-} from "@vkontakte/vk-mini-apps-router";
+import { useParams, useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import { Panel, ScreenSpinner, PanelHeaderBack } from "@vkontakte/vkui";
 import { TripDetailsPanel } from "@/panels/TripDetailsPanel/TripDetailsPanel";
-import { MODAL_DRIVER_PROFILE } from "@/consts/modals";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useTripDetailQuery } from "@/queries/useTripsQuery";
+import { useModalApi } from "@/providers/ModalProvider";
 import type { Role } from "@/types";
 
 export const TripDetailsPanelWrapper: FC<{ id: string; role: Role }> = ({
@@ -18,7 +14,7 @@ export const TripDetailsPanelWrapper: FC<{ id: string; role: Role }> = ({
 }) => {
   const params = useParams<"tripId">();
   const routeNavigator = useRouteNavigator();
-  const [, setSearchParams] = useSearchParams();
+  const modalApi = useModalApi();
 
   const tripId = params?.tripId;
 
@@ -49,25 +45,24 @@ export const TripDetailsPanelWrapper: FC<{ id: string; role: Role }> = ({
     );
   }
 
+  const onOpenDriver = async () => {
+    if (!trip) {
+      return;
+    }
+    const { DriverProfileModal } = await import("@/modals/DriverProfileModal/DriverProfileModal");
+    modalApi.openCustomModalCard({
+      component: DriverProfileModal,
+      additionalProps: { driverId: trip.driver.id },
+    });
+  };
+
   return (
     <TripDetailsPanel
       id={id}
       trip={trip ?? null}
       role={role}
       onBack={() => routeNavigator.back()}
-      onOpenDriver={() => {
-        if (trip) {
-          setSearchParams(
-            (prev) => {
-              prev.set("driverId", trip.driver.id);
-              return prev;
-            },
-            { replace: true }
-          );
-
-          routeNavigator.showModal(MODAL_DRIVER_PROFILE);
-        }
-      }}
+      onOpenDriver={onOpenDriver}
     />
   );
 };

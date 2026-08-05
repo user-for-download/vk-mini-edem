@@ -39,9 +39,7 @@ import {
 } from "@/queries/useTripsQuery";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { MODAL_EDIT_TRIP } from "@/consts/modals";
-import { useModalStore } from "@/store/useModalStore";
-import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
+import { useModalApi } from "@/providers/ModalProvider";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -69,8 +67,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
-  const routeNavigator = useRouteNavigator();
-  const setEditTrip = useModalStore((state) => state.setEditTrip);
+  const modalApi = useModalApi();
 
   const createBooking = useCreateBookingMutation();
   const cancelBooking = useCancelBookingMutation();
@@ -180,9 +177,13 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     );
   };
 
-  const handleEditTrip = () => {
-    setEditTrip(trip);
-    routeNavigator.showModal(MODAL_EDIT_TRIP);
+  const handleEditTrip = async () => {
+    const { EditTripModal } = await import("@/modals/EditTripModal");
+    modalApi.openCustomModalPage({
+      component: EditTripModal,
+      additionalProps: { trip },
+      baseProps: { settlingHeight: 100 },
+    });
   };
 
   const handleCancelTrip = () => {

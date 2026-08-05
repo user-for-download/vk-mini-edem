@@ -8,11 +8,11 @@ import {
   Input,
   ModalPage,
   ModalPageHeader,
-  ModalPageProps,
   PanelHeaderButton,
   Separator,
   Box,
 } from "@vkontakte/vkui";
+import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi, type CarFormDto } from "@/api/users.api";
 import { ApiError } from "@/api/client";
@@ -20,16 +20,10 @@ import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
-export interface CarFormModalProps extends ModalPageProps {
-  id: string;
-  onClose: () => void;
-}
+export interface CarFormModalProps
+  extends CustomModalProps<OpenModalPageProps, object> {}
 
-export const CarFormModal: FC<CarFormModalProps> = ({
-  id,
-  onClose,
-  ...restProps
-}) => {
+export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
   const currentUser = useCurrentUser();
 
   const [values, setValues] = useState<CarFormDto>({
@@ -89,7 +83,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({
         dedupeKey: "car_form_success",
       });
 
-      onClose();
+      close();
     } catch (submitError) {
       if (submitError instanceof ApiError && submitError.code === 'VALIDATION_FAILED') {
         setError(`Ошибка валидации: ${submitError.message}`);
@@ -109,13 +103,12 @@ export const CarFormModal: FC<CarFormModalProps> = ({
 
   return (
     <ModalPage
-      id={id}
-      onClose={onClose}
+      {...modalProps}
       settlingHeight={100}
       header={
         <ModalPageHeader
           after={
-            <PanelHeaderButton onClick={onClose} aria-label="Закрыть">
+            <PanelHeaderButton onClick={close} aria-label="Закрыть">
               <Icon24Cancel />
             </PanelHeaderButton>
           }
@@ -123,7 +116,6 @@ export const CarFormModal: FC<CarFormModalProps> = ({
           Автомобиль
         </ModalPageHeader>
       }
-      {...restProps}
     >
       <Group header={<Header size="s">Данные автомобиля</Header>}>
         <FormItem top="Модель">
