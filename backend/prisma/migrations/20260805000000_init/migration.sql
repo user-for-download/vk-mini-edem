@@ -8,11 +8,39 @@ CREATE TABLE "User" (
     "reviewsCount" INTEGER NOT NULL DEFAULT 0,
     "tripsCount" INTEGER NOT NULL DEFAULT 0,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "verificationStatus" TEXT NOT NULL DEFAULT 'none',
+    "verifiedAt" TIMESTAMP(3),
     "about" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RefreshToken" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RefreshToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "isRead" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -41,7 +69,7 @@ CREATE TABLE "Trip" (
     "price" INTEGER NOT NULL,
     "seatsTotal" INTEGER NOT NULL,
     "seatsAvailable" INTEGER NOT NULL,
-    "tags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "comment" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -82,7 +110,46 @@ CREATE TABLE "Review" (
 CREATE UNIQUE INDEX "User_vkUserId_key" ON "User"("vkUserId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "RefreshToken_userId_idx" ON "RefreshToken"("userId");
+
+-- CreateIndex
+CREATE INDEX "Notification_userId_isRead_createdAt_idx" ON "Notification"("userId", "isRead", "createdAt" DESC);
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Car_userId_key" ON "Car"("userId");
+
+-- CreateIndex
+CREATE INDEX "Trip_status_departureAt_idx" ON "Trip"("status", "departureAt" ASC);
+
+-- CreateIndex
+CREATE INDEX "Trip_driverId_status_idx" ON "Trip"("driverId", "status");
+
+-- CreateIndex
+CREATE INDEX "Trip_fromCity_toCity_status_idx" ON "Trip"("fromCity", "toCity", "status");
+
+-- CreateIndex
+CREATE INDEX "Booking_tripId_status_idx" ON "Booking"("tripId", "status");
+
+-- CreateIndex
+CREATE INDEX "Booking_passengerId_status_idx" ON "Booking"("passengerId", "status");
+
+-- CreateIndex
+CREATE INDEX "Booking_tripId_seat_status_idx" ON "Booking"("tripId", "seat", "status");
+
+-- CreateIndex
+CREATE INDEX "Review_targetUserId_createdAt_idx" ON "Review"("targetUserId", "createdAt" DESC);
+
+-- CreateIndex
+CREATE INDEX "Review_authorId_tripId_idx" ON "Review"("authorId", "tripId");
+
+-- AddForeignKey
+ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Car" ADD CONSTRAINT "Car_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -104,3 +171,7 @@ ALTER TABLE "Review" ADD CONSTRAINT "Review_authorId_fkey" FOREIGN KEY ("authorI
 
 -- AddForeignKey
 ALTER TABLE "Review" ADD CONSTRAINT "Review_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+
+-- Partial unique index: одно место не может быть занято двумя активными бронями
+CREATE UNIQUE INDEX "active_seat_booking" ON "Booking"("tripId", "seat") WHERE "status" IN ('pending', 'confirmed');
