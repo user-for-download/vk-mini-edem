@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripsManagePanel/TripsManagePanel.tsx
-import { useMemo, useEffect, useRef, type FC } from "react";
+import { useMemo, useEffect, useRef, useState, type FC } from "react";
 import {
   Box,
   Button,
@@ -7,6 +7,7 @@ import {
   Panel,
   PanelHeaderButton,
   Spacing,
+  SegmentedControl,
 } from "@vkontakte/vkui";
 import { Icon28AddOutline } from "@vkontakte/icons";
 import type { Trip } from "@/types";
@@ -18,9 +19,11 @@ import { useInfiniteMyTripsQuery } from "@/queries/useTripsQuery";
 
 export interface TripsManagePanelProps {
   id: string;
-  onOpenTripRequests: (trip: Trip) => void;
+  onOpenTrip: (trip: Trip) => void;
   onOpenCreateTrip: () => void;
 }
+
+type DriverTripTab = "active" | "archive";
 
 /**
  * Список поездок водителя.
@@ -33,9 +36,10 @@ export interface TripsManagePanelProps {
  */
 export const TripsManagePanel: FC<TripsManagePanelProps> = ({
   id,
-  onOpenTripRequests,
+  onOpenTrip,
   onOpenCreateTrip,
 }) => {
+  const [tab, setTab] = useState<DriverTripTab>("active");
   const {
     data,
     isLoading,
@@ -48,11 +52,11 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
   } = useInfiniteMyTripsQuery();
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  
+
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-    
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
@@ -61,24 +65,18 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       },
       { rootMargin: "200px" }
     );
-    
+
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const myTrips = useMemo(() => {
     const trips = data?.pages.flatMap((page) => page.items) ?? [];
-
-    /**
-     * Активные поездки показываем выше.
-     */
-    return [...trips].sort((a, b) => {
-      const aWeight = a.status === "active" ? 0 : 1;
-      const bWeight = b.status === "active" ? 0 : 1;
-
-      return aWeight - bWeight;
+    return trips.filter((trip) => {
+      if (tab === "active") return trip.status === "active";
+      return trip.status === "completed" || trip.status === "cancelled";
     });
-  }, [data]);
+  }, [data, tab]);
 
   return (
     <Panel id={id}>
@@ -94,6 +92,19 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       >
         Мои поездки
       </AppPanelHeader>
+
+      <Group>
+        <Box padding="system">
+          <SegmentedControl<DriverTripTab>
+            value={tab}
+            onChange={(value) => setTab(value)}
+            options={[
+              { label: "Активные", value: "active" },
+              { label: "Архив", value: "archive" },
+            ]}
+          />
+        </Box>
+      </Group>
 
       <Group>
         {isLoading && (
@@ -135,9 +146,14 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
               <TripCard
                 key={trip.id}
                 trip={trip}
-                onOpen={onOpenTripRequests}
+                onOpen={onOpenTrip}
                 requestsCount={trip.pendingRequestsCount ?? 0}
                 hideSeats
+                archivedStatus={
+                  tab === "archive"
+                    ? (trip.status as "completed" | "cancelled")
+                    : undefined
+                }
               />
             ))}
             <div ref={sentinelRef} style={{ height: 1 }} />
@@ -145,9 +161,9 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
           </Box>
         )}
 
-        {!isLoading && !isError && myTrips.length === 0 && (
+        {!isLoading && !isError && myTrips.length === 0 && tab === "active" && (
           <EmptyState
-            title="Пока нет поездок"
+            title="Нет активных поездок"
             subtitle="Опубликуйте маршрут — и попутчики смогут отправить заявку"
             action={
               <Box padding="system">
@@ -158,10 +174,16 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
             }
           />
         )}
+
+        {!isLoading && !isError && myTrips.length === 0 && tab === "archive" && (
+          <EmptyState
+            title="Архив пуст"
+            subtitle="Здесь будут завершенные и отмененные поездки"
+          />
+        )}
       </Group>
 
       <Spacing size={24} />
     </Panel>
   );
 };
-

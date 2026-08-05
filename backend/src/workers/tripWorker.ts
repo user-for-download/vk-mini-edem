@@ -4,6 +4,7 @@ import { wsManager } from "../ws/manager.js";
 import { logBusinessEvent } from "../logger/business.js";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const AUTO_DELETE_DELAY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function processExpiredTrips() {
   try {
@@ -102,6 +103,33 @@ export async function processExpiredTrips() {
         logger.error({ err, tripId: trip.id }, "Failed to auto-complete trip");
       }
     }
+
+    // 2. Авто-удаление отменённых поездок старше 24 часов
+    const deleteThreshold = new Date(Date.now() - AUTO_DELETE_DELAY_MS);
+    const oldCancelledTrips = await db.trip.findMany({
+      where: {
+        status: "cancelled",
+        updatedAt: { lt: deleteThreshold },
+      },
+      select: { id: true },
+    });
+
+    if (oldCancelledTrips.length > 0) {
+      logger.info(
+        { count: oldCancelledTrips.length },
+        "Found old cancelled trips. Deleting..."
+      );
+
+      for (const trip of oldCancelledTrips) {
+        try {
+          // CASCADE в Prisma схеме автоматически удалит связанные брони и отзывы
+          await db.trip.delete({ where: { id: trip.id } });
+          logBusinessEvent("trip.auto_deleted", { tripId: trip.id });
+        } catch (err) {
+          logger.error({ err, tripId: trip.id }, "Failed to delete cancelled trip");
+        }
+      }
+    }
   } catch (error) {
     logger.error({ err: error }, "Error in processExpiredTrips worker");
   }
@@ -117,7 +145,7 @@ export function startTripWorker() {
     void processExpiredTrips();
   }, CHECK_INTERVAL_MS);
   
-  logger.info("Trip auto-completion worker started");
+  logger.info("Trip auto-completion and cleanup worker started");
 }
 
 export function stopTripWorker() {

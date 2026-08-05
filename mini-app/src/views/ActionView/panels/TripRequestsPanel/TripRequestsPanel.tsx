@@ -1,23 +1,29 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel.tsx
-import { type FC, memo } from "react";
+import { type FC } from "react";
 import {
   Avatar,
   Button,
   Caption,
   Box,
   Group,
+  Header,
   Panel,
   PanelHeaderBack,
   PanelHeaderContent,
-  Separator,
-  Subhead,
+  InfoRow,
+  FormStatus,
+  Spacing,
   Text,
 } from "@vkontakte/vkui";
 import type { DriverBookingAction } from "@edem/contracts";
-import type { Booking, BookingStatus, Trip } from "@/types";
-import { RatingBadge } from "@/components/RatingBadge";
+import type { Booking, Trip } from "@/types";
+import { BookingRequestRow } from "@/components/BookingRequestRow";
+import { RouteLine } from "@/components/RouteLine";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
+import { useModalApi } from "@/providers/ModalProvider";
+import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTripsQuery";
+import { useSnackbarStore } from "@/store/useSnackbarStore";
 
 export interface TripRequestsPanelProps {
   id: string;
@@ -30,101 +36,6 @@ export interface TripRequestsPanelProps {
   onRetry: () => void;
 }
 
-const STATUS_LABEL: Record<BookingStatus, string> = {
-  pending: "Ждёт решения",
-  confirmed: "Подтверждено",
-  declined: "Отклонено",
-  cancelled: "Отменена",
-};
-
-const BookingRequestRow: FC<{
-  booking: Booking;
-  onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
-}> = memo(({ booking, onSetStatus }) => {
-  const statusColor =
-    booking.status === "confirmed"
-      ? "var(--carpool_accent)"
-      : booking.status === "declined"
-        ? "var(--vkui--color_text_secondary)"
-        : "var(--vkui--color_text_accent, #3f8ae0)";
-
-  return (
-    <>
-      <Box padding="system" style={{ display: "flex", gap: 10 }}>
-        <Avatar src={booking.passenger.avatar} size={44} />
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <Text weight="2">{booking.passenger.name}</Text>
-            <Caption
-              level="1"
-              style={{
-                color: "var(--vkui--color_text_secondary)",
-                flexShrink: 0,
-              }}
-            >
-              Место {booking.seat}
-            </Caption>
-          </div>
-
-          <RatingBadge
-            value={booking.passenger.rating}
-            reviewsCount={booking.passenger.reviewsCount}
-            size="s"
-          />
-
-          {booking.comment && (
-            <Text
-              style={{
-                marginTop: 6,
-                color: "var(--vkui--color_text_secondary)",
-              }}
-            >
-              «{booking.comment}»
-            </Text>
-          )}
-
-          {booking.status === "pending" ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <Button
-                size="s"
-                mode="primary"
-                appearance="positive"
-                onClick={() => onSetStatus(booking.id, "confirmed")}
-              >
-                Подтвердить
-              </Button>
-
-              <Button
-                size="s"
-                mode="secondary"
-                appearance="negative"
-                onClick={() => onSetStatus(booking.id, "declined")}
-              >
-                Отклонить
-              </Button>
-            </div>
-          ) : (
-            <Subhead weight="2" style={{ color: statusColor, marginTop: 8 }}>
-              {STATUS_LABEL[booking.status]}
-            </Subhead>
-          )}
-        </div>
-      </Box>
-
-      <Separator />
-    </>
-  );
-});
-
-BookingRequestRow.displayName = "BookingRequestRow";
-
 export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   id,
   trip,
@@ -135,6 +46,72 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   onSetStatus,
   onRetry,
 }) => {
+  const modalApi = useModalApi();
+  const cancelTrip = useCancelTripMutation();
+  const completeTrip = useCompleteTripMutation();
+  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+
+  const handleEditTrip = async () => {
+    if (!trip) return;
+    const { EditTripModal } = await import("@/modals/EditTripModal");
+    modalApi.openCustomModalPage({
+      component: EditTripModal,
+      additionalProps: { trip },
+      baseProps: { settlingHeight: 100 },
+    });
+  };
+
+  const handleCancelTrip = () => {
+    if (!trip || trip.status !== "active") return;
+    cancelTrip.mutate(trip.id, {
+      onSuccess: () => {
+        enqueueSnackbar({
+          type: "success",
+          title: "Поездка отменена",
+          dedupeKey: `cancel_trip_${trip.id}`,
+        });
+        onBack();
+      },
+      onError: (error) => {
+        enqueueSnackbar({
+          type: "error",
+          title: "Не удалось отменить поездку",
+          subtitle: error instanceof Error ? error.message : undefined,
+          dedupeKey: `cancel_trip_error_${trip.id}`,
+        });
+      },
+    });
+  };
+
+  const handleCompleteTrip = () => {
+    if (!trip || trip.status !== "active") return;
+    completeTrip.mutate(trip.id, {
+      onSuccess: () => {
+        enqueueSnackbar({
+          type: "success",
+          title: "Поездка завершена",
+          dedupeKey: `complete_trip_${trip.id}`,
+        });
+        onBack();
+      },
+      onError: (error) => {
+        enqueueSnackbar({
+          type: "error",
+          title: "Не удалось завершить поездку",
+          subtitle: error instanceof Error ? error.message : undefined,
+          dedupeKey: `complete_trip_error_${trip.id}`,
+        });
+      },
+    });
+  };
+
+  const departureTime = trip?.departureAt ? Date.parse(trip.departureAt) : null;
+  const canComplete =
+    trip &&
+    trip.status === "active" &&
+    departureTime !== null &&
+    departureTime <= Date.now();
+
   return (
     <Panel id={id}>
       <AppPanelHeader
@@ -147,11 +124,96 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
               : undefined
           }
         >
-          Заявки
+          Управление поездкой
         </PanelHeaderContent>
       </AppPanelHeader>
 
-      <Group>
+      {trip && (
+        <Group>
+          <Box padding="system">
+            <RouteLine
+              from={{ city: trip.fromCity, address: trip.fromAddress }}
+              to={{ city: trip.toCity, address: trip.toAddress }}
+            />
+            <Spacing size={12} />
+            <div
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+            >
+              <InfoRow header="Цена">
+                {trip.price.toLocaleString("ru-RU")} ₽
+              </InfoRow>
+              <InfoRow header="Свободно мест">
+                {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
+              </InfoRow>
+            </div>
+
+            {trip.status === "active" && (
+              <>
+                <Spacing size={16} />
+                <Button
+                  size="m"
+                  mode="secondary"
+                  stretched
+                  onClick={handleEditTrip}
+                  style={{ marginBottom: 8 }}
+                  disabled={cancelTrip.isPending || completeTrip.isPending}
+                >
+                  Редактировать поездку
+                </Button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    size="m"
+                    mode="primary"
+                    appearance="positive"
+                    stretched
+                    onClick={handleCompleteTrip}
+                    loading={completeTrip.isPending}
+                    disabled={!canComplete || cancelTrip.isPending}
+                  >
+                    Завершить
+                  </Button>
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    appearance="negative"
+                    stretched
+                    onClick={handleCancelTrip}
+                    loading={cancelTrip.isPending}
+                    disabled={completeTrip.isPending}
+                  >
+                    Отменить
+                  </Button>
+                </div>
+                {!canComplete && (
+                  <Caption
+                    level="1"
+                    style={{
+                      color: "var(--vkui--color_text_secondary)",
+                      marginTop: 8,
+                      textAlign: "center",
+                    }}
+                  >
+                    Завершение будет доступно после времени отправления
+                  </Caption>
+                )}
+              </>
+            )}
+
+            {trip.status === "cancelled" && (
+              <FormStatus mode="default" title="Поездка отменена">
+                Эта поездка больше недоступна для бронирования.
+              </FormStatus>
+            )}
+            {trip.status === "completed" && (
+              <FormStatus mode="default" title="Поездка завершена">
+                Пассажиры могут оставить отзыв.
+              </FormStatus>
+            )}
+          </Box>
+        </Group>
+      )}
+
+      <Group header={<Header size="s">Заявки ({bookings.length})</Header>}>
         {isLoading && (
           <Box padding="system">
             <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
@@ -175,7 +237,10 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
         )}
 
         {!isLoading && !isError && bookings.length > 0 && (
-          <Box aria-live="polite" aria-label={`Список заявок, ${bookings.length}`}>
+          <Box
+            aria-live="polite"
+            aria-label={`Список заявок, ${bookings.length}`}
+          >
             {bookings.map((booking) => (
               <BookingRequestRow
                 key={booking.id}

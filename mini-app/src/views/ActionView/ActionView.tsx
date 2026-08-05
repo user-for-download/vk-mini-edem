@@ -68,7 +68,7 @@ export const ActionView: FC<ActionViewProps> = ({
         <TripsManagePanel
           id={PANEL_TRIPS_MANAGE}
           onOpenCreateTrip={onOpenCreateTrip}
-          onOpenTripRequests={(trip) => routeNavigator.push(`/trips/my/${trip.id}/requests`)}
+          onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
         />
         <TripRequestsPanelWrapper id={PANEL_TRIP_REQUESTS} />
         <PassengerBookingsPanel

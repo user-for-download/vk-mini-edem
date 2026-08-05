@@ -31,6 +31,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useCreateBookingMutation,
   useCancelBookingMutation,
+  useTripBookingsQuery,
+  useUpdateBookingStatusMutation,
 } from "@/queries/useBookingsQuery";
 import {
   useCancelTripMutation,
@@ -40,6 +42,8 @@ import {
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useModalApi } from "@/providers/ModalProvider";
+import { BookingRequestRow } from "@/components/BookingRequestRow";
+import type { DriverBookingAction } from "@edem/contracts";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -73,6 +77,36 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const cancelBooking = useCancelBookingMutation();
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
+
+  // Запрос заявок для водителя
+  const { data: tripBookings, isLoading: isLoadingBookings } = useTripBookingsQuery(
+    trip?.id ?? ""
+  );
+  const updateBookingStatus = useUpdateBookingStatusMutation();
+
+  const handleSetBookingStatus = (bookingId: string, status: DriverBookingAction) => {
+    updateBookingStatus.mutate(
+      { id: bookingId, status },
+      {
+        onSuccess: () => {
+          enqueueSnackbar({
+            type: status === "confirmed" ? "success" : "info",
+            title:
+              status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+            dedupeKey: `booking_status_${bookingId}_${status}`,
+          });
+        },
+        onError: (error) => {
+          enqueueSnackbar({
+            type: "error",
+            title: "Не удалось обновить заявку",
+            subtitle: error instanceof Error ? error.message : undefined,
+            dedupeKey: `booking_status_error_${bookingId}`,
+          });
+        },
+      }
+    );
+  };
 
   if (!currentUser) {
     return (
@@ -351,6 +385,76 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         </Card>
       </Group>
 
+      {canBook && (
+        <>
+          <div
+            className={`BookingCollapse${
+              bookingOpen ? " BookingCollapse--open" : ""
+            }`}
+          >
+            <div className="BookingCollapse__inner">
+              <Group header={<Header size="s">Выберите место</Header>}>
+                <Box padding="system">
+                  <SeatScheme
+                    seatsTotal={trip.seatsTotal}
+                    takenSeats={takenSeats}
+                    selectedSeat={selectedSeat}
+                    onSelect={setSelectedSeat}
+                  />
+                </Box>
+              </Group>
+
+              <Group header={<Header size="s">Комментарий водителю</Header>}>
+                <FormItem>
+                  <Textarea
+                    placeholder="Например: буду с небольшим чемоданом, подойду к 9:25"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+                </FormItem>
+              </Group>
+            </div>
+          </div>
+
+          <Box
+            padding="system"
+            style={{
+              position: "sticky",
+              bottom: 0,
+              background: "var(--vkui--color_background_content)",
+            }}
+          >
+            <Separator style={{ marginBottom: 12 }} />
+
+            {bookingOpen && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <Text weight="2">Итого</Text>
+                <Title level="3" weight="2">
+                  {trip.price.toLocaleString("ru-RU")} ₽
+                </Title>
+              </div>
+            )}
+
+            <Button
+              size="l"
+              stretched
+              mode="primary"
+              disabled={bookingOpen && selectedSeat === null}
+              loading={isSubmittingBooking}
+              onClick={handleFooterClick}
+            >
+              {bookingOpen ? "Отправить заявку" : "Забронировать место"}
+            </Button>
+          </Box>
+        </>
+      )}
+
       {isOwnTrip && (
         <Box padding="system">
           {isTripCompleted && (
@@ -428,6 +532,38 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         </Box>
       )}
 
+      {isOwnTrip && (
+        <Group header={<Header size="s">Заявки пассажиров ({tripBookings?.length ?? 0})</Header>}>
+          {isLoadingBookings && (
+            <Box padding="system">
+              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                Загрузка заявок...
+              </Text>
+            </Box>
+          )}
+
+          {!isLoadingBookings && tripBookings && tripBookings.length === 0 && (
+            <Box padding="system">
+              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                На эту поездку пока нет заявок.
+              </Text>
+            </Box>
+          )}
+
+          {!isLoadingBookings && tripBookings && tripBookings.length > 0 && (
+            <Box aria-live="polite" aria-label={`Список заявок, ${tripBookings.length}`}>
+              {tripBookings.map((booking) => (
+                <BookingRequestRow
+                  key={booking.id}
+                  booking={booking}
+                  onSetStatus={handleSetBookingStatus}
+                />
+              ))}
+            </Box>
+          )}
+        </Group>
+      )}
+
       {!isOwnTrip && hasActiveBooking && myBooking && (
         <Box padding="system">
           {myBooking.status === "pending" && (
@@ -485,76 +621,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               : "Эта поездка больше недоступна для бронирования."}
           </FormStatus>
         </Box>
-      )}
-
-      {canBook && (
-        <>
-          <div
-            className={`BookingCollapse${
-              bookingOpen ? " BookingCollapse--open" : ""
-            }`}
-          >
-            <div className="BookingCollapse__inner">
-              <Group header={<Header size="s">Выберите место</Header>}>
-                <Box padding="system">
-                  <SeatScheme
-                    seatsTotal={trip.seatsTotal}
-                    takenSeats={takenSeats}
-                    selectedSeat={selectedSeat}
-                    onSelect={setSelectedSeat}
-                  />
-                </Box>
-              </Group>
-
-              <Group header={<Header size="s">Комментарий водителю</Header>}>
-                <FormItem>
-                  <Textarea
-                    placeholder="Например: буду с небольшим чемоданом, подойду к 9:25"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                  />
-                </FormItem>
-              </Group>
-            </div>
-          </div>
-
-          <Box
-            padding="system"
-            style={{
-              position: "sticky",
-              bottom: 0,
-              background: "var(--vkui--color_background_content)",
-            }}
-          >
-            <Separator style={{ marginBottom: 12 }} />
-
-            {bookingOpen && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
-                <Text weight="2">Итого</Text>
-                <Title level="3" weight="2">
-                  {trip.price.toLocaleString("ru-RU")} ₽
-                </Title>
-              </div>
-            )}
-
-            <Button
-              size="l"
-              stretched
-              mode="primary"
-              disabled={bookingOpen && selectedSeat === null}
-              loading={isSubmittingBooking}
-              onClick={handleFooterClick}
-            >
-              {bookingOpen ? "Отправить заявку" : "Забронировать место"}
-            </Button>
-          </Box>
-        </>
       )}
 
       <Spacing size={24} />

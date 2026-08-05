@@ -10,6 +10,7 @@ export interface TripCardProps {
   onOpen?: (trip: Trip) => void;
   requestsCount?: number;
   hideSeats?: boolean;
+  archivedStatus?: "completed" | "cancelled";
 }
 
 function formatDuration(minutes: number): string {
@@ -25,6 +26,7 @@ export const TripCard: FC<TripCardProps> = ({
   onOpen,
   requestsCount = 0,
   hideSeats = false,
+  archivedStatus,
 }) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -34,6 +36,7 @@ export const TripCard: FC<TripCardProps> = ({
   };
 
   const isInteractive = Boolean(onOpen);
+  const isArchived = Boolean(archivedStatus);
 
   const seatsLabel =
     trip.seatsAvailable === 0
@@ -55,6 +58,7 @@ export const TripCard: FC<TripCardProps> = ({
       style={{
         cursor: isInteractive ? "pointer" : "default",
         outline: "none",
+        opacity: isArchived ? 0.6 : 1,
       }}
     >
       <Box padding="system">
@@ -66,6 +70,22 @@ export const TripCard: FC<TripCardProps> = ({
             {trip.price.toLocaleString("ru-RU")} ₽
           </Title>
         </div>
+
+        {isArchived && (
+          <Caption
+            level="1"
+            weight="2"
+            style={{
+              marginTop: 4,
+              color:
+                archivedStatus === "cancelled"
+                  ? "var(--vkui--color_text_negative)"
+                  : "var(--vkui--color_text_secondary)",
+            }}
+          >
+            {archivedStatus === "cancelled" ? "ОТМЕНЕНА" : "ЗАВЕРШЕНА"}
+          </Caption>
+        )}
 
         <Spacing size={12} />
         <RouteLine from={{ city: trip.fromCity, address: trip.fromAddress }} to={{ city: trip.toCity, address: trip.toAddress }} />
