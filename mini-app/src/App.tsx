@@ -31,7 +31,6 @@ import { useSwipeBackSync } from "@/hooks/useSwipeBackSync";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { parseDeepLink } from "@/helpers/deepLink";
-import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function App() {
   const { isOnline, wasOffline } = useOnlineStatus();
@@ -80,7 +79,6 @@ export default function App() {
   const reviewTrip = reviewTripState;
 
   useSwipeBackSync();
-  useWebSocket();
 
   const closeModal = () => {
     setReviewTripState(null);

@@ -2,10 +2,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
 export class ApiError extends Error {
   code?: string;
-  constructor(message: string, code?: string) {
+  status?: number;
+  constructor(message: string, code?: string, status?: number) {
     super(message);
     this.name = "ApiError";
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -41,7 +43,7 @@ class ApiClient {
         const retryResponse = await this.doFetch(endpoint, options);
         if (!retryResponse.ok) {
           const errorData = await retryResponse.json().catch(() => ({}));
-          throw new ApiError(errorData.message || `HTTP error ${retryResponse.status}`, errorData.code);
+          throw new ApiError(errorData.message || `HTTP error ${retryResponse.status}`, errorData.code, retryResponse.status);
         }
         return retryResponse.json();
       }
@@ -49,7 +51,7 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(errorData.message || `HTTP error ${response.status}`, errorData.code);
+      throw new ApiError(errorData.message || `HTTP error ${response.status}`, errorData.code, response.status);
     }
 
     return response.json();

@@ -1,37 +1,34 @@
 import { z } from "zod";
-import { bookingStatusSchema } from "./booking.schema.js";
-import { tripStatusSchema } from "./trip.schema.js";
 
 /**
  * События, которые сервер отправляет клиенту через WebSocket.
  */
-export const wsEventSchema = z.discriminatedUnion("event", [
+export const wsServerEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("pong") }),
+  z.object({ type: z.literal("ping") }),
   z.object({
-    event: z.literal("booking_created"),
-    tripId: z.string(),
-    bookingId: z.string(),
-    passengerId: z.string(),
-    seat: z.number().int(),
+    type: z.literal("booking:new"),
+    payload: z.object({ bookingId: z.string(), tripId: z.string() }),
   }),
   z.object({
-    event: z.literal("booking_status_changed"),
-    tripId: z.string(),
-    bookingId: z.string(),
-    status: bookingStatusSchema,
+    type: z.literal("booking:status_changed"),
+    payload: z.object({ bookingId: z.string(), tripId: z.string(), status: z.string() }),
   }),
   z.object({
-    event: z.literal("booking_cancelled"),
-    tripId: z.string(),
-    bookingId: z.string(),
+    type: z.literal("trip:status_changed"),
+    payload: z.object({ tripId: z.string(), status: z.string() }),
   }),
   z.object({
-    event: z.literal("trip_status_changed"),
-    tripId: z.string(),
-    status: tripStatusSchema,
+    type: z.literal("notification:new"),
+    payload: z.object({ id: z.string() }),
+  }),
+  z.object({
+    type: z.literal("error"),
+    payload: z.object({ code: z.string(), message: z.string() }),
   }),
 ]);
 
-export type WsEvent = z.infer<typeof wsEventSchema>;
+export type WsServerEvent = z.infer<typeof wsServerEventSchema>;
 
 /**
  * Сообщения от клиента к серверу.

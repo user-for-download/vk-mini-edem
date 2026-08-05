@@ -5,7 +5,7 @@ import { db } from "../db.js";
 import { env } from "../env.js";
 import { serializeUser } from "../serializers/index.js";
 
-import { verifyVkSignature } from "./vkSign.js";
+import { verifyVkLaunchSignature } from "./vkSign.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -35,15 +35,21 @@ authRouter.post("/vk", authRateLimiter, async (c) => {
     );
   }
 
-  const { vkUserId, sign, ts } = parseResult.data;
+  const { searchParams, vkUserId: reqVkUserId, sign: reqSign, ts: reqTs } = parseResult.data;
 
-  const isValidSignature = verifyVkSignature({
-    vkUserId,
-    sign,
-    ts,
-  });
+  let queryToVerify = searchParams;
+  if (!queryToVerify && reqVkUserId && reqSign) {
+    const tsSec = Math.floor((reqTs || Date.now()) / 1000);
+    queryToVerify = `vk_user_id=${reqVkUserId}&vk_app_id=0&vk_platform=desktop_web&vk_ts=${tsSec}&sign=${encodeURIComponent(reqSign)}`;
+  }
 
-  if (!isValidSignature) {
+  if (!queryToVerify) {
+    return c.json({ message: "Invalid auth payload" }, 400);
+  }
+
+  const { isValid, vkUserId } = verifyVkLaunchSignature(queryToVerify);
+
+  if (!isValid || !vkUserId) {
     return c.json({ message: "Invalid or expired signature" }, 401);
   }
 

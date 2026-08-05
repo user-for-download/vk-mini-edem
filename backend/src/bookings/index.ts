@@ -483,14 +483,6 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
     );
 
     wsManager.sendToUser(booking.trip.driverId, {
-      event: "booking_created",
-      tripId,
-      bookingId: booking.id,
-      passengerId: passenger.id,
-      seat,
-    });
-
-    wsManager.sendToUser(booking.trip.driverId, {
       type: "booking:new",
       payload: { bookingId: booking.id, tripId },
     });
@@ -714,13 +706,6 @@ bookingsRouter.patch("/:id/status", async (c) => {
     );
 
     wsManager.sendToUser(passengerId, {
-      event: "booking_status_changed",
-      tripId: updated.tripId,
-      bookingId: id,
-      status: newStatus,
-    });
-
-    wsManager.sendToUser(passengerId, {
       type: "booking:status_changed",
       payload: { bookingId: id, tripId: updated.tripId, status: newStatus },
     });
@@ -820,12 +805,6 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
     logBusinessEvent("booking.cancelled", {
       bookingId: id,
       passengerId: user.id,
-    });
-
-    wsManager.sendToUser(txResult.driverId, {
-      event: "booking_cancelled",
-      tripId: txResult.tripId,
-      bookingId: id,
     });
 
     wsManager.sendToUser(txResult.driverId, {

@@ -13,10 +13,15 @@ import { router } from "@/router";
 import { WsProvider } from "@/providers/WsProvider";
 import { GlobalWsListener } from "@/components/GlobalWsListener";
 
+import { ApiError } from "@/api/client";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
+        if (error instanceof ApiError && error.status && error.status >= 400 && error.status < 500) {
+          return false;
+        }
         if (error instanceof Error && error.message.startsWith("HTTP error 4")) {
           return false;
         }

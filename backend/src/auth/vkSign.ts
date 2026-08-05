@@ -1,63 +1,82 @@
-// backend/src/auth/vkSign.ts
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env.js";
 import { logger } from "../logger.js";
 
 const MAX_SIGN_AGE_MS = 5 * 60 * 1000;
 
-export interface VkAuthPayload {
-  vkUserId: number;
-  sign: string;
-  ts: number;
+export interface VkAuthResult {
+  isValid: boolean;
+  vkUserId?: number;
 }
 
 /**
- * Проверка подписи VK auth payload.
+ * Проверка подписи VK Mini Apps launch params.
  *
- * Canonical string:
- * vk_user_id={vkUserId}&ts={ts}
- *
- * Signature:
- * base64url(HMAC_SHA256(canonical, VK_APP_SECRET))
+ * Алгоритм VK:
+ * 1. Из URLSearchParams берутся только параметры с префиксом vk_* (кроме sign и vk_sign).
+ * 2. Параметры сортируются по алфавиту по ключу.
+ * 3. Формируется каноническая строка k1=v1&k2=v2...
+ * 4. Считается HMAC-SHA256(canonical, VK_APP_SECRET) -> base64url.
+ * 5. Сравнивается с переданным параметром sign.
  */
-export function verifyVkSignature(payload: VkAuthPayload): boolean {
-  /**
-   * Dev-имитация.
-   *
-   * Разрешена только если:
-   * - NODE_ENV !== production;
-   * - ALLOW_DEV_AUTH !== false;
-   * - sign === "dev-sign" или "test-sign".
-   */
-  if (
-    env.ALLOW_DEV_AUTH &&
-    payload.sign === "dev-sign"
-  ) {
-    logger.warn(
-      { env: env.NODE_ENV },
-      "[Auth] DEV signature bypass accepted"
-    );
-    return true;
+export function verifyVkLaunchSignature(rawSearchParams: string): VkAuthResult {
+  const params = new URLSearchParams(rawSearchParams);
+
+  // Dev-bypass для локальной разработки
+  if (env.ALLOW_DEV_AUTH && rawSearchParams.includes("sign=dev-sign")) {
+    logger.warn({ env: env.NODE_ENV }, "[Auth] DEV launch params bypass accepted");
+    const rawId = params.get("vk_user_id");
+    const vkUserId = rawId ? Number(rawId) : 100001;
+    return { isValid: true, vkUserId: Number.isFinite(vkUserId) && vkUserId > 0 ? vkUserId : 100001 };
   }
 
-  const now = Date.now();
+  const sign = params.get("sign");
+  const vkTsStr = params.get("vk_ts");
+  const vkUserIdStr = params.get("vk_user_id");
 
-  if (Math.abs(now - payload.ts) > MAX_SIGN_AGE_MS) {
-    return false;
+  if (!sign || !vkTsStr || !vkUserIdStr) {
+    return { isValid: false };
   }
 
-  const canonical = `vk_user_id=${payload.vkUserId}&ts=${payload.ts}`;
+  const vkUserId = Number(vkUserIdStr);
+  if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
+    return { isValid: false };
+  }
+
+  // Проверка свежести vk_ts (в секундах)
+  const vkTsMs = Number(vkTsStr) * 1000;
+  if (Number.isNaN(vkTsMs) || Math.abs(Date.now() - vkTsMs) > MAX_SIGN_AGE_MS) {
+    return { isValid: false };
+  }
+
+  // Сбор только vk_* параметров (исключая подпись и любые сторонние параметры вроде driverId/tripId)
+  const entries: [string, string][] = [];
+  params.forEach((value, key) => {
+    if (key.startsWith("vk_") && key !== "vk_sign" && key !== "sign") {
+      entries.push([key, value]);
+    }
+  });
+
+  // Строгое посимвольное сравнение
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const canonical = entries.map(([k, v]) => `${k}=${v}`).join("&");
 
   const expected = createHmac("sha256", env.VK_APP_SECRET)
     .update(canonical)
     .digest("base64url");
 
   const expectedBuffer = Buffer.from(expected);
-  const receivedBuffer = Buffer.from(payload.sign);
+  const receivedBuffer = Buffer.from(sign);
 
-  if (expectedBuffer.length !== receivedBuffer.length) {
-    return false;
+  if (expectedBuffer.byteLength !== receivedBuffer.byteLength) {
+    return { isValid: false };
   }
 
-  return timingSafeEqual(expectedBuffer, receivedBuffer);
+  try {
+    const isValid = timingSafeEqual(expectedBuffer, receivedBuffer);
+    return { isValid, vkUserId };
+  } catch {
+    return { isValid: false };
+  }
 }
+

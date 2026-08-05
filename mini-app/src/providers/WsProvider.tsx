@@ -46,6 +46,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     ws.onopen = () => {
       setIsConnected(true);
+      ws.send(JSON.stringify({ type: "auth", token }));
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;

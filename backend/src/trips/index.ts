@@ -535,11 +535,6 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   
   for (const pid of uniquePassengers) {
     wsManager.sendToUser(pid, {
-      event: "trip_status_changed",
-      tripId: trip.id,
-      status: "cancelled",
-    });
-    wsManager.sendToUser(pid, {
       type: "trip:status_changed",
       payload: { tripId: trip.id, status: "cancelled" },
     });
@@ -680,11 +675,6 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   });
 
   for (const pid of passengerIds) {
-    wsManager.sendToUser(pid, {
-      event: "trip_status_changed",
-      tripId: trip.id,
-      status: "completed",
-    });
     wsManager.sendToUser(pid, {
       type: "trip:status_changed",
       payload: { tripId: trip.id, status: "completed" },

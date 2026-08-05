@@ -36,51 +36,30 @@ type VkLaunchParams = ReturnType<typeof parseURLSearchParamsForGetLaunchParams> 
 let bootstrapPromise: Promise<void> | null = null;
 let refreshPromise: Promise<void> | null = null;
 
-async function getVkAuthPayload(): Promise<{ vkUserId: number; sign: string; ts: number }> {
-  const launchParams = parseURLSearchParamsForGetLaunchParams(
-    window.location.search
-  ) as VkLaunchParams;
+async function getVkAuthPayload(): Promise<{ searchParams: string }> {
+  const search = window.location.search;
+  const urlParams = new URLSearchParams(search);
 
-  let vkUserId = Number(launchParams.vk_user_id);
-
-  const ts = Date.now();
-
-  let sign: string;
-  if (launchParams.vk_sign) {
-    sign = launchParams.vk_sign;
-  } else if (import.meta.env.DEV) {
-    sign = "dev-sign";
-  } else {
-    throw new Error("VK sign is missing");
-  }
-
-  if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
+  if (import.meta.env.DEV && !urlParams.has("vk_user_id")) {
+    let devUserId = 100001;
     try {
       const userInfo = await bridge.send("VKWebAppGetUserInfo");
-      vkUserId = Number(userInfo.id);
+      if (userInfo?.id) devUserId = Number(userInfo.id);
     } catch {
       // ignore
     }
+
+    const devParams = new URLSearchParams({
+      vk_user_id: String(devUserId),
+      vk_app_id: "0",
+      vk_platform: "desktop_web",
+      vk_ts: Math.floor(Date.now() / 1000).toString(),
+      sign: "dev-sign",
+    });
+    return { searchParams: devParams.toString() };
   }
 
-  if (!Number.isFinite(vkUserId) || vkUserId <= 0) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        "[Auth] DEV fallback: vkUserId not available, using mock 100001"
-      );
-      vkUserId = 100001;
-    } else {
-      throw new Error(
-        "Не удалось получить идентификатор пользователя ВКонтакте"
-      );
-    }
-  }
-
-  return {
-    vkUserId,
-    sign,
-    ts,
-  };
+  return { searchParams: search.replace(/^\?/, "") };
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -103,15 +82,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ status: "initializing" });
 
       try {
-        const { vkUserId, sign, ts } = await getVkAuthPayload();
+        const payload = await getVkAuthPayload();
 
-        const response = await authApi.loginWithVk({
-          vkUserId,
-          sign,
-          ts,
-        });
+        const response = await authApi.loginWithVk(payload);
 
         apiClient.setToken(response.accessToken);
+        apiClient.setRefreshToken(response.refreshToken);
 
         set({
           status: "authenticated",
@@ -125,6 +101,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (error) {
         console.error("[Auth] Bootstrap failed:", error);
         apiClient.setToken(null);
+        apiClient.setRefreshToken(null);
 
         set({
           status: "unauthenticated",
@@ -160,6 +137,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         apiClient.setToken(response.accessToken);
+        apiClient.setRefreshToken(response.refreshToken);
 
         set({
           status: "authenticated",
@@ -213,6 +191,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     console.log(`[Auth] Clearing session. Reason: ${reason}`);
 
     apiClient.setToken(null);
+    apiClient.setRefreshToken(null);
 
     set({
       status: "unauthenticated",

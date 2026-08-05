@@ -1,5 +1,5 @@
 import type { WSContext } from "hono/ws";
-import type { WsEvent } from "@edem/contracts";
+import type { WsServerEvent } from "@edem/contracts";
 import { logger } from "../logger.js";
 
 const AUTH_TIMEOUT_MS = 5_000;
@@ -89,7 +89,7 @@ class WebSocketManager {
     return stale;
   }
 
-  sendToUser(userId: string, event: WsEvent | any): number {
+  sendToUser(userId: string, event: WsServerEvent): number {
     const connIds = this.connections.get(userId);
     if (!connIds || connIds.size === 0) return 0;
 
@@ -108,7 +108,7 @@ class WebSocketManager {
     return sent;
   }
 
-  sendToUsers(userIds: string[], event: WsEvent | any): number {
+  sendToUsers(userIds: string[], event: WsServerEvent): number {
     let total = 0;
     for (const userId of userIds) {
       total += this.sendToUser(userId, event);

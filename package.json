@@ -34,6 +34,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "@vkontakte/icons": "^3.64.1",
     "@vkontakte/vk-bridge": "^3.0.2",
+    "@vkontakte/vk-bridge-mock": "^2.2.0",
     "@vkontakte/vk-bridge-react": "^2.0.1",
     "@vkontakte/vk-mini-apps-router": "^1.8.6",
     "@vkontakte/vkui": "^8.3.1",
