@@ -8,6 +8,9 @@ export const tripTagSchema = z.enum([
   "Только девушки",
   "Тихая поездка",
   "С остановками",
+  "Не курить",
+  "Можно с детьми",
+  "Разговорчивый",
 ]);
 
 export type TripTag = z.infer<typeof tripTagSchema>;
