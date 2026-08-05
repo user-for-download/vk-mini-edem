@@ -29,6 +29,20 @@ model User {
   reviewsGiven Review[]  @relation("AuthorReviews")
   reviewsRecv  Review[]  @relation("TargetReviews")
   notifications Notification[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Notification {

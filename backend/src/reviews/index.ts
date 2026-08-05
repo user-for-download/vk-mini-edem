@@ -7,6 +7,7 @@ import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeTrip, serializeReview, type TripWithDriver } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 
@@ -163,7 +164,7 @@ reviewsRouter.get("/user/:userId", publicReadLimiter, async (c) => {
  * - после создания отзыва пересчитываются rating и reviewsCount.
  */
 reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = createReviewDtoSchema.safeParse(body);
 
   if (!parseResult.success) {

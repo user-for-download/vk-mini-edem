@@ -130,14 +130,14 @@ app.get("/health/ready", async (c) => {
   return c.json({ ready: dbOk }, dbOk ? 200 : 503);
 });
 
-app.route("/api/auth", authRouter);
-app.route("/api/trips", tripsRouter);
-app.route("/api/bookings", bookingsRouter);
-app.route("/api/reviews", reviewsRouter);
-app.route("/api/notifications", notificationsRouter);
-app.route("/api/users", usersRouter);
+app.route("/api/v1/auth", authRouter);
+app.route("/api/v1/trips", tripsRouter);
+app.route("/api/v1/bookings", bookingsRouter);
+app.route("/api/v1/reviews", reviewsRouter);
+app.route("/api/v1/notifications", notificationsRouter);
+app.route("/api/v1/users", usersRouter);
 app.get("/ws", createWsHandler(upgradeWebSocket));
-app.get("/api/ws", createWsHandler(upgradeWebSocket));
+app.get("/api/v1/ws", createWsHandler(upgradeWebSocket));
 
 if (env.isProduction) {
   const distPath = path.resolve(process.cwd(), "mini-app/dist");

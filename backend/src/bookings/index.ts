@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { Prisma } from "@prisma/client";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   createBookingDtoSchema,
@@ -13,6 +14,7 @@ import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
 import { mutationLimiter } from "../middleware/rateLimit.js";
+import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
@@ -361,7 +363,7 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
  * Pending сразу удерживает место.
  */
 bookingsRouter.post("/", mutationLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = createBookingDtoSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -494,6 +496,17 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
 
     return c.json(serializeBooking(booking), 201);
   } catch (error) {
+    // Ловим ошибку уникального индекса (гонка броней на уровне БД)
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.SEAT_TAKEN, message: "Место только что заняли" },
+        409
+      );
+    }
+
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },

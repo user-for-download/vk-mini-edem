@@ -10,18 +10,26 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  rotateRefreshToken,
+  hashToken,
 } from "./tokens.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
 
 export const authRouter = new Hono();
 
-const authRateLimiter = createRateLimiter({
-  windowMs: env.AUTH_RATE_WINDOW_MS,
-  max: env.AUTH_RATE_MAX,
-  keyPrefix: "auth",
+const vkAuthLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  max: 5,
+  keyPrefix: "auth-vk",
 });
 
-authRouter.post("/vk", authRateLimiter, async (c) => {
+const refreshLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyPrefix: "auth-refresh",
+});
+
+authRouter.post("/vk", vkAuthLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = authRequestSchema.safeParse(body);
 
@@ -74,7 +82,7 @@ authRouter.post("/vk", authRateLimiter, async (c) => {
   }
 
   const accessToken = await signAccessToken(user.id);
-  const refreshToken = await signRefreshToken(user.id);
+  const refreshToken = await signRefreshToken(user.id); // Создаёт запись в БД
 
   return c.json({
     accessToken,
@@ -84,7 +92,7 @@ authRouter.post("/vk", authRateLimiter, async (c) => {
   });
 });
 
-authRouter.post("/refresh", authRateLimiter, async (c) => {
+authRouter.post("/refresh", refreshLimiter, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const parseResult = refreshRequestSchema.safeParse(body);
 
@@ -93,7 +101,10 @@ authRouter.post("/refresh", authRateLimiter, async (c) => {
   }
 
   try {
-    const userId = await verifyRefreshToken(parseResult.data.refreshToken);
+    const { userId, jti } = await verifyRefreshToken(
+      parseResult.data.refreshToken
+    );
+    const newJti = await rotateRefreshToken(jti, userId); // Атомарно: отзыв старого + создание нового
 
     const user = await db.user.findUnique({
       where: { id: userId },
@@ -105,7 +116,8 @@ authRouter.post("/refresh", authRateLimiter, async (c) => {
     }
 
     const accessToken = await signAccessToken(user.id);
-    const refreshToken = await signRefreshToken(user.id);
+    // Подписываем JWT с newJti без дублирования записи в БД
+    const refreshToken = await signRefreshToken(user.id, newJti);
 
     return c.json({
       accessToken,
@@ -116,4 +128,22 @@ authRouter.post("/refresh", authRateLimiter, async (c) => {
   } catch {
     return c.json({ message: "Invalid refresh token" }, 401);
   }
+});
+
+authRouter.post("/logout", refreshLimiter, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parseResult = refreshRequestSchema.safeParse(body);
+
+  if (parseResult.success) {
+    try {
+      const { jti } = await verifyRefreshToken(parseResult.data.refreshToken);
+      await db.refreshToken.update({
+        where: { tokenHash: hashToken(jti) },
+        data: { revokedAt: new Date() },
+      });
+    } catch {
+      // Игнорируем — логаут всегда успешен для клиента
+    }
+  }
+  return c.json({ success: true });
 });

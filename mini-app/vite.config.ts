@@ -2,6 +2,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf-8")
@@ -11,7 +12,57 @@ const pkg = JSON.parse(
 
 export default defineConfig(() => {
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      VitePWA({
+        registerType: "autoUpdate",
+        includeAssets: ["pwa-192x192.png", "pwa-512x512.png"],
+        manifest: {
+          name: "Едем — попутчики",
+          short_name: "Едем",
+          description: "Поиск попутчиков и совместные поездки",
+          theme_color: "#0077ff",
+          background_color: "#ffffff",
+          display: "standalone",
+          start_url: "/",
+          icons: [
+            {
+              src: "/pwa-192x192.png",
+              sizes: "192x192",
+              type: "image/png",
+            },
+            {
+              src: "/pwa-512x512.png",
+              sizes: "512x512",
+              type: "image/png",
+            },
+            {
+              src: "/pwa-512x512.png",
+              sizes: "512x512",
+              type: "image/png",
+              purpose: "maskable",
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+          navigateFallback: "/index.html",
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/i\.pravatar\.cc\/.*/,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "avatars",
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: {

@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
+import type { ZodType } from "zod";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export class ApiError extends Error {
   code?: string;
@@ -28,7 +30,7 @@ class ApiClient {
     return this.token;
   }
 
-  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  async request<T>(endpoint: string, options: RequestInit = {}, schema?: ZodType<T>): Promise<T> {
     const response = await this.doFetch(endpoint, options);
 
     // Если 401 и это НЕ сам auth-эндпоинт — пробуем refresh
@@ -45,7 +47,7 @@ class ApiClient {
           const errorData = await retryResponse.json().catch(() => ({}));
           throw new ApiError(errorData.message || `HTTP error ${retryResponse.status}`, errorData.code, retryResponse.status);
         }
-        return retryResponse.json();
+        return this.parseResponse(retryResponse, schema);
       }
     }
 
@@ -54,7 +56,21 @@ class ApiClient {
       throw new ApiError(errorData.message || `HTTP error ${response.status}`, errorData.code, response.status);
     }
 
-    return response.json();
+    return this.parseResponse(response, schema);
+  }
+
+  private async parseResponse<T>(response: Response, schema?: ZodType<T>): Promise<T> {
+    const data = await response.json();
+
+    if (schema) {
+      const parsed = schema.safeParse(data);
+      if (!parsed.success) {
+        throw new ApiError("Некорректный ответ сервера", "INVALID_RESPONSE", response.status);
+      }
+      return parsed.data;
+    }
+
+    return data as T;
   }
 
   private async doFetch(endpoint: string, options: RequestInit): Promise<Response> {

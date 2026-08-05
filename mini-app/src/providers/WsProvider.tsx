@@ -19,7 +19,7 @@ export const useWs = () => {
 };
 
 function getWsUrl(): string {
-  const apiUrl = import.meta.env.VITE_API_URL || "/api";
+  const apiUrl = import.meta.env.VITE_API_URL || "/api/v1";
   if (apiUrl.startsWith("http")) {
     return apiUrl.replace(/^http/, "ws") + "/ws";
   }

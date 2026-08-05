@@ -26,7 +26,7 @@ const queryClient = new QueryClient({
         if (error instanceof Error && error.message.startsWith("HTTP error 4")) {
           return false;
         }
-        return failureCount < 2;
+        return failureCount < 3;
       },
       refetchOnWindowFocus: false,
       staleTime: 60_000,

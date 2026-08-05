@@ -11,6 +11,7 @@ import {
 } from "@/consts/panels";
 import { VIEW_PROFILE } from "@/consts/views";
 import type { Role, Trip } from "@/types";
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 const ProfilePanel = lazy(() =>
   import("@/views/ProfileView/panels/ProfilePanel/ProfilePanel").then((m) => ({
     default: m.ProfilePanel,
@@ -69,27 +70,29 @@ export const ProfileView: FC<ProfileViewProps> = ({
 
   return (
     <Suspense fallback={<PanelSpinner />}>
-      <View id={id} activePanel={activePanel}>
-        <ProfilePanel
-          id={PANEL_PROFILE}
-          role={role}
-          onChangeRole={onChangeRole}
-          onOpenCreateReview={onOpenCreateReview}
-          onOpenReviewForTrip={onOpenReviewForTrip}
-          onOpenCarForm={onOpenCarForm}
-          onOpenEditProfile={onOpenEditProfile}
-          onOpenMyBookings={() => routeNavigator.push("/bookings")}
-          onOpenHistory={() => routeNavigator.push("/bookings/history")}
-          onOpenNotifications={() => routeNavigator.push("/profile/notifications")}
-          onOpenSupport={() => routeNavigator.push("/profile/support")}
-          onOpenAbout={() => routeNavigator.push("/profile/about")}
-        />
-        <NotificationsPanel id={PANEL_SETTINGS_NOTIFICATIONS} onBack={backToProfile} />
-        <SupportPanel id={PANEL_SETTINGS_SUPPORT} onBack={backToProfile} />
-        <AboutPanel id={PANEL_SETTINGS_ABOUT} onBack={backToProfile} />
-        <TermsPanel id={PANEL_ABOUT_TERMS} onBack={backToProfile} />
-        <PrivacyPanel id={PANEL_ABOUT_PRIVACY} onBack={backToProfile} />
-      </View>
+      <ViewErrorBoundary>
+        <View id={id} activePanel={activePanel}>
+          <ProfilePanel
+            id={PANEL_PROFILE}
+            role={role}
+            onChangeRole={onChangeRole}
+            onOpenCreateReview={onOpenCreateReview}
+            onOpenReviewForTrip={onOpenReviewForTrip}
+            onOpenCarForm={onOpenCarForm}
+            onOpenEditProfile={onOpenEditProfile}
+            onOpenMyBookings={() => routeNavigator.push("/bookings")}
+            onOpenHistory={() => routeNavigator.push("/bookings/history")}
+            onOpenNotifications={() => routeNavigator.push("/profile/notifications")}
+            onOpenSupport={() => routeNavigator.push("/profile/support")}
+            onOpenAbout={() => routeNavigator.push("/profile/about")}
+          />
+          <NotificationsPanel id={PANEL_SETTINGS_NOTIFICATIONS} onBack={backToProfile} />
+          <SupportPanel id={PANEL_SETTINGS_SUPPORT} onBack={backToProfile} />
+          <AboutPanel id={PANEL_SETTINGS_ABOUT} onBack={backToProfile} />
+          <TermsPanel id={PANEL_ABOUT_TERMS} onBack={backToProfile} />
+          <PrivacyPanel id={PANEL_ABOUT_PRIVACY} onBack={backToProfile} />
+        </View>
+      </ViewErrorBoundary>
     </Suspense>
   );
 };

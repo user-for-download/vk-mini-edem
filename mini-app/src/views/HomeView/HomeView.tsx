@@ -4,6 +4,7 @@ import { useGetPanelForView, useRouteNavigator } from "@vkontakte/vk-mini-apps-r
 import { PANEL_HOME, PANEL_TRIP_DETAILS } from "@/consts/panels";
 import { VIEW_HOME } from "@/consts/views";
 import type { Role, User } from "@/types";
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 const HomePanel = lazy(() =>
   import("@/views/HomeView/panels/HomePanel/HomePanel").then((m) => ({
     default: m.HomePanel,
@@ -34,16 +35,18 @@ export const HomeView: FC<HomeViewProps> = ({ id, role, onGoSearch, onOpenCreate
 
   return (
     <Suspense fallback={<PanelSpinner />}>
-      <View id={id} activePanel={activePanel}>
-        <HomePanel
-          id={PANEL_HOME}
-          role={role}
-          onOpenTrip={(trip) => openTrip(trip.id)}
-          onGoSearch={onGoSearch}
-          onOpenCreateTrip={onOpenCreateTrip}
-        />
-        <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
-      </View>
+      <ViewErrorBoundary>
+        <View id={id} activePanel={activePanel}>
+          <HomePanel
+            id={PANEL_HOME}
+            role={role}
+            onOpenTrip={(trip) => openTrip(trip.id)}
+            onGoSearch={onGoSearch}
+            onOpenCreateTrip={onOpenCreateTrip}
+          />
+          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
+        </View>
+      </ViewErrorBoundary>
     </Suspense>
   );
 };

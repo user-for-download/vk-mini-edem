@@ -11,6 +11,7 @@ import {
 } from "@/consts/panels";
 import { VIEW_ACTION } from "@/consts/views";
 import type { Role, Trip, User } from "@/types";
+import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 const SearchPanel = lazy(() =>
   import("@/views/ActionView/panels/SearchPanel/SearchPanel").then((m) => ({
     default: m.SearchPanel,
@@ -63,30 +64,32 @@ export const ActionView: FC<ActionViewProps> = ({
 
   return (
     <Suspense fallback={<PanelSpinner />}>
-      <View id={id} activePanel={activePanel}>
-        <SearchPanel id={PANEL_SEARCH} onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)} />
-        <TripsManagePanel
-          id={PANEL_TRIPS_MANAGE}
-          onOpenCreateTrip={onOpenCreateTrip}
-          onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
-        />
-        <TripRequestsPanelWrapper id={PANEL_TRIP_REQUESTS} />
-        <PassengerBookingsPanel
-          id={PANEL_PASSENGER_BOOKINGS}
-          onBack={() => routeNavigator.back()}
-          onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
-          onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
-          onGoSearch={() => routeNavigator.push("/trips/search")}
-        />
-        <PassengerHistoryPanel
-          id={PANEL_PASSENGER_HISTORY}
-          onBack={() => routeNavigator.back()}
-          onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
-          onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
-          onGoSearch={() => routeNavigator.push("/trips/search")}
-        />
-        <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
-      </View>
+      <ViewErrorBoundary>
+        <View id={id} activePanel={activePanel}>
+          <SearchPanel id={PANEL_SEARCH} onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)} />
+          <TripsManagePanel
+            id={PANEL_TRIPS_MANAGE}
+            onOpenCreateTrip={onOpenCreateTrip}
+            onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
+          />
+          <TripRequestsPanelWrapper id={PANEL_TRIP_REQUESTS} />
+          <PassengerBookingsPanel
+            id={PANEL_PASSENGER_BOOKINGS}
+            onBack={() => routeNavigator.back()}
+            onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
+            onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
+            onGoSearch={() => routeNavigator.push("/trips/search")}
+          />
+          <PassengerHistoryPanel
+            id={PANEL_PASSENGER_HISTORY}
+            onBack={() => routeNavigator.back()}
+            onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
+            onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
+            onGoSearch={() => routeNavigator.push("/trips/search")}
+          />
+          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
+        </View>
+      </ViewErrorBoundary>
     </Suspense>
   );
 };

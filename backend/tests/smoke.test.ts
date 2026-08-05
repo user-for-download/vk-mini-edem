@@ -39,7 +39,7 @@ describe("auth bootstrap", () => {
   it("creates user and returns token", async () => {
     await cleanDb();
 
-    const response = await app.request("/api/auth/vk", {
+    const response = await app.request("/api/v1/auth/vk", {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify({
@@ -111,7 +111,7 @@ describe("trips", () => {
       },
     });
 
-    const response = await app.request("/api/trips");
+    const response = await app.request("/api/v1/trips");
 
     expect(response.status).toBe(200);
 
@@ -167,7 +167,7 @@ describe("bookings smoke", () => {
       },
     });
 
-    const response = await app.request("/api/bookings", {
+    const response = await app.request("/api/v1/bookings", {
       method: "POST",
       headers: {
         ...JSON_HEADERS,

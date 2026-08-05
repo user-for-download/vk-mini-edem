@@ -8,6 +8,7 @@ import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { optionalAuth, type OptionalAuthEnv } from "../auth/optionalMiddleware.js";
 import { serializeTrip } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 import { wsManager } from "../ws/manager.js";
@@ -318,7 +319,7 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth as any, async (c) => {
  * Создание поездки текущим пользователем.
  */
 tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = createTripDtoSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -392,7 +393,7 @@ tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   
   const updateTripSchema = createTripDtoSchema.partial();
   const parseResult = updateTripSchema.safeParse(body);

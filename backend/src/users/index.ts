@@ -5,6 +5,7 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeUser } from "../serializers/index.js";
 import { publicReadLimiter } from "../middleware/rateLimit.js";
+import { getSanitizedBody } from "../middleware/sanitize.js";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -34,7 +35,7 @@ usersRouter.get("/me", requireUser, async (c) => {
 
 usersRouter.patch("/me/notification-settings", requireUser, async (c) => {
   const user = c.get("user");
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = updateNotificationSettingsSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -75,7 +76,7 @@ usersRouter.post("/me/request-verification", requireUser, async (c) => {
 usersRouter.patch("/me", requireUser, async (c) => {
   const user = c.get("user");
 
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = updateProfileSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -108,7 +109,7 @@ usersRouter.patch("/me", requireUser, async (c) => {
 usersRouter.post("/me/car", requireUser, async (c) => {
   const user = c.get("user");
 
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = carFormSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -142,7 +143,7 @@ usersRouter.post("/me/car", requireUser, async (c) => {
 usersRouter.patch("/me/car", requireUser, async (c) => {
   const user = c.get("user");
 
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = carFormSchema.safeParse(body);
 
   if (!parseResult.success) {
