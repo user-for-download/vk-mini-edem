@@ -56,8 +56,8 @@ jobs:
       - name: Prisma validate
         run: npm run --workspace backend prisma:validate
 
-      - name: Apply Prisma migrations
-        run: npm run --workspace backend db:migrate:deploy
+      - name: Push Prisma schema to DB
+        run: npm run --workspace backend db:push
 
       - name: Typecheck contracts
         run: npm run --workspace "@edem/contracts" typecheck

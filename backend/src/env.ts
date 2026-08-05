@@ -62,7 +62,7 @@ export const env = {
 
   PORT: isProduction
     ? intEnv("PORT", 3000)
-    : (process.env.PORT ? intEnv("PORT", 3001) : intEnv("BACKEND_PORT", 3001)),
+    : intEnv("BACKEND_PORT", 3001),
 
   /**
    * DATABASE_URL обязателен всегда.
