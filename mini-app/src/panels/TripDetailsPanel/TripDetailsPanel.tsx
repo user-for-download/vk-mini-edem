@@ -28,7 +28,10 @@ import { SeatScheme } from "@/components/SeatScheme";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useCreateBookingMutation } from "@/queries/useBookingsQuery";
+import {
+  useCreateBookingMutation,
+  useCancelBookingMutation,
+} from "@/queries/useBookingsQuery";
 import {
   useCancelTripMutation,
   useCompleteTripMutation,
@@ -70,6 +73,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const setEditTrip = useModalStore((state) => state.setEditTrip);
 
   const createBooking = useCreateBookingMutation();
+  const cancelBooking = useCancelBookingMutation();
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
 
@@ -103,7 +107,12 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const noSeats = trip.seatsAvailable === 0;
   const takenSeats = trip.bookedSeats ?? [];
 
-  const canBook = !isOwnTrip && isTripActive && !noSeats;
+  const myBooking = trip.myBooking ?? null;
+  const hasActiveBooking =
+    myBooking !== null &&
+    (myBooking.status === "pending" || myBooking.status === "confirmed");
+
+  const canBook = !isOwnTrip && isTripActive && !noSeats && !hasActiveBooking;
 
   const departureTime = trip.departureAt ? Date.parse(trip.departureAt) : null;
 
@@ -418,7 +427,53 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         </Box>
       )}
 
-      {!isOwnTrip && !isTripActive && (
+      {!isOwnTrip && hasActiveBooking && myBooking && (
+        <Box padding="system">
+          {myBooking.status === "pending" && (
+            <FormStatus mode="default" title="Заявка на рассмотрении">
+              Вы забронировали место {myBooking.seat}. Ожидайте подтверждения
+              водителя.
+            </FormStatus>
+          )}
+          {myBooking.status === "confirmed" && (
+            <FormStatus mode="default" title="Место подтверждено">
+              Ваше место {myBooking.seat} подтверждено водителем. Увидимся в
+              поездке!
+            </FormStatus>
+          )}
+          <Spacing size={12} />
+          <Button
+            size="m"
+            mode="secondary"
+            appearance="negative"
+            stretched
+            loading={cancelBooking.isPending}
+            onClick={() => {
+              cancelBooking.mutate(myBooking.id, {
+                onSuccess: () => {
+                  enqueueSnackbar({
+                    type: "info",
+                    title: "Бронь отменена",
+                    dedupeKey: `cancel_booking_${myBooking.id}`,
+                  });
+                },
+                onError: (error) => {
+                  enqueueSnackbar({
+                    type: "error",
+                    title: "Не удалось отменить бронь",
+                    subtitle: error instanceof Error ? error.message : undefined,
+                    dedupeKey: `cancel_booking_error_${myBooking.id}`,
+                  });
+                },
+              });
+            }}
+          >
+            Отменить бронь
+          </Button>
+        </Box>
+      )}
+
+      {!isOwnTrip && !isTripActive && !hasActiveBooking && (
         <Box padding="system">
           <FormStatus
             mode="default"

@@ -5,10 +5,12 @@ import { createTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem
 import { db } from "../db.js";
 import { logger } from "../logger.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
+import { optionalAuth, type OptionalAuthEnv } from "../auth/optionalMiddleware.js";
 import { serializeTrip } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
+import { wsManager } from "../ws/manager.js";
 
 async function getActiveBookingSeatsByTripIds(
   tripIds: string[]
@@ -248,8 +250,9 @@ tripsRouter.get("/my", requireUser, async (c) => {
  * Детали поездки.
  * Возвращаем bookedSeats, чтобы фронт мог корректно рисовать SeatScheme.
  */
-tripsRouter.get("/:id", publicReadLimiter, async (c) => {
+tripsRouter.get("/:id", publicReadLimiter, optionalAuth as any, async (c) => {
   const id = c.req.param("id");
+  const currentUser = c.get("user");
 
   const trip = await db.trip.findUnique({
     where: { id },
@@ -263,7 +266,7 @@ tripsRouter.get("/:id", publicReadLimiter, async (c) => {
   });
 
   if (!trip) {
-    return c.json({ message: "Trip not found" }, 404);
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
   }
 
   const activeBookings = await db.booking.findMany({
@@ -278,9 +281,35 @@ tripsRouter.get("/:id", publicReadLimiter, async (c) => {
     },
   });
 
+  let myBooking: {
+    id: string;
+    seat: number;
+    status: string;
+    createdAt: Date;
+  } | null = null;
+
+  if (currentUser) {
+    const booking = await db.booking.findFirst({
+      where: {
+        tripId: trip.id,
+        passengerId: currentUser.id,
+        status: { in: ["pending", "confirmed"] },
+      },
+      select: {
+        id: true,
+        seat: true,
+        status: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    myBooking = booking;
+  }
+
   return c.json(
     serializeTrip(trip, {
       bookedSeats: activeBookings.map((booking) => booking.seat),
+      myBooking,
     })
   );
 });
@@ -470,6 +499,15 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
       },
     });
 
+    const activeBookings = await tx.booking.findMany({
+      where: {
+        tripId: trip.id,
+        status: "cancelled", // they are now cancelled
+      },
+    });
+    
+    // We will extract passengerIds below, outside the transaction map
+
     return tx.trip.update({
       where: { id: trip.id },
       data: {
@@ -485,6 +523,31 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
       },
     });
   });
+
+  const passengersToNotify = await db.booking.findMany({
+    where: {
+      tripId: trip.id,
+    },
+    select: { passengerId: true }
+  });
+
+  const uniquePassengers = Array.from(new Set(passengersToNotify.map(b => b.passengerId)));
+  
+  for (const pid of uniquePassengers) {
+    wsManager.sendToUser(pid, {
+      event: "trip_status_changed",
+      tripId: trip.id,
+      status: "cancelled",
+    });
+    wsManager.sendToUser(pid, {
+      type: "trip:status_changed",
+      payload: { tripId: trip.id, status: "cancelled" },
+    });
+    wsManager.sendToUser(pid, {
+      type: "notification:new",
+      payload: { id: "refresh" },
+    });
+  }
 
   logBusinessEvent("trip.cancelled", {
     tripId: trip.id,
@@ -542,6 +605,8 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
     return c.json({ code: ERROR_CODES.TRIP_IN_PAST, message: "Trip has not started yet" }, 400);
   }
 
+  let passengerIds: string[] = [];
+
   const updated = await db.$transaction(async (tx) => {
     // 1. Decline all pending bookings
     await tx.booking.updateMany({
@@ -565,7 +630,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
       },
     });
 
-    const passengerIds = Array.from(
+    passengerIds = Array.from(
       new Set(confirmedBookings.map((booking) => booking.passengerId))
     );
 
@@ -592,7 +657,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
     }
 
     // 5. Update trip status
-    const updated = await tx.trip.update({
+    return tx.trip.update({
       where: { id: trip.id },
       data: {
         status: "completed",
@@ -606,18 +671,32 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
         },
       },
     });
-
-    return { updated, passengerIds };
   });
 
   logBusinessEvent("trip.completed", {
     tripId: trip.id,
     driverId: user.id,
-    passengersCount: updated.passengerIds.length,
+    passengersCount: passengerIds.length,
   });
 
+  for (const pid of passengerIds) {
+    wsManager.sendToUser(pid, {
+      event: "trip_status_changed",
+      tripId: trip.id,
+      status: "completed",
+    });
+    wsManager.sendToUser(pid, {
+      type: "trip:status_changed",
+      payload: { tripId: trip.id, status: "completed" },
+    });
+    wsManager.sendToUser(pid, {
+      type: "notification:new",
+      payload: { id: "refresh" },
+    });
+  }
+
   return c.json(
-    serializeTrip(updated.updated, {
+    serializeTrip(updated, {
       bookedSeats: [],
       pendingRequestsCount: 0,
     })

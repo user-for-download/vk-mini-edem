@@ -30,7 +30,7 @@ class BookingError extends Error {
 
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
-
+import { wsManager } from "../ws/manager.js";
 
 export const bookingsRouter = new Hono<AuthEnv>();
 
@@ -482,6 +482,24 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
       `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`
     );
 
+    wsManager.sendToUser(booking.trip.driverId, {
+      event: "booking_created",
+      tripId,
+      bookingId: booking.id,
+      passengerId: passenger.id,
+      seat,
+    });
+
+    wsManager.sendToUser(booking.trip.driverId, {
+      type: "booking:new",
+      payload: { bookingId: booking.id, tripId },
+    });
+    
+    wsManager.sendToUser(booking.trip.driverId, {
+      type: "notification:new",
+      payload: { id: "refresh" },
+    });
+
     return c.json(serializeBooking(booking), 201);
   } catch (error) {
     if (error instanceof BookingError) {
@@ -528,6 +546,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
   }
 
   let oldStatus = "";
+  let passengerId = "";
 
   try {
     const updated = await db.$transaction(async (tx) => {
@@ -560,6 +579,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
       }
 
       oldStatus = booking.status;
+      passengerId = booking.passengerId;
 
       if (booking.status === newStatus) {
         return booking;
@@ -687,11 +707,28 @@ bookingsRouter.patch("/:id/status", async (c) => {
     });
 
     await createNotification(
-      updated.passengerId,
+      passengerId,
       "booking_status_changed",
       newStatus === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
       `Водитель ${newStatus === "confirmed" ? "подтвердил" : "отклонил"} вашу заявку в поездке ${updated.trip.fromCity} → ${updated.trip.toCity}`
     );
+
+    wsManager.sendToUser(passengerId, {
+      event: "booking_status_changed",
+      tripId: updated.tripId,
+      bookingId: id,
+      status: newStatus,
+    });
+
+    wsManager.sendToUser(passengerId, {
+      type: "booking:status_changed",
+      payload: { bookingId: id, tripId: updated.tripId, status: newStatus },
+    });
+
+    wsManager.sendToUser(passengerId, {
+      type: "notification:new",
+      payload: { id: "refresh" },
+    });
 
     return c.json(serializeBooking(updated));
   } catch (error) {
@@ -728,7 +765,7 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
   const id = c.req.param("id");
 
   try {
-    await db.$transaction(async (tx) => {
+    const txResult = await db.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
         where: { id },
         include: {
@@ -776,11 +813,24 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
           status: "cancelled",
         },
       });
+
+      return { tripId: booking.tripId, driverId: booking.trip.driverId };
     });
 
     logBusinessEvent("booking.cancelled", {
       bookingId: id,
       passengerId: user.id,
+    });
+
+    wsManager.sendToUser(txResult.driverId, {
+      event: "booking_cancelled",
+      tripId: txResult.tripId,
+      bookingId: id,
+    });
+
+    wsManager.sendToUser(txResult.driverId, {
+      type: "booking:status_changed",
+      payload: { bookingId: id, tripId: txResult.tripId, status: "cancelled" },
     });
 
     return c.json({ success: true });

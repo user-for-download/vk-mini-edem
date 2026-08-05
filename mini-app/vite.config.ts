@@ -51,6 +51,11 @@ export default defineConfig(() => {
           target: "http://127.0.0.1:3001",
           changeOrigin: true,
         },
+        "/ws": {
+          target: "ws://127.0.0.1:3001",
+          ws: true,
+          changeOrigin: true,
+        },
       },
       hmr: process.env.DISABLE_HMR !== "true",
       watch: process.env.DISABLE_HMR === "true" ? null : {},

@@ -35,6 +35,13 @@ export type TripTag =
   | "Тихая поездка"
   | "С остановками";
 
+export interface MyBooking {
+  id: string;
+  seat: number;
+  status: BookingStatus;
+  createdAt?: string;
+}
+
 export interface Trip {
   id: string;
   fromCity: string;
@@ -65,6 +72,12 @@ export interface Trip {
    * Актуально для поездок водителя.
    */
   pendingRequestsCount?: number;
+
+  /**
+   * Активная бронь текущего пользователя в этой поездке.
+   * null — брони нет.
+   */
+  myBooking?: MyBooking | null;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "declined" | "cancelled";

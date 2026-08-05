@@ -1,5 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { createNodeWebSocket } from "@hono/node-ws";
+import fs from "node:fs";
+import path from "node:path";
 
 import { authRouter } from "./auth/index.js";
 import { tripsRouter } from "./trips/index.js";
@@ -7,6 +11,7 @@ import { bookingsRouter } from "./bookings/index.js";
 import { reviewsRouter } from "./reviews/index.js";
 import { usersRouter } from "./users/index.js";
 import { notificationsRouter } from "./notifications/index.js";
+import { createWsHandler } from "./ws/index.js";
 
 import { env } from "./env.js";
 import { db } from "./db.js";
@@ -15,6 +20,9 @@ import { Sentry } from "./sentry.js";
 import { ERROR_CODES } from "./errors.js";
 
 export const app = new Hono();
+
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+export { injectWebSocket };
 
 const allowedOrigins = env.CORS_ORIGINS.split(",")
   .map((origin) => origin.trim())
@@ -128,6 +136,20 @@ app.route("/api/bookings", bookingsRouter);
 app.route("/api/reviews", reviewsRouter);
 app.route("/api/notifications", notificationsRouter);
 app.route("/api/users", usersRouter);
+app.get("/ws", createWsHandler(upgradeWebSocket));
+
+if (env.isProduction) {
+  const distPath = path.resolve(process.cwd(), "mini-app/dist");
+  app.use("/*", serveStatic({ root: path.relative(process.cwd(), distPath) }));
+  app.get("*", (c) => {
+    try {
+      const html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+      return c.html(html);
+    } catch {
+      return c.text("Frontend build not found", 404);
+    }
+  });
+}
 
 /**
  * Глобальная обработка ошибок.

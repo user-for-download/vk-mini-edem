@@ -88,6 +88,12 @@ export function serializeTrip(
   options?: {
     bookedSeats?: number[];
     pendingRequestsCount?: number;
+    myBooking?: {
+      id: string;
+      seat: number;
+      status: string;
+      createdAt?: Date;
+    } | null;
   }
 ) {
   return {
@@ -110,6 +116,16 @@ export function serializeTrip(
     status: trip.status as TripStatus,
     bookedSeats: options?.bookedSeats ?? [],
     pendingRequestsCount: options?.pendingRequestsCount,
+    myBooking: options?.myBooking
+      ? {
+          id: options.myBooking.id,
+          seat: options.myBooking.seat,
+          status: options.myBooking.status as BookingStatus,
+          createdAt: options.myBooking.createdAt
+            ? options.myBooking.createdAt.toISOString()
+            : undefined,
+        }
+      : null,
   };
 }
 

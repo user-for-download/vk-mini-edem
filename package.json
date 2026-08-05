@@ -11,8 +11,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"vite --port=3000 --host=0.0.0.0\"",
     "dev:backend": "npm run dev --workspace=backend",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\"",
-    "build": "npm run build:contracts && vite build",
+    "build": "npm run build:contracts && npm run build --workspace=backend && vite build",
+    "start": "node backend/dist/src/index.js",
     "build:contracts": "npm run build --workspace=packages/contracts",
     "db:push": "npm run db:push --workspace=backend",
     "db:push:force": "npm run db:push:force --workspace=backend",

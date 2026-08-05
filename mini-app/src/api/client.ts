@@ -22,6 +22,10 @@ class ApiClient {
     this.refreshTokenValue = token;
   }
 
+  getToken(): string | null {
+    return this.token;
+  }
+
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const response = await this.doFetch(endpoint, options);
 

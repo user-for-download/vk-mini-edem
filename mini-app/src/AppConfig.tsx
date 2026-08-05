@@ -10,6 +10,8 @@ import { transformVKBridgeAdaptivity } from "@/helpers/transformVKBridgeAdaptivi
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGate } from "@/components/AuthGate";
 import { router } from "@/router";
+import { WsProvider } from "@/providers/WsProvider";
+import { GlobalWsListener } from "@/components/GlobalWsListener";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,9 +51,12 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
           <QueryClientProvider client={queryClient}>
             <ErrorBoundary>
               <AuthGate>
-                <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
-                  {children}
-                </AppRoot>
+                <WsProvider>
+                  <GlobalWsListener />
+                  <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
+                    {children}
+                  </AppRoot>
+                </WsProvider>
               </AuthGate>
             </ErrorBoundary>
           </QueryClientProvider>
@@ -60,3 +65,4 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
     </ConfigProvider>
   );
 };
+

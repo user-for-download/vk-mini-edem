@@ -289,6 +289,8 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
           <Box
             padding="system"
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            aria-live="polite"
+            aria-label={`Список поездок, всего ${visibleBookings.length}`}
           >
             {visibleBookings.map((booking) => (
               <BookingCard

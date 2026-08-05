@@ -175,7 +175,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
         )}
 
         {!isLoading && !isError && bookings.length > 0 && (
-          <>
+          <Box aria-live="polite" aria-label={`Список заявок, ${bookings.length}`}>
             {bookings.map((booking) => (
               <BookingRequestRow
                 key={booking.id}
@@ -183,7 +183,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                 onSetStatus={onSetStatus}
               />
             ))}
-          </>
+          </Box>
         )}
 
         {!isLoading && !isError && bookings.length === 0 && (

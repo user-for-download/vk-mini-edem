@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { userSchema } from "./user.schema.js";
+import { bookingStatusSchema } from "./booking.schema.js";
 
 export const tripTagSchema = z.enum([
   "Можно с животными",
@@ -15,6 +16,15 @@ export type TripTag = z.infer<typeof tripTagSchema>;
 export const tripStatusSchema = z.enum(["active", "cancelled", "completed"]);
 
 export type TripStatus = z.infer<typeof tripStatusSchema>;
+
+export const myBookingSchema = z.object({
+  id: z.string(),
+  seat: z.number().int().min(1),
+  status: bookingStatusSchema,
+  createdAt: z.string().datetime().optional(),
+});
+
+export type MyBooking = z.infer<typeof myBookingSchema>;
 
 export const tripSchema = z.object({
   id: z.string(),
@@ -37,6 +47,7 @@ export const tripSchema = z.object({
 
   bookedSeats: z.array(z.number().int().min(1)).optional(),
   pendingRequestsCount: z.number().int().min(0).optional(),
+  myBooking: myBookingSchema.nullable().optional(),
 });
 
 export type Trip = z.infer<typeof tripSchema>;

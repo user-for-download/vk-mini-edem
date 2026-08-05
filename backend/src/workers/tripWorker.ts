@@ -1,13 +1,12 @@
 import { db } from "../db.js";
 import { logger } from "../logger.js";
+import { wsManager } from "../ws/manager.js";
+import { logBusinessEvent } from "../logger/business.js";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-// For testing locally we can make it shorter or just run on boot once?
-// We can run it every hour.
 
 export async function processExpiredTrips() {
   try {
-    // Find active trips where departureAt is more than 24 hours ago
     const expiredTrips = await db.trip.findMany({
       where: {
         status: "active",
@@ -29,13 +28,11 @@ export async function processExpiredTrips() {
     for (const trip of expiredTrips) {
       try {
         await db.$transaction(async (tx) => {
-          // 1. Mark trip as completed
           await tx.trip.update({
             where: { id: trip.id },
-            data: { status: "completed" },
+            data: { status: "completed", seatsAvailable: 0 },
           });
 
-          // 2. Decline pending bookings
           const pendingBookingIds = trip.bookings
             .filter((b) => b.status === "pending")
             .map((b) => b.id);
@@ -47,22 +44,15 @@ export async function processExpiredTrips() {
             });
           }
 
-          // 3. Increment driver tripsCount
           await tx.user.update({
             where: { id: trip.driverId },
             data: { tripsCount: { increment: 1 } },
           });
 
-          // 4. Increment passengers tripsCount (only confirmed)
           const confirmedPassengerIds = trip.bookings
             .filter((b) => b.status === "confirmed")
             .map((b) => b.passengerId);
 
-          // Passenger IDs can have duplicates if someone booked multiple seats?
-          // Actually, passengerId is unique per booking? No, booking has passengerId. 
-          // If a passenger books multiple seats, it's one booking or multiple?
-          // The schema has `seat` in booking, so maybe multiple bookings for the same user.
-          // Let's use unique passenger IDs to increment tripsCount once per passenger.
           const uniquePassengerIds = [...new Set(confirmedPassengerIds)];
           
           for (const pId of uniquePassengerIds) {
@@ -73,6 +63,40 @@ export async function processExpiredTrips() {
           }
 
           logger.info(`Trip ${trip.id} auto-completed. Driver and ${uniquePassengerIds.length} passengers updated.`);
+
+          logBusinessEvent("trip.completed", {
+            tripId: trip.id,
+            driverId: trip.driverId,
+            passengersCount: uniquePassengerIds.length,
+          });
+
+          for (const pId of uniquePassengerIds) {
+            wsManager.sendToUser(pId, {
+              type: "trip:status_changed",
+              payload: { tripId: trip.id, status: "completed" },
+            });
+            wsManager.sendToUser(pId, {
+              type: "notification:new",
+              payload: { id: "refresh" },
+            });
+          }
+          
+          const declinedPassengerIds = trip.bookings
+            .filter((b) => b.status === "pending")
+            .map((b) => b.passengerId);
+            
+          const uniqueDeclinedPassengerIds = [...new Set(declinedPassengerIds)];
+          
+          for (const pId of uniqueDeclinedPassengerIds) {
+            wsManager.sendToUser(pId, {
+              type: "trip:status_changed",
+              payload: { tripId: trip.id, status: "completed" },
+            });
+            wsManager.sendToUser(pId, {
+              type: "notification:new",
+              payload: { id: "refresh" },
+            });
+          }
         });
       } catch (err) {
         logger.error({ err, tripId: trip.id }, "Failed to auto-complete trip");

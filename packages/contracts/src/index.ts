@@ -4,9 +4,11 @@ export * from "./schemas/trip.schema.js";
 export * from "./schemas/booking.schema.js";
 export * from "./schemas/review.schema.js";
 export * from "./schemas/status.const.js";
+export * from "./schemas/ws.schema.js";
 
 // DTO
 export * from "./dto/auth.dto.js";
 export * from "./dto/trip.dto.js";
 export * from "./dto/booking.dto.js";
 export * from "./dto/review.dto.js";
+export * from "./ws.js";
