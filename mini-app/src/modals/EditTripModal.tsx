@@ -3,6 +3,7 @@ import { type FC, useState, useCallback } from "react";
 import {
   Button,
   Box,
+  DateInput,
   Flex,
   FormItem,
   FormLayoutGroup,
@@ -79,6 +80,16 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<TripTag[]>(trip.tags as TripTag[]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Единый объект даты+времени для DateInput; инициализируется из trip.departureAt
+  // в ЛОКАЛЬНОМ времени (см. комментарий выше про сдвиг суток из-за UTC).
+  const [departureDateTime, setDepartureDateTime] = useState<Date | null>(() => {
+    if (values.date && values.time) {
+      const dt = new Date(`${values.date}T${values.time}`);
+      return Number.isNaN(dt.getTime()) ? null : dt;
+    }
+    return null;
+  });
+
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const updateTrip = useUpdateTripMutation();
 
@@ -105,6 +116,26 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     [values]
   );
 
+  const handleDateTimeChange = useCallback((date: Date | null) => {
+    setDepartureDateTime(date);
+
+    if (date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+
+      setValues((prev) => ({
+        ...prev,
+        date: `${year}-${month}-${day}`,
+        time: `${hours}:${minutes}`,
+      }));
+    } else {
+      setValues((prev) => ({ ...prev, date: "", time: "" }));
+    }
+  }, []);
+
   const handlePublish = useCallback(() => {
     const allTouched: Partial<Record<keyof TripFormValues, boolean>> = {};
 
@@ -127,7 +158,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       return;
     }
 
-    const departureAt = new Date(`${values.date}T${values.time}`);
+    const departureAt = departureDateTime ?? new Date(`${values.date}T${values.time}`);
 
     if (Number.isNaN(departureAt.getTime())) {
       setErrors((prev) => ({
@@ -177,6 +208,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     });
   }, [
     values,
+    departureDateTime,
     selectedTags,
     trip.id,
     updateTrip,
@@ -306,50 +338,28 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       <Group header={<Header size="s">Дата и время</Header>}>
         <FormLayoutGroup>
           <FormItem
-            top="Дата"
-            status={showError("date") ? "error" : "default"}
+            top="Дата и время отправления"
+            status={showError("date") || showError("time") ? "error" : "default"}
             bottom={
-              showError("date") ? (
+              showError("date") || showError("time") ? (
                 <Caption
                   level="1"
                   role="alert"
                   style={{ color: "var(--vkui--color_text_negative)" }}
                 >
-                  {showError("date")}
+                  {showError("date") || showError("time")}
                 </Caption>
               ) : undefined
             }
           >
-            <Input
-              type="date"
-              value={values.date}
-              onChange={(e) => handleChange("date", e.target.value)}
-              onBlur={() => handleBlur("date")}
-              aria-invalid={!!showError("date")}
-            />
-          </FormItem>
-
-          <FormItem
-            top="Время отправления"
-            status={showError("time") ? "error" : "default"}
-            bottom={
-              showError("time") ? (
-                <Caption
-                  level="1"
-                  role="alert"
-                  style={{ color: "var(--vkui--color_text_negative)" }}
-                >
-                  {showError("time")}
-                </Caption>
-              ) : undefined
-            }
-          >
-            <Input
-              type="time"
-              value={values.time}
-              onChange={(e) => handleChange("time", e.target.value)}
-              onBlur={() => handleBlur("time")}
-              aria-invalid={!!showError("time")}
+            <DateInput
+              value={departureDateTime}
+              onChange={handleDateTimeChange}
+              enableTime
+              disablePast
+              size="m"
+              placeholder="Выберите дату и время"
+              aria-invalid={!!(showError("date") || showError("time"))}
             />
           </FormItem>
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useRef, type FC } from "react";
-import { Box, Button, Caption, Flex, Group, Input, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
+import { Box, Button, Caption, DateInput, Flex, Group, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
@@ -72,19 +72,27 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
 
   const [searchValue, setSearchValue] = useState("");
   const [selectedTags, setSelectedTags] = useState<TripTag[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchValue = useDebouncedValue(searchValue, 400);
+
+  // Локальная YYYY-MM-DD (не toISOString — он сдвигает дату на UTC).
+  const toDateString = useCallback((date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
 
   const filters = useMemo(() => {
     const parsedFilters = parseSearchQuery(debouncedSearchValue);
     const result: SearchTripsFilters = { ...parsedFilters };
     if (selectedTags.length > 0) result.tags = selectedTags;
-    if (dateFrom) result.dateFrom = dateFrom;
-    if (dateTo) result.dateTo = dateTo;
+    if (dateFrom) result.dateFrom = toDateString(dateFrom);
+    if (dateTo) result.dateTo = toDateString(dateTo);
     return Object.keys(result).length > 0 ? result : undefined;
-  }, [debouncedSearchValue, selectedTags, dateFrom, dateTo]);
+  }, [debouncedSearchValue, selectedTags, dateFrom, dateTo, toDateString]);
 
   const {
     data, isLoading, isError, error, refetch, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage,
@@ -143,13 +151,40 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
             <Flex gap={8}>
               <div className="SearchPanel__field">
                 <Caption level="1" className="SearchPanel__fieldLabel">Дата от</Caption>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <DateInput
+                  value={dateFrom}
+                  onChange={setDateFrom}
+                  disablePast
+                  placeholder="Не выбрано"
+                />
               </div>
               <div className="SearchPanel__field">
                 <Caption level="1" className="SearchPanel__fieldLabel">Дата до</Caption>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <DateInput
+                  value={dateTo}
+                  onChange={setDateTo}
+                  disablePast
+                  minDateTime={dateFrom ?? undefined}
+                  placeholder="Не выбрано"
+                />
               </div>
             </Flex>
+            {(dateFrom || dateTo) && (
+              <Spacing size={8} />
+            )}
+            {(dateFrom || dateTo) && (
+              <Button
+                size="s"
+                mode="tertiary"
+                appearance="neutral"
+                onClick={() => {
+                  setDateFrom(null);
+                  setDateTo(null);
+                }}
+              >
+                Сбросить даты
+              </Button>
+            )}
           </Box>
         )}
       </Group>
