@@ -21,13 +21,15 @@ export const BOOKING_KEYS = {
   trip: (tripId: string) => [...BOOKING_KEYS.all, "trip", tripId] as const,
 };
 
-export function useMyBookingsQuery() {
+export function useMyBookingsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: BOOKING_KEYS.my(),
     queryFn: async () => {
-      const res = await bookingsApi.getUserBookings();
-      return res as unknown as Booking[];
+      // getUserBookings уже типизирован как PassengerBooking[] (поле scope
+      // нужно для разделения активных/истории на главной).
+      return bookingsApi.getUserBookings();
     },
+    enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
   });
 }

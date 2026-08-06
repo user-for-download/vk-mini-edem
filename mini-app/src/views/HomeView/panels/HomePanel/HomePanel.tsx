@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTripsQuery, useMyTripsQuery } from "@/queries/useTripsQuery";
+import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
 
 export interface HomePanelProps {
   id: string;
@@ -30,6 +31,7 @@ export interface HomePanelProps {
 /**
  * Главная: приветствие, промо и подборка ближайших поездок.
  * Для водителя дополнительно показываем его активную поездку.
+ * Для пассажира — его ближайшую активную бронь.
  */
 export const HomePanel: FC<HomePanelProps> = ({
   id,
@@ -52,6 +54,16 @@ export const HomePanel: FC<HomePanelProps> = ({
     isLoading: myTripsLoading,
   } = useMyTripsQuery({
     enabled: role === "driver",
+  });
+
+  // Брони пассажира — только при активной роли «пассажир»,
+  // чтобы не гонять лишний запрос для водителя.
+  const {
+    data: myBookings,
+    isLoading: myBookingsLoading,
+    isError: myBookingsError,
+  } = useMyBookingsQuery({
+    enabled: role === "passenger",
   });
 
   if (!currentUser) {
@@ -82,6 +94,16 @@ export const HomePanel: FC<HomePanelProps> = ({
       .sort((a, b) => {
         const aTime = a.departureAt ? Date.parse(a.departureAt) : 0;
         const bTime = b.departureAt ? Date.parse(b.departureAt) : 0;
+        return aTime - bTime;
+      })[0] ?? null;
+
+  // Ближайшая активная бронь пассажира (scope: "active" с бэкенда).
+  const nextActiveBooking =
+    (myBookings ?? [])
+      .filter((b) => b.scope === "active")
+      .sort((a, b) => {
+        const aTime = a.trip.departureAt ? Date.parse(a.trip.departureAt) : 0;
+        const bTime = b.trip.departureAt ? Date.parse(b.trip.departureAt) : 0;
         return aTime - bTime;
       })[0] ?? null;
 
@@ -147,6 +169,40 @@ export const HomePanel: FC<HomePanelProps> = ({
             <EmptyState
               title="Активных поездок нет"
               subtitle="Создайте поездку, чтобы получать заявки пассажиров"
+            />
+          )}
+        </Group>
+      )}
+
+      {role === "passenger" && (
+        <Group header={<Header size="s">Ваша активная поездка</Header>}>
+          {myBookingsLoading && (
+            <Box padding="system">
+              <TripCardSkeleton />
+            </Box>
+          )}
+
+          {myBookingsError && (
+            <EmptyState
+              title="Не удалось загрузить бронирование"
+              subtitle="Проверьте соединение и попробуйте позже"
+            />
+          )}
+
+          {!myBookingsLoading && !myBookingsError && nextActiveBooking && (
+            <Box padding="system">
+              <TripCard
+                trip={nextActiveBooking.trip}
+                onOpen={() => onOpenTrip(nextActiveBooking.trip)}
+                hideSeats // Пассажиру важнее его бронь, а не свободные места
+              />
+            </Box>
+          )}
+
+          {!myBookingsLoading && !myBookingsError && !nextActiveBooking && (
+            <EmptyState
+              title="Нет активных броней"
+              subtitle="Найдите поездку и отправьте заявку водителю"
             />
           )}
         </Group>
