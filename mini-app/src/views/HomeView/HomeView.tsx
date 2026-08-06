@@ -44,7 +44,7 @@ export const HomeView: FC<HomeViewProps> = ({ id, role, onGoSearch, onOpenCreate
             onGoSearch={onGoSearch}
             onOpenCreateTrip={onOpenCreateTrip}
           />
-          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
+          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
         </View>
       </ViewErrorBoundary>
     </Suspense>

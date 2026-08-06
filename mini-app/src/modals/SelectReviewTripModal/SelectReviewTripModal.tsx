@@ -9,7 +9,6 @@ import {
   ModalPage,
   ModalPageHeader,
   PanelHeaderButton,
-  Text,
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
@@ -19,8 +18,7 @@ import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { useAvailableReviewTripsQuery, useMyReviewsQuery } from "@/queries/useReviewsQuery";
 
-export interface SelectReviewTripModalProps
-  extends CustomModalProps<OpenModalPageProps, { onSelectTrip: (trip: Trip) => void }> {}
+export type SelectReviewTripModalProps = CustomModalProps<OpenModalPageProps, { onSelectTrip: (trip: Trip) => void }>;
 
 /**
  * Модалка выбора поездки для отзыва.

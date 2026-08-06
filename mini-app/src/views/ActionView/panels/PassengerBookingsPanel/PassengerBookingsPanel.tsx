@@ -68,38 +68,29 @@ const BookingCardFooter: FC<{
       </Flex>
 
       {booking.comment && (
-        <Text
-          style={{
-            marginTop: 10,
-            color: "var(--vkui--color_text_secondary)",
-          }}
-        >
+        <Text className="PassengerBookingsPanel__comment">
           «{booking.comment}»
         </Text>
       )}
 
       {booking.scope === "history" && booking.canReview && (
-        <Button
-          size="s"
-          mode="primary"
-          style={{ marginTop: 12 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenReview(booking.trip);
-          }}
-        >
-          Оставить отзыв
-        </Button>
+        <>
+          <Spacing size={12} />
+          <Button
+            size="s"
+            mode="primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenReview(booking.trip);
+            }}
+          >
+            Оставить отзыв
+          </Button>
+        </>
       )}
 
       {booking.scope === "history" && booking.hasReview && (
-        <Caption
-          level="1"
-          style={{
-            marginTop: 10,
-            color: "var(--vkui--color_text_secondary)",
-          }}
-        >
+        <Caption level="1" className="PassengerBookingsPanel__comment">
           Отзыв оставлен
         </Caption>
       )}

@@ -26,21 +26,11 @@ export const OfflineBanner: FC<{ isOnline: boolean; wasOffline: boolean }> = ({
       gap={6}
       role="status"
       aria-live="assertive"
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        padding: "8px 16px",
-        fontSize: 13,
-        background: isReconnected
-          ? "var(--vkui--color_background_positive, #4bb34b)"
-          : "var(--vkui--color_background_negative, #e64646)",
-        color: "#fff",
-        transition: "background 0.3s ease",
-        textAlign: "center",
-      }}
+      className={
+        isReconnected
+          ? "OfflineBanner OfflineBanner--reconnected"
+          : "OfflineBanner OfflineBanner--offline"
+      }
     >
       {isReconnected ? <Icon16Done /> : <Icon16ErrorCircle />}
       <Text weight="2">

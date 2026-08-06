@@ -1,7 +1,6 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel.tsx
-import { type FC } from "react";
+import { type FC, useEffect, useState } from "react";
 import {
-  Avatar,
   Button,
   ButtonGroup,
   Caption,
@@ -52,6 +51,13 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+
+  // Date.now() в рендере запрещён (react-hooks/purity) — время обновляем по таймеру
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleEditTrip = async () => {
     if (!trip) return;
@@ -112,7 +118,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
     trip &&
     trip.status === "active" &&
     departureTime !== null &&
-    departureTime <= Date.now();
+    departureTime <= now;
 
   return (
     <Panel id={id}>
@@ -155,11 +161,11 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                   mode="secondary"
                   stretched
                   onClick={handleEditTrip}
-                  style={{ marginBottom: 8 }}
                   disabled={cancelTrip.isPending || completeTrip.isPending}
                 >
                   Редактировать поездку
                 </Button>
+                <Spacing size={8} />
                 <ButtonGroup mode="horizontal" gap="s" stretched>
                   <Button
                     size="m"
@@ -187,11 +193,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                 {!canComplete && (
                   <Caption
                     level="1"
-                    style={{
-                      color: "var(--vkui--color_text_secondary)",
-                      marginTop: 8,
-                      textAlign: "center",
-                    }}
+                    className="TripRequestsPanel__hint TripRequestsPanel__hint--center"
                   >
                     Завершение будет доступно после времени отправления
                   </Caption>

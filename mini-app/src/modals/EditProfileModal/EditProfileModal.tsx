@@ -10,6 +10,7 @@ import {
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
+  Spacing,
   Textarea,
   Box,
 } from "@vkontakte/vkui";
@@ -20,8 +21,7 @@ import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
-export interface EditProfileModalProps
-  extends CustomModalProps<OpenModalPageProps, object> {}
+export type EditProfileModalProps = CustomModalProps<OpenModalPageProps, object>;
 
 export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close }) => {
   const currentUser = useCurrentUser();
@@ -146,7 +146,9 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
           background: "var(--vkui--color_background_content)",
         }}
       >
-        <Separator style={{ marginBottom: 12 }} />
+        <Separator />
+
+        <Spacing size={12} />
 
         <Button
           size="l"

@@ -11,12 +11,12 @@ export interface RatingBadgeProps {
 
 export const RatingBadge: FC<RatingBadgeProps> = ({ value, reviewsCount, size = "m" }) => {
   return (
-    <Flex align="center" gap={4} style={{ display: "inline-flex" }}>
-      <Icon12Star fill="var(--carpool_accent)" />
+    <Flex className="RatingBadge" gap={3}>
+      <Icon12Star className="RatingBadge__star" />
       <Caption level={size === "s" ? "1" : "2"} weight="2">
         {value.toFixed(1)}
         {typeof reviewsCount === "number" && reviewsCount > 0 && (
-          <span style={{ color: "var(--vkui--color_text_secondary)", marginLeft: 4 }}>
+          <span className="RatingBadge__count">
             · {reviewsCount}
           </span>
         )}

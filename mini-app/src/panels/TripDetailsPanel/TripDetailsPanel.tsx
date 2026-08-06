@@ -1,5 +1,5 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanel.tsx
-import { type FC, useState } from "react";
+import { type FC, useEffect, useState } from "react";
 import {
   Avatar,
   Button,
@@ -23,7 +23,7 @@ import {
   Textarea,
   Title,
 } from "@vkontakte/vkui";
-import type { Role, Trip } from "@/types";
+import type { Trip } from "@/types";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
 import { SeatScheme } from "@/components/SeatScheme";
@@ -52,7 +52,6 @@ import type { DriverBookingAction } from "@edem/contracts";
 export interface TripDetailsPanelProps {
   id: string;
   trip: Trip | null;
-  role: Role;
   onBack: () => void;
   onOpenDriver: () => void;
 }
@@ -60,13 +59,20 @@ export interface TripDetailsPanelProps {
 export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   id,
   trip,
-  role,
   onBack,
   onOpenDriver,
 }) => {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [comment, setComment] = useState("");
+
+  // Текущее время с периодическим обновлением: Date.now() в рендере запрещён
+  // (react-hooks/purity), а кнопка «Завершить поездку» должна оживать после отправления.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
@@ -172,7 +178,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     isOwnTrip &&
     isTripActive &&
     departureTime !== null &&
-    departureTime <= Date.now();
+    departureTime <= now;
 
   const handleFooterClick = () => {
     if (!canBook) {
@@ -348,11 +354,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                   key={tag}
                   level="1"
                   weight="2"
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 100,
-                    background: "var(--vkui--color_background_secondary)",
-                  }}
+                  className="TripDetailsPanel__tag"
                 >
                   {tag}
                 </Caption>
@@ -478,16 +480,20 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               background: "var(--vkui--color_background_content)",
             }}
           >
-            <Separator style={{ marginBottom: 12 }} />
+            <Separator />
+
+            <Spacing size={12} />
 
             {bookingOpen && (
-              <Flex justify="space-between" style={{ marginBottom: 12 }}>
+              <Flex justify="space-between">
                 <Text weight="2">Итого</Text>
                 <Title level="3" weight="2">
                   {trip.price.toLocaleString("ru-RU")} ₽
                 </Title>
               </Flex>
             )}
+
+            <Spacing size={12} />
 
             <Button
               size="l"
@@ -552,11 +558,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               {!canCompleteTrip && (
                 <Caption
                   level="1"
-                  style={{
-                    color: "var(--vkui--color_text_secondary)",
-                    marginTop: 8,
-                    textAlign: "center",
-                  }}
+                  className="TripDetailsPanel__hint TripDetailsPanel__hint--center"
                 >
                   Завершение будет доступно после времени отправления
                 </Caption>

@@ -50,15 +50,15 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
       )}
       <div className="SeatScheme__legend">
         <div className="SeatScheme__legendItem">
-          <div className="SeatScheme__legendDot" style={{ background: "var(--carpool_accent)" }} />
+          <div className="SeatScheme__legendDot SeatScheme__legendDot--selected" />
           <Caption level="1">Выбрано</Caption>
         </div>
         <div className="SeatScheme__legendItem">
-          <div className="SeatScheme__legendDot" style={{ background: "var(--vkui--color_background_secondary)" }} />
+          <div className="SeatScheme__legendDot SeatScheme__legendDot--free" />
           <Caption level="1">Свободно</Caption>
         </div>
         <div className="SeatScheme__legendItem">
-          <div className="SeatScheme__legendDot" style={{ background: "var(--vkui--color_text_secondary)", opacity: 0.5 }} />
+          <div className="SeatScheme__legendDot SeatScheme__legendDot--taken" />
           <Caption level="1">Занято</Caption>
         </div>
       </div>

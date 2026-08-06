@@ -13,6 +13,7 @@ import {
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
+  Spacing,
   Textarea,
   Caption,
 } from "@vkontakte/vkui";
@@ -32,8 +33,7 @@ import {
   isFormValid,
 } from "./CreateTripModal/validation";
 
-export interface EditTripModalProps
-  extends CustomModalProps<OpenModalPageProps, { trip: Trip }> {}
+export type EditTripModalProps = CustomModalProps<OpenModalPageProps, { trip: Trip }>;
 
 export const EditTripModal: FC<EditTripModalProps> = ({
   modalProps,
@@ -54,7 +54,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
         const day = String(d.getDate()).padStart(2, "0");
         date = `${year}-${month}-${day}`;
         time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-      } catch (e) {
+      } catch {
         // fallback
       }
     }
@@ -455,7 +455,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
               </Button>
 
               <span
-                style={{ minWidth: 16, textAlign: "center", fontWeight: 600 }}
+                className="EditTripModal__seatCounter"
                 aria-live="polite"
               >
                 {values.seats}
@@ -478,7 +478,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       </Group>
 
       <Group header={<Header size="s">Особенности поездки</Header>}>
-        <Box padding="system" style={{ padding: 0 }}>
+        <Box padding={0}>
           <TagsScroll
             tags={TRIP_TAGS}
             selected={selectedTags}
@@ -512,7 +512,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
         </FormItem>
 
         {values.comment.length > 0 && (
-          <Box padding="system" style={{ paddingTop: 0 }}>
+          <Box padding="system" paddingBlockStart={0}>
             <Caption
               level="1"
               style={{
@@ -538,7 +538,9 @@ export const EditTripModal: FC<EditTripModalProps> = ({
           background: "var(--vkui--color_background_content)",
         }}
       >
-        <Separator style={{ marginBottom: 12 }} />
+        <Separator />
+
+        <Spacing size={12} />
 
         <Button
           size="l"

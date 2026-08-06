@@ -107,38 +107,29 @@ const HistoryCardFooter: FC<{
       </Flex>
 
       {booking.comment && (
-        <Text
-          style={{
-            marginTop: 10,
-            color: "var(--vkui--color_text_secondary)",
-          }}
-        >
+        <Text className="PassengerHistoryPanel__comment">
           «{booking.comment}»
         </Text>
       )}
 
       {booking.canReview && onOpenReview && (
-        <Button
-          size="s"
-          mode="primary"
-          style={{ marginTop: 12 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenReview(booking.trip);
-          }}
-        >
-          Оставить отзыв
-        </Button>
+        <>
+          <Spacing size={12} />
+          <Button
+            size="s"
+            mode="primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenReview(booking.trip);
+            }}
+          >
+            Оставить отзыв
+          </Button>
+        </>
       )}
 
       {booking.hasReview && (
-        <Caption
-          level="1"
-          style={{
-            marginTop: 10,
-            color: "var(--vkui--color_text_secondary)",
-          }}
-        >
+        <Caption level="1" className="PassengerHistoryPanel__comment">
           Отзыв оставлен
         </Caption>
       )}
@@ -171,10 +162,8 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
     refetch,
   } = usePassengerHistoryQuery();
 
-  const historyItems = data ?? [];
-
   const visibleItems = useMemo(() => {
-    let items = historyItems;
+    let items = data ?? [];
 
     if (filter !== "all") {
       items = items.filter((item) => item.historyCategory === filter);
@@ -189,7 +178,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
 
       return bTime - aTime;
     });
-  }, [historyItems, filter]);
+  }, [data, filter]);
 
   return (
     <Panel id={id}>

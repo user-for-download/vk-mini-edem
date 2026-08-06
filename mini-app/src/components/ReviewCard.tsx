@@ -1,6 +1,6 @@
 // mini-app/src/components/ReviewCard.tsx
 import { type FC, useState } from "react";
-import { Avatar, Caption, RichCell, Text } from "@vkontakte/vkui";
+import { Avatar, Caption, Flex, RichCell, Text } from "@vkontakte/vkui";
 import { Icon16StarAlt } from "@vkontakte/icons";
 import { resolveAvatar } from "@/helpers/avatar";
 import type { Review } from "@/types";
@@ -27,53 +27,45 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
       ? review.text.slice(0, MAX_PREVIEW_LENGTH).trimEnd() + "…"
       : review.text;
 
+  const textClassName = [
+    "ReviewCard__text",
+    isLong && "ReviewCard__text--expandable",
+    !isExpanded && "ReviewCard__text--clamped",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <RichCell
       before={<Avatar src={resolveAvatar(review.author.avatar)} size={48} />}
       overTitle={`${review.tripRoute} · ${roleLabel}`}
       after={
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            color: "var(--carpool_accent)",
-          }}
-        >
+        <Flex align="center" gap={4} className="ReviewCard__rating">
           <Icon16StarAlt />
           <Text weight="2">{review.rating}</Text>
-        </div>
+        </Flex>
       }
       afterAlign="center"
       subtitle={
         <span
+          className={textClassName}
           onClick={(e) => {
             if (isLong) {
               e.stopPropagation();
               setIsExpanded((v) => !v);
             }
           }}
-          style={{
-            cursor: isLong ? "pointer" : "default",
-            WebkitLineClamp: isExpanded ? undefined : 3,
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
         >
           {displayText}
           {isLong && !isExpanded && (
-            <Text
-              weight="2"
-              style={{ color: "var(--vkui--color_text_accent)" }}
-            >
+            <Text weight="2" className="ReviewCard__showMore">
               {" "}Показать полностью
             </Text>
           )}
         </span>
       }
       bottom={
-        <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
+        <Caption level="1" className="ReviewCard__date">
           {review.date}
         </Caption>
       }

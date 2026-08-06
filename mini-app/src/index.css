@@ -254,3 +254,354 @@ body {
   outline-offset: 2px;
   border-radius: 12px;
 }
+
+/* ---------- SearchPanel ---------- */
+.SearchPanel__field {
+  flex: 1;
+}
+
+.SearchPanel__fieldLabel {
+  color: var(--vkui--color_text_secondary, #818c99);
+  margin-bottom: 4px;
+}
+
+.SearchPanel__sentinel {
+  height: 1px;
+}
+
+/* ---------- NotificationsPanel ---------- */
+.NotificationsPanel__savedNote {
+  color: var(--carpool_accent);
+}
+
+.NotificationsPanel__footnote {
+  color: var(--vkui--color_text_secondary, #818c99);
+}
+
+/* ---------- ProfilePanel ---------- */
+.ProfilePanel__profileHeader {
+  text-align: center;
+}
+
+.ProfilePanel__avatar {
+  margin: 0 auto 12px;
+}
+
+.ProfilePanel__rating {
+  margin-top: 4px;
+}
+
+.ProfilePanel__statusText {
+  margin-top: 4px;
+}
+
+.ProfilePanel__statusText--verified {
+  color: var(--carpool_accent);
+}
+
+.ProfilePanel__statusText--pending {
+  color: var(--vkui--color_text_secondary, #818c99);
+}
+
+.ProfilePanel__verifyButton {
+  margin-top: 8px;
+}
+
+.ProfilePanel__text--secondary {
+  color: var(--vkui--color_text_secondary, #818c99);
+}
+
+.ProfilePanel__text--negative {
+  color: var(--vkui--color_text_negative, #e64646);
+}
+
+/* ---------- SupportPanel ---------- */
+.SupportPanel__answer {
+  color: var(--vkui--color_text_secondary, #818c99);
+}
+
+/* ---------- TripDetailsPanel ---------- */
+.TripDetailsPanel__tag {
+  padding: 6px 10px;
+  border-radius: 100px;
+  background: var(--vkui--color_background_secondary);
+}
+
+.TripDetailsPanel__comment {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripDetailsPanel__driverCar {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripDetailsPanel__hint {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripDetailsPanel__hint--center {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.TripDetailsPanel__footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--vkui--color_background_content);
+}
+
+/* ---------- PassengerBookingsPanel ---------- */
+.PassengerBookingsPanel__hint {
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- PassengerHistoryPanel ---------- */
+.PassengerHistoryPanel__hint {
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- TripRequestsPanel ---------- */
+.TripRequestsPanel__hint {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripRequestsPanel__hint--center {
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* ---------- TripsManagePanel ---------- */
+.TripsManagePanel__sentinel {
+  height: 1px;
+}
+
+/* ---------- RatingBadge count ---------- */
+.RatingBadge__count {
+  margin-left: 4px;
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- SeatScheme legend state ---------- */
+.SeatScheme__legendDot--selected {
+  background: var(--carpool_accent);
+}
+
+.SeatScheme__legendDot--free {
+  background: var(--vkui--color_background_secondary);
+}
+
+.SeatScheme__legendDot--taken {
+  background: var(--vkui--color_text_secondary);
+  opacity: 0.5;
+}
+
+/* ---------- TripCardSkeleton ---------- */
+.TripCardSkeleton__line {
+  background: var(--vkui--color_skeleton_start);
+  border-radius: 4px;
+}
+
+.TripCardSkeleton__line--title-left {
+  width: 100px;
+  height: 14px;
+}
+
+.TripCardSkeleton__line--title-right {
+  width: 60px;
+  height: 18px;
+}
+
+.TripCardSkeleton__line--map {
+  width: 100%;
+  height: 60px;
+}
+
+.TripCardSkeleton__line--duration {
+  width: 60%;
+  height: 14px;
+}
+
+/* ---------- BookingRequestRow ---------- */
+.BookingRequestRow__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.BookingRequestRow__seat {
+  flex-shrink: 0;
+  color: var(--vkui--color_text_secondary);
+}
+
+.BookingRequestRow__comment {
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- OfflineBanner ---------- */
+.OfflineBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #fff;
+  text-align: center;
+  transition: background 0.3s ease;
+}
+
+.OfflineBanner--reconnected {
+  background: var(--vkui--color_background_positive, #4bb34b);
+}
+
+.OfflineBanner--offline {
+  background: var(--vkui--color_background_negative, #e64646);
+}
+
+/* ---------- ReviewCard ---------- */
+.ReviewCard__rating {
+  color: var(--carpool_accent);
+}
+
+.ReviewCard__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ReviewCard__text--expandable {
+  cursor: pointer;
+}
+
+.ReviewCard__text--clamped {
+  -webkit-line-clamp: 3;
+}
+
+.ReviewCard__showMore {
+  color: var(--vkui--color_text_accent);
+}
+
+.ReviewCard__date {
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- TripCard ---------- */
+.TripCard[role="button"] {
+  cursor: pointer;
+}
+
+.TripCard--archived {
+  opacity: 0.6;
+}
+
+.TripCard__date {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripCard__archiveStatus--cancelled {
+  color: var(--vkui--color_text_negative);
+}
+
+.TripCard__archiveStatus--completed {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripCard__duration {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripCard__driver {
+  min-width: 0;
+}
+
+.TripCard__driverInfo {
+  min-width: 0;
+}
+
+.TripCard__driverName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.TripCard__seats {
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.TripCard__seats--none {
+  color: var(--vkui--color_text_secondary);
+}
+
+.TripCard__seats--available {
+  color: var(--carpool_accent);
+}
+
+.TripCard__requestsCount {
+  margin-top: 2px;
+  color: var(--carpool_accent);
+}
+
+/* ---------- CreateReviewModal ---------- */
+.CreateReviewModal__starButton {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  outline-offset: 2px;
+}
+
+.CreateReviewModal__title {
+  text-align: center;
+}
+
+.CreateReviewModal__counter {
+  text-align: right;
+  margin-bottom: 8px;
+}
+
+.CreateReviewModal__counter--danger {
+  color: var(--vkui--color_text_negative);
+}
+
+.CreateReviewModal__counter--normal {
+  color: var(--vkui--color_text_secondary);
+}
+
+/* ---------- CreateTripModal / EditTripModal ---------- */
+.CreateTripModal__seatCounter,
+.EditTripModal__seatCounter {
+  min-width: 16px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* ---------- DriverProfileModal ---------- */
+.DriverProfileModal__centered {
+  text-align: center;
+}
+
+.DriverProfileModal__avatar {
+  margin: 0 auto 12px;
+}
+
+.DriverProfileModal__meta {
+  margin-top: 4px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.DriverProfileModal__about {
+  margin-top: 8px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.DriverProfileModal__reviews {
+  text-align: left;
+}
+
+/* ---------- PassengerBookingsPanel / PassengerHistoryPanel ---------- */
+.PassengerBookingsPanel__comment,
+.PassengerHistoryPanel__comment {
+  margin-top: 10px;
+  color: var(--vkui--color_text_secondary);
+}

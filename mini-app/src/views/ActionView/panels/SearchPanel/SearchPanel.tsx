@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, type FC } from "react";
-import { Box, Button, Caption, Flex, Group, Header, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
+import { Box, Button, Caption, Flex, Group, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
@@ -123,23 +123,23 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
             onChange={(e) => setSearchValue(e.target.value)}
           />
         </Box>
-        <Box padding="system" style={{ paddingTop: 0 }}>
+        <Box padding="system" paddingBlockStart={0}>
           <TagsScroll tags={TRIP_TAGS} selected={selectedTags} onChange={(next) => setSelectedTags(next as TripTag[])} />
         </Box>
-        <Box padding="system" style={{ paddingTop: 0 }}>
+        <Box padding="system" paddingBlockStart={0}>
           <Button size="s" mode="tertiary" onClick={() => setShowFilters(!showFilters)}>
             {showFilters ? "Скрыть фильтры" : "Больше фильтров"}
           </Button>
         </Box>
         {showFilters && (
-          <Box padding="system" style={{ paddingTop: 0 }}>
+          <Box padding="system" paddingBlockStart={0}>
             <Flex gap={8}>
-              <div style={{ flex: 1 }}>
-                <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата от</Caption>
+              <div className="SearchPanel__field">
+                <Caption level="1" className="SearchPanel__fieldLabel">Дата от</Caption>
                 <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
               </div>
-              <div style={{ flex: 1 }}>
-                <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата до</Caption>
+              <div className="SearchPanel__field">
+                <Caption level="1" className="SearchPanel__fieldLabel">Дата до</Caption>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
             </Flex>
@@ -187,7 +187,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
               {results.map((trip) => (
                 <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
               ))}
-              <div ref={sentinelRef} style={{ height: 1 }} />
+              <div ref={sentinelRef} className="SearchPanel__sentinel" />
               {isFetchingNextPage && <TripCardSkeleton />}
             </Flex>
           </Box>

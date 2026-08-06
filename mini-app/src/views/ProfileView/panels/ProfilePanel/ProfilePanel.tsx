@@ -11,7 +11,7 @@ import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserReviewsQuery, useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
 import { usersApi } from "@/api/users.api";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export interface ProfilePanelProps {
@@ -46,7 +46,6 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
   const currentUser = useCurrentUser();
   const routeNavigator = useRouteNavigator();
-  const queryClient = useQueryClient();
 
   const verifyMutation = useMutation({
     mutationFn: () => usersApi.requestVerification(),
@@ -84,29 +83,29 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     <Panel id={id}>
       <AppPanelHeader>Профиль</AppPanelHeader>
       <Group>
-        <Box padding="system" style={{ textAlign: "center" }}>
-          <Avatar src={resolveAvatar(currentUser.avatar)} size={80} style={{ margin: "0 auto 12px" }} />
+        <Box padding="system" className="ProfilePanel__profileHeader">
+          <Avatar src={resolveAvatar(currentUser.avatar)} size={80} className="ProfilePanel__avatar" />
           <Title level="2" weight="2">
             {currentUser.name}
           </Title>
-          <Flex justify="center" style={{ marginTop: 4 }}>
+          <Flex justify="center" className="ProfilePanel__rating">
             <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
           </Flex>
           {currentUser.isVerified ? (
-            <Caption level="1" style={{ color: "var(--carpool_accent)", marginTop: 4 }}>
+            <Caption level="1" className="ProfilePanel__statusText ProfilePanel__statusText--verified">
               Личность подтверждена ВКонтакте
             </Caption>
           ) : currentUser.verificationStatus === "pending" ? (
-            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginTop: 4 }}>
+            <Caption level="1" className="ProfilePanel__statusText ProfilePanel__statusText--pending">
               Заявка на верификацию на рассмотрении
             </Caption>
           ) : (
-            <Button 
-              size="s" 
-              mode="outline" 
+            <Button
+              size="s"
+              mode="outline"
               onClick={() => verifyMutation.mutate()}
               loading={verifyMutation.isPending}
-              style={{ marginTop: 8 }}
+              className="ProfilePanel__verifyButton"
             >
               Пройти верификацию
             </Button>
@@ -145,7 +144,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
                 </SimpleGrid>
               </Box>
 
-              <Box padding="system" style={{ paddingTop: 0 }}>
+              <Box padding="system" paddingBlockStart={0}>
                 <Button mode="secondary" size="m" onClick={onOpenCarForm}>
                   Изменить автомобиль
                 </Button>
@@ -153,7 +152,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             </>
           ) : (
             <Box padding="system">
-              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+              <Text className="ProfilePanel__text--secondary">
                 Чтобы публиковать поездки как водитель, добавьте автомобиль.
               </Text>
 
@@ -238,7 +237,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       <Group header={<Header size="s">Отзывы о вас</Header>}>
         {reviewsLoading && (
           <Box padding="system">
-            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            <Text className="ProfilePanel__text--secondary">
               Загрузка отзывов...
             </Text>
           </Box>
@@ -246,7 +245,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
         {reviewsError && (
           <Box padding="system">
-            <Text style={{ color: "var(--vkui--color_text_negative)" }}>
+            <Text className="ProfilePanel__text--negative">
               Не удалось загрузить отзывы
             </Text>
           </Box>
@@ -262,7 +261,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
         {!reviewsLoading && !reviewsError && visibleReviews.length === 0 && (
           <Box padding="system">
-            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            <Text className="ProfilePanel__text--secondary">
               Отзывов пока нет
             </Text>
           </Box>

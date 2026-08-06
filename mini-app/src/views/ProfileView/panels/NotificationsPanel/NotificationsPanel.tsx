@@ -151,8 +151,8 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
         </SimpleCell>
 
         {showSaved && (
-          <Box padding="system" style={{ paddingTop: 0 }}>
-            <Caption level="1" style={{ color: "var(--carpool_accent)" }}>
+          <Box padding="system" paddingBlockStart={0}>
+            <Caption level="1" className="NotificationsPanel__savedNote">
               Настройки сохранены
             </Caption>
           </Box>
@@ -217,7 +217,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
       <Box padding="system">
         <Caption
           level="1"
-          style={{ color: "var(--vkui--color_text_secondary)" }}
+          className="NotificationsPanel__footnote"
         >
           Настройки сохраняются на этом устройстве. Доставка push-уведомлений
           появится в одном из следующих обновлений.

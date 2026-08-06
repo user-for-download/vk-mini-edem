@@ -10,6 +10,7 @@ import {
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
+  Spacing,
   Box,
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
@@ -21,8 +22,7 @@ import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
-export interface CarFormModalProps
-  extends CustomModalProps<OpenModalPageProps, object> {}
+export type CarFormModalProps = CustomModalProps<OpenModalPageProps, object>;
 
 export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
   const currentUser = useCurrentUser();
@@ -181,7 +181,9 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
           background: "var(--vkui--color_background_content)",
         }}
       >
-        <Separator style={{ marginBottom: 12 }} />
+        <Separator />
+
+        <Spacing size={12} />
 
         <Button
           size="l"

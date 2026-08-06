@@ -121,7 +121,7 @@ export const HomePanel: FC<HomePanelProps> = ({
           </Title>
         </Box>
 
-        <Box padding="system" style={{ paddingTop: 0 }} onClick={onGoSearch}>
+        <Box padding="system" paddingBlockStart={0} onClick={onGoSearch}>
           <Search placeholder="Куда едем? Например, Тверь" disabled value="" />
         </Box>
       </Group>

@@ -6,12 +6,8 @@ import { TripDetailsPanel } from "@/panels/TripDetailsPanel/TripDetailsPanel";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useTripDetailQuery } from "@/queries/useTripsQuery";
 import { useModalApi } from "@/providers/ModalProvider";
-import type { Role } from "@/types";
 
-export const TripDetailsPanelWrapper: FC<{ id: string; role: Role }> = ({
-  id,
-  role,
-}) => {
+export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const params = useParams<"tripId">();
   const routeNavigator = useRouteNavigator();
   const modalApi = useModalApi();
@@ -60,7 +56,6 @@ export const TripDetailsPanelWrapper: FC<{ id: string; role: Role }> = ({
     <TripDetailsPanel
       id={id}
       trip={trip ?? null}
-      role={role}
       onBack={() => routeNavigator.back()}
       onOpenDriver={onOpenDriver}
     />

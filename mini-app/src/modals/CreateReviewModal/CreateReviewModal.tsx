@@ -7,22 +7,22 @@ import {
   Flex,
   FormItem,
   ModalCard,
+  Spacing,
   Text,
   Textarea,
   Title,
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
-import type { Trip, User, Role } from "@/types";
+import type { Trip, User } from "@/types";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCreateReviewMutation, REVIEW_KEYS } from "@/queries/useReviewsQuery";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 
-export interface CreateReviewModalProps
-  extends CustomModalProps<
-    OpenModalCardProps,
-    { trip: Trip | null; target?: User | null; targetRole?: Role | null }
-  > {}
+export type CreateReviewModalProps = CustomModalProps<
+  OpenModalCardProps,
+  { trip: Trip | null; target?: User | null }
+>;
 
 const MAX_TEXT_LENGTH = 1000;
 
@@ -83,13 +83,7 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           aria-label={`${n} из 5`}
           tabIndex={n === value ? 0 : -1}
           onClick={() => onChange(n)}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 4,
-            cursor: "pointer",
-            outlineOffset: 2,
-          }}
+          className="CreateReviewModal__starButton"
         >
           <svg
             width="30"
@@ -113,7 +107,6 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   close,
   trip,
   target,
-  targetRole,
 }) => {
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
@@ -232,20 +225,19 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
         </Button>
       }
     >
-      <Box padding="system" style={{ paddingTop: 0 }}>
-        <Title
-          level="3"
-          weight="2"
-          style={{ textAlign: "center", marginBottom: 16 }}
-        >
+      <Box padding="system" paddingBlockStart={0}>
+        <Title level="3" weight="2" className="CreateReviewModal__title">
           Как прошла поездка?
         </Title>
 
+        <Spacing size={16} />
+
         <StarPicker value={rating} onChange={setRating} />
+
+        <Spacing size={8} />
 
         <FormItem
           top="Комментарий"
-          style={{ marginTop: 8 }}
           status={validationError ? "error" : "default"}
           bottom={
             validationError ? (
@@ -271,14 +263,11 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
         {text.length > 0 && (
           <Caption
             level="1"
-            style={{
-              color:
-                text.length > MAX_TEXT_LENGTH - 50
-                  ? "var(--vkui--color_text_negative)"
-                  : "var(--vkui--color_text_secondary)",
-              textAlign: "right",
-              marginBottom: 8,
-            }}
+            className={`CreateReviewModal__counter ${
+              text.length > MAX_TEXT_LENGTH - 50
+                ? "CreateReviewModal__counter--danger"
+                : "CreateReviewModal__counter--normal"
+            }`}
             aria-live="polite"
           >
             {text.length}/{MAX_TEXT_LENGTH}

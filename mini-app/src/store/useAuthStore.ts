@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
 import { bridge } from "@/helpers/bridge";
 import type { User } from "@/types";
 import { authApi } from "@/api/auth.api";
@@ -28,10 +27,6 @@ interface AuthState {
   handleBackgroundState: (isHidden: boolean) => void;
   clearSession: (reason?: string) => Promise<void>;
 }
-
-type VkLaunchParams = ReturnType<typeof parseURLSearchParamsForGetLaunchParams> & {
-  vk_sign?: string;
-};
 
 let bootstrapPromise: Promise<void> | null = null;
 let refreshPromise: Promise<void> | null = null;

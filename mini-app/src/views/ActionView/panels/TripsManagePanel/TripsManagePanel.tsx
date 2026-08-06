@@ -157,7 +157,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
                   }
                 />
               ))}
-              <div ref={sentinelRef} style={{ height: 1 }} />
+              <div ref={sentinelRef} className="TripsManagePanel__sentinel" />
               {isFetchingNextPage && <TripCardSkeleton />}
             </Flex>
           </Box>

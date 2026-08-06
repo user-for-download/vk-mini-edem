@@ -60,7 +60,11 @@ const FAQ_ITEMS = [
 function openExternalUrl(url: string) {
   try {
     if (bridge.isWebView()) {
-      void (bridge.send as any)("VKWebAppOpenUrl", { url });
+      // VKWebAppOpenUrl отсутствует в типизированном перечне методов vk-bridge
+      void (bridge.send as (method: string, props?: unknown) => Promise<unknown>)(
+        "VKWebAppOpenUrl",
+        { url }
+      );
       return;
     }
   } catch {
@@ -106,12 +110,8 @@ export const SupportPanel: FC<SupportPanelProps> = ({ id, onBack }) => {
               </SimpleCell>
 
               {isOpen && (
-                <Box padding="system" style={{ paddingTop: 0 }}>
-                  <Text
-                    style={{
-                      color: "var(--vkui--color_text_secondary)",
-                    }}
-                  >
+                <Box padding="system" paddingBlockStart={0}>
+                  <Text className="SupportPanel__answer">
                     {item.answer}
                   </Text>
                 </Box>

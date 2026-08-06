@@ -36,6 +36,12 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const reconnectTimeoutRef = useRef<number | null>(null);
   const isRefreshingRef = useRef(false);
 
+  // connect вызывается сам из себя (reconnect в onclose), а самоссылка
+  // в инициализаторе useCallback запрещена (react-hooks/immutability).
+  // Храним актуальную ссылку в рефе — identity connect стабильна (deps []),
+  // поэтому эффект ниже отрабатывает один раз.
+  const connectRef = useRef<() => void>(() => {});
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     if (isRefreshingRef.current) return;
@@ -85,7 +91,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           isRefreshingRef.current = false;
         }
         if (refreshed) {
-          connect();
+          connectRef.current();
         } else {
           // Refresh не удался — сессия мертва, полный логаут.
           useAuthStore.getState().clearSession("WS Auth failed");
@@ -94,7 +100,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
 
       // Обычный реконнект при обрыве сети
-      reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
+      reconnectTimeoutRef.current = window.setTimeout(() => connectRef.current(), 3000);
     };
 
     ws.onerror = () => {
@@ -102,6 +108,11 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       // `onclose` will be called right after `onerror`.
     };
   }, []);
+
+  // Синхронизируем актуальную ссылку для самовызовов внутри connect (reconnect)
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

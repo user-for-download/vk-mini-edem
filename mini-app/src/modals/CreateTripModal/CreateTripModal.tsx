@@ -13,6 +13,7 @@ import {
   ModalPageHeader,
   PanelHeaderButton,
   Separator,
+  Spacing,
   Textarea,
   Caption,
 } from "@vkontakte/vkui";
@@ -34,8 +35,7 @@ import {
   isFormValid,
 } from "./validation";
 
-export interface CreateTripModalProps
-  extends CustomModalProps<OpenModalPageProps, { onTripCreated: () => void }> {}
+export type CreateTripModalProps = CustomModalProps<OpenModalPageProps, { onTripCreated: () => void }>;
 
 export const CreateTripModal: FC<CreateTripModalProps> = ({
   modalProps,
@@ -445,7 +445,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               </Button>
 
               <span
-                style={{ minWidth: 16, textAlign: "center", fontWeight: 600 }}
+                className="CreateTripModal__seatCounter"
                 aria-live="polite"
               >
                 {values.seats}
@@ -468,7 +468,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       </Group>
 
       <Group header={<Header size="s">Особенности поездки</Header>}>
-        <Box padding="system" style={{ padding: 0 }}>
+        <Box padding={0}>
           <TagsScroll
             tags={TRIP_TAGS}
             selected={selectedTags}
@@ -502,7 +502,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
         </FormItem>
 
         {values.comment.length > 0 && (
-          <Box padding="system" style={{ paddingTop: 0 }}>
+          <Box padding="system" paddingBlockStart={0}>
             <Caption
               level="1"
               style={{
@@ -528,7 +528,9 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
           background: "var(--vkui--color_background_content)",
         }}
       >
-        <Separator style={{ marginBottom: 12 }} />
+        <Separator />
+
+        <Spacing size={12} />
 
         <Button
           size="l"

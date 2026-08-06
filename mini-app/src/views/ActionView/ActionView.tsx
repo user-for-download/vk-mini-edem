@@ -87,7 +87,7 @@ export const ActionView: FC<ActionViewProps> = ({
             onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
             onGoSearch={() => routeNavigator.push("/trips/search")}
           />
-          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} role={role} />
+          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
         </View>
       </ViewErrorBoundary>
     </Suspense>

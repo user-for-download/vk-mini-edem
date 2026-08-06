@@ -8,7 +8,6 @@ import {
 import { bookingsApi } from "../api/bookings.api";
 import { TRIP_KEYS } from "./useTripsQuery";
 import type {
-  BookingStatus,
   CreateBookingDto,
   DriverBookingAction,
 } from "@edem/contracts";

@@ -1,24 +1,19 @@
 // mini-app/src/components/Skeleton/TripCardSkeleton.tsx
-import { type CSSProperties, type FC } from "react";
-import { Box, Card, Flex } from "@vkontakte/vkui";
-
-const skeletonStyle: CSSProperties = {
-  background: "var(--vkui--color_skeleton_start)",
-  borderRadius: 4,
-};
+import { type FC } from "react";
+import { Box, Card, Flex, Spacing } from "@vkontakte/vkui";
 
 export const TripCardSkeleton: FC = () => {
   return (
     <Card mode="shadow">
       <Box padding="system">
-        <Flex justify="space-between" style={{ marginBottom: 12 }}>
-          <div style={{ ...skeletonStyle, width: 100, height: 14 }} />
-          <div style={{ ...skeletonStyle, width: 60, height: 18 }} />
+        <Flex justify="space-between">
+          <div className="TripCardSkeleton__line TripCardSkeleton__line--title-left" />
+          <div className="TripCardSkeleton__line TripCardSkeleton__line--title-right" />
         </Flex>
-        <div
-          style={{ ...skeletonStyle, width: "100%", height: 60, marginBottom: 12 }}
-        />
-        <div style={{ ...skeletonStyle, width: "60%", height: 14 }} />
+        <Spacing size={12} />
+        <div className="TripCardSkeleton__line TripCardSkeleton__line--map" />
+        <Spacing size={12} />
+        <div className="TripCardSkeleton__line TripCardSkeleton__line--duration" />
       </Box>
     </Card>
   );

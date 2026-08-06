@@ -62,6 +62,7 @@ export const TripCard: FC<TripCardProps> = ({
   return (
     <Card
       mode="shadow"
+      className={isArchived ? "TripCard TripCard--archived" : "TripCard"}
       onClick={isInteractive ? () => onOpen?.(trip) : undefined}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -71,15 +72,10 @@ export const TripCard: FC<TripCardProps> = ({
           ? `Поездка ${trip.fromCity} — ${trip.toCity}, ${trip.date} в ${trip.time}, ${trip.price} рублей`
           : undefined
       }
-      style={{
-        cursor: isInteractive ? "pointer" : "default",
-        outline: "none",
-        opacity: isArchived ? 0.6 : 1,
-      }}
     >
       <Box padding="system">
         <Flex justify="space-between" align="baseline">
-          <Subhead weight="2" style={{ color: "var(--vkui--color_text_secondary)" }}>
+          <Subhead weight="2" className="TripCard__date">
             {trip.date} · {trip.time}
           </Subhead>
           <Title level="3" weight="2">
@@ -88,19 +84,20 @@ export const TripCard: FC<TripCardProps> = ({
         </Flex>
 
         {isArchived && (
-          <Caption
-            level="1"
-            weight="2"
-            style={{
-              marginTop: 4,
-              color:
+          <>
+            <Spacing size={4} />
+            <Caption
+              level="1"
+              weight="2"
+              className={
                 archivedStatus === "cancelled"
-                  ? "var(--vkui--color_text_negative)"
-                  : "var(--vkui--color_text_secondary)",
-            }}
-          >
-            {archivedStatus === "cancelled" ? "ОТМЕНЕНА" : "ЗАВЕРШЕНА"}
-          </Caption>
+                  ? "TripCard__archiveStatus TripCard__archiveStatus--cancelled"
+                  : "TripCard__archiveStatus TripCard__archiveStatus--completed"
+              }
+            >
+              {archivedStatus === "cancelled" ? "ОТМЕНЕНА" : "ЗАВЕРШЕНА"}
+            </Caption>
+          </>
         )}
 
         <Spacing size={12} />
@@ -110,7 +107,7 @@ export const TripCard: FC<TripCardProps> = ({
         />
 
         <Spacing size={8} />
-        <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
+        <Caption level="1" className="TripCard__duration">
           В пути ≈ {formatDuration(trip.durationMinutes)} · {trip.distanceKm} км
         </Caption>
 
@@ -132,17 +129,10 @@ export const TripCard: FC<TripCardProps> = ({
         <Spacing size={12} />
 
         <Flex justify="space-between" align="center">
-          <Flex align="center" gap={8} style={{ minWidth: 0 }}>
+          <Flex align="center" gap={8} className="TripCard__driver">
             <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
-            <div style={{ minWidth: 0 }}>
-              <Text
-                weight="2"
-                style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
+            <div className="TripCard__driverInfo">
+              <Text weight="2" className="TripCard__driverName">
                 {trip.driver.name}
               </Text>
               <RatingBadge value={trip.driver.rating} size="s" />
@@ -153,20 +143,17 @@ export const TripCard: FC<TripCardProps> = ({
               <Caption
                 level="1"
                 weight="2"
-                style={{
-                  color:
-                    trip.seatsAvailable === 0
-                      ? "var(--vkui--color_text_secondary)"
-                      : "var(--carpool_accent)",
-                  flexShrink: 0,
-                  marginLeft: 8,
-                }}
+                className={
+                  trip.seatsAvailable === 0
+                    ? "TripCard__seats TripCard__seats--none"
+                    : "TripCard__seats TripCard__seats--available"
+                }
               >
                 {seatsLabel}
               </Caption>
             )}
             {requestsCount > 0 && (
-              <Caption level="1" style={{ marginTop: 2, color: "var(--carpool_accent)" }}>
+              <Caption level="1" className="TripCard__requestsCount">
                 Новых заявок: {requestsCount}
               </Caption>
             )}

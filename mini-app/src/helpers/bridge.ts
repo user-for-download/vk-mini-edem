@@ -4,7 +4,7 @@ import vkBridgeMock from "@vkontakte/vk-bridge-mock";
 const customBridgeMock = new Proxy(vkBridgeMock, {
   get(target, prop, receiver) {
     if (prop === "send") {
-      return async (method: string, props?: any) => {
+      return async (method: string, props?: unknown) => {
         if (method === "VKWebAppGetUserInfo") {
           return {
             id: 100001,
@@ -32,7 +32,11 @@ const customBridgeMock = new Proxy(vkBridgeMock, {
             sign: "dev-sign",
           };
         }
-        return vkBridgeMock.send(method as any, props);
+        // Проброс в mock: сигнатура vk-bridge слишком узкая для произвольных строк
+        return vkBridgeMock.send(
+          method as Parameters<typeof vkBridgeMock.send>[0],
+          props as Parameters<typeof vkBridgeMock.send>[1],
+        );
       };
     }
     return Reflect.get(target, prop, receiver);

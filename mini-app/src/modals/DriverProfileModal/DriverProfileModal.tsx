@@ -17,8 +17,7 @@ import { useUserQuery } from "@/queries/useUsersQuery";
 import { useUserReviewsQuery } from "@/queries/useReviewsQuery";
 import { resolveAvatar } from "@/helpers/avatar";
 
-export interface DriverProfileModalProps
-  extends CustomModalProps<OpenModalCardProps, { driverId: string }> {}
+export type DriverProfileModalProps = CustomModalProps<OpenModalCardProps, { driverId: string }>;
 
 /**
  * Публичный профиль водителя.
@@ -32,7 +31,6 @@ const REVIEWS_PAGE_SIZE = 5;
 
 export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   modalProps,
-  close,
   driverId: driverIdProp,
 }) => {
   const [visibleReviewsCount, setVisibleReviewsCount] = useState(REVIEWS_PAGE_SIZE);
@@ -59,7 +57,11 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         {...modalProps}
         title="Профиль водителя"
       >
-        <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
+        <Box
+          padding="system"
+          paddingBlockStart={0}
+          className="DriverProfileModal__centered"
+        >
           <ScreenSpinner state="loading" />
         </Box>
       </ModalCard>
@@ -73,8 +75,8 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         title="Профиль не найден"
         description="Не удалось загрузить данные водителя"
       >
-        <Box padding="system" style={{ paddingTop: 0 }}>
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+        <Box padding="system" paddingBlockStart={0}>
+          <Text className="DriverProfileModal__meta">
             Пользователь недоступен или был удален.
           </Text>
         </Box>
@@ -92,35 +94,34 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       title={driver.name}
       description={driver.isVerified ? "Личность подтверждена" : undefined}
     >
-      <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
-        <Avatar src={resolveAvatar(driver.avatar)} size={72} style={{ margin: "0 auto 12px" }} />
+      <Box
+        padding="system"
+        paddingBlockStart={0}
+        className="DriverProfileModal__centered"
+      >
+        <Avatar
+          src={resolveAvatar(driver.avatar)}
+          size={72}
+          className="DriverProfileModal__avatar"
+        />
 
         <Flex justify="center">
           <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
         </Flex>
 
-        <Text
-          style={{
-            color: "var(--vkui--color_text_secondary)",
-            marginTop: 4,
-          }}
-        >
+        <Text className="DriverProfileModal__meta">
           {driver.tripsCount} поездок на сервисе
         </Text>
 
         {driver.car && (
-          <Text weight="2" style={{ marginTop: 12 }}>
-            {driver.car.model} · {driver.car.color}
-          </Text>
+          <>
+            <Spacing size={12} />
+            <Text weight="2">{driver.car.model} · {driver.car.color}</Text>
+          </>
         )}
 
         {driver.about && (
-          <Text
-            style={{
-              marginTop: 8,
-              color: "var(--vkui--color_text_secondary)",
-            }}
-          >
+          <Text className="DriverProfileModal__about">
             {driver.about}
           </Text>
         )}
@@ -131,7 +132,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
           <Spacing size={8} />
           <Separator />
 
-          <div style={{ textAlign: "left" }}>
+          <div className="DriverProfileModal__reviews">
             {driverReviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}

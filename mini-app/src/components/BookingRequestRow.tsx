@@ -1,6 +1,16 @@
 // mini-app/src/components/BookingRequestRow.tsx
 import { type FC, memo } from "react";
-import { Avatar, Button, Caption, Box, Separator, Subhead, Text } from "@vkontakte/vkui";
+import {
+  Avatar,
+  Button,
+  Caption,
+  Box,
+  Separator,
+  Subhead,
+  Text,
+  Flex,
+  Spacing,
+} from "@vkontakte/vkui";
 import type { DriverBookingAction } from "@edem/contracts";
 import type { Booking, BookingStatus } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -29,72 +39,70 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
 
     return (
       <>
-        <Box padding="system" style={{ display: "flex", gap: 10 }}>
-          <Avatar src={resolveAvatar(booking.passenger.avatar)} size={44} />
+        <Box padding="system">
+          <Flex gap={10}>
+            <Avatar src={resolveAvatar(booking.passenger.avatar)} size={44} />
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <Text weight="2">{booking.passenger.name}</Text>
-              <Caption
-                level="1"
-                style={{
-                  color: "var(--vkui--color_text_secondary)",
-                  flexShrink: 0,
-                }}
-              >
-                Место {booking.seat}
-              </Caption>
+            <div className="BookingRequestRow__main">
+              <Flex justify="space-between" gap={8}>
+                <Text weight="2">{booking.passenger.name}</Text>
+                <Caption level="1" className="BookingRequestRow__seat">
+                  Место {booking.seat}
+                </Caption>
+              </Flex>
+
+              <RatingBadge
+                value={booking.passenger.rating}
+                reviewsCount={booking.passenger.reviewsCount}
+                size="s"
+              />
+
+              {booking.comment && (
+                <>
+                  <Spacing size={6} />
+                  <Text className="BookingRequestRow__comment">
+                    «{booking.comment}»
+                  </Text>
+                </>
+              )}
+
+              {booking.status === "pending" ? (
+                <>
+                  <Spacing size={10} />
+                  <Flex gap={8}>
+                    <Button
+                      size="s"
+                      mode="primary"
+                      appearance="positive"
+                      onClick={() => onSetStatus(booking.id, "confirmed")}
+                    >
+                      Подтвердить
+                    </Button>
+
+                    <Button
+                      size="s"
+                      mode="secondary"
+                      appearance="negative"
+                      onClick={() => onSetStatus(booking.id, "declined")}
+                    >
+                      Отклонить
+                    </Button>
+                  </Flex>
+                </>
+              ) : (
+                <>
+                  <Spacing size={8} />
+                  <Subhead
+                    weight="2"
+                    // eslint-disable-next-line react/forbid-dom-props -- цвет зависит от статуса бронирования
+                    style={{ color: statusColor }}
+                  >
+                    {STATUS_LABEL[booking.status]}
+                  </Subhead>
+                </>
+              )}
             </div>
-
-            <RatingBadge
-              value={booking.passenger.rating}
-              reviewsCount={booking.passenger.reviewsCount}
-              size="s"
-            />
-
-            {booking.comment && (
-              <Text
-                style={{
-                  marginTop: 6,
-                  color: "var(--vkui--color_text_secondary)",
-                }}
-              >
-                «{booking.comment}»
-              </Text>
-            )}
-
-            {booking.status === "pending" ? (
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <Button
-                  size="s"
-                  mode="primary"
-                  appearance="positive"
-                  onClick={() => onSetStatus(booking.id, "confirmed")}
-                >
-                  Подтвердить
-                </Button>
-
-                <Button
-                  size="s"
-                  mode="secondary"
-                  appearance="negative"
-                  onClick={() => onSetStatus(booking.id, "declined")}
-                >
-                  Отклонить
-                </Button>
-              </div>
-            ) : (
-              <Subhead weight="2" style={{ color: statusColor, marginTop: 8 }}>
-                {STATUS_LABEL[booking.status]}
-              </Subhead>
-            )}
-          </div>
+          </Flex>
         </Box>
 
         <Separator />

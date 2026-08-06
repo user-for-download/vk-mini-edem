@@ -13,10 +13,11 @@ export function useWsEvent<T extends WsServerEvent["type"]>(
 
   useEffect(() => {
     if (lastMessage?.type === type) {
-      if ("payload" in lastMessage) {
-        handler((lastMessage as any).payload);
+      const event = lastMessage as Extract<WsServerEvent, { type: T }>;
+      if ("payload" in event) {
+        handler(event.payload as PayloadOf<T>);
       } else {
-        handler(undefined as any);
+        handler(undefined as PayloadOf<T>);
       }
     }
   }, [lastMessage, type, handler]);
