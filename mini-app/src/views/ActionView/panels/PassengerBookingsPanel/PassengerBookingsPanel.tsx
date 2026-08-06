@@ -172,13 +172,11 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
 
       <Group>
         {isLoading && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy="true"
-          >
-            <TripCardSkeleton />
-            <TripCardSkeleton />
+          <Box padding="system">
+            <Flex direction="column" gap={12} aria-busy="true">
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+            </Flex>
           </Box>
         )}
 
@@ -201,13 +199,14 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
         )}
 
         {!isLoading && !isError && visibleBookings.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-live="polite"
-            aria-label={`Список поездок, всего ${visibleBookings.length}`}
-          >
-            {visibleBookings.map((booking) => (
+          <Box padding="system">
+            <Flex
+              direction="column"
+              gap={12}
+              aria-live="polite"
+              aria-label={`Список поездок, всего ${visibleBookings.length}`}
+            >
+              {visibleBookings.map((booking) => (
               <TripCard
                 key={booking.id}
                 trip={booking.trip}
@@ -220,6 +219,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
                 />
               </TripCard>
             ))}
+            </Flex>
           </Box>
         )}
 

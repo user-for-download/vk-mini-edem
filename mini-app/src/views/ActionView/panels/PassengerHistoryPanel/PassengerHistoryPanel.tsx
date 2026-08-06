@@ -215,14 +215,16 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
 
       <Group>
         {isLoading && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy="true"
-            aria-label="Загрузка истории поездок"
-          >
-            <TripCardSkeleton />
-            <TripCardSkeleton />
+          <Box padding="system">
+            <Flex
+              direction="column"
+              gap={12}
+              aria-busy="true"
+              aria-label="Загрузка истории поездок"
+            >
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+            </Flex>
           </Box>
         )}
 
@@ -245,24 +247,23 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
         )}
 
         {!isLoading && !isError && visibleItems.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            {visibleItems.map((booking) => (
-              <TripCard
-                key={booking.id}
-                trip={booking.trip}
-                onOpen={() => onOpenTrip(booking.trip)}
-                hideSeats
-              >
-                <HistoryCardFooter
-                  booking={booking}
-                  status={getStatusData(booking)}
-                  onOpenReview={onOpenReview}
-                />
-              </TripCard>
-            ))}
+          <Box padding="system">
+            <Flex direction="column" gap={12}>
+              {visibleItems.map((booking) => (
+                <TripCard
+                  key={booking.id}
+                  trip={booking.trip}
+                  onOpen={() => onOpenTrip(booking.trip)}
+                  hideSeats
+                >
+                  <HistoryCardFooter
+                    booking={booking}
+                    status={getStatusData(booking)}
+                    onOpenReview={onOpenReview}
+                  />
+                </TripCard>
+              ))}
+            </Flex>
           </Box>
         )}
 

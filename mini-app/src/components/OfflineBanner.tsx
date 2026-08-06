@@ -1,4 +1,7 @@
+// mini-app/src/components/OfflineBanner.tsx
 import { type FC } from "react";
+import { Flex, Text } from "@vkontakte/vkui";
+import { Icon16Done, Icon16ErrorCircle } from "@vkontakte/icons";
 
 /**
  * Баннер, отображаемый при потере соединения.
@@ -17,7 +20,10 @@ export const OfflineBanner: FC<{ isOnline: boolean; wasOffline: boolean }> = ({
   const isReconnected = isOnline && wasOffline;
 
   return (
-    <div
+    <Flex
+      align="center"
+      justify="center"
+      gap={6}
       role="status"
       aria-live="assertive"
       style={{
@@ -26,23 +32,22 @@ export const OfflineBanner: FC<{ isOnline: boolean; wasOffline: boolean }> = ({
         left: 0,
         right: 0,
         zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
         padding: "8px 16px",
         fontSize: 13,
-        fontWeight: 500,
-        color: "#fff",
         background: isReconnected
           ? "var(--vkui--color_background_positive, #4bb34b)"
           : "var(--vkui--color_background_negative, #e64646)",
+        color: "#fff",
         transition: "background 0.3s ease",
+        textAlign: "center",
       }}
     >
-      {isReconnected
-        ? "Соединение восстановлено"
-        : "⚠ Нет подключения к интернету"}
-    </div>
+      {isReconnected ? <Icon16Done /> : <Icon16ErrorCircle />}
+      <Text weight="2">
+        {isReconnected
+          ? "Соединение восстановлено"
+          : "Нет подключения к интернету"}
+      </Text>
+    </Flex>
   );
 };

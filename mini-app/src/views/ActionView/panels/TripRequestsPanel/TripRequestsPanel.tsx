@@ -3,6 +3,7 @@ import { type FC } from "react";
 import {
   Avatar,
   Button,
+  ButtonGroup,
   Caption,
   Box,
   Group,
@@ -12,6 +13,7 @@ import {
   PanelHeaderContent,
   InfoRow,
   FormStatus,
+  SimpleGrid,
   Spacing,
   Text,
 } from "@vkontakte/vkui";
@@ -136,16 +138,14 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
               to={{ city: trip.toCity, address: trip.toAddress }}
             />
             <Spacing size={12} />
-            <div
-              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-            >
+            <SimpleGrid columns={2} gap={12}>
               <InfoRow header="Цена">
                 {trip.price.toLocaleString("ru-RU")} ₽
               </InfoRow>
               <InfoRow header="Свободно мест">
                 {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
               </InfoRow>
-            </div>
+            </SimpleGrid>
 
             {trip.status === "active" && (
               <>
@@ -160,7 +160,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                 >
                   Редактировать поездку
                 </Button>
-                <div style={{ display: "flex", gap: 8 }}>
+                <ButtonGroup mode="horizontal" gap="s" stretched>
                   <Button
                     size="m"
                     mode="primary"
@@ -183,7 +183,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                   >
                     Отменить
                   </Button>
-                </div>
+                </ButtonGroup>
                 {!canComplete && (
                   <Caption
                     level="1"

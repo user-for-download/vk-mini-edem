@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { Avatar, Button, Caption, Box, Group, Header, InfoRow, Panel, SimpleCell, Spacing, Text, Title } from "@vkontakte/vkui";
+import { Avatar, Button, Caption, Box, Flex, Group, Header, InfoRow, Panel, SimpleCell, SimpleGrid, Spacing, Text, Title } from "@vkontakte/vkui";
 import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import type { Role, Trip } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -89,9 +89,9 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           <Title level="2" weight="2">
             {currentUser.name}
           </Title>
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+          <Flex justify="center" style={{ marginTop: 4 }}>
             <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
-          </div>
+          </Flex>
           {currentUser.isVerified ? (
             <Caption level="1" style={{ color: "var(--carpool_accent)", marginTop: 4 }}>
               Личность подтверждена ВКонтакте
@@ -117,13 +117,15 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           </Button>
         </Box>
 
-        <Box padding="system" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <InfoRow header="Поездок совершено">{currentUser.tripsCount}</InfoRow>
-          <InfoRow header="На сервисе с">
-            {currentUser.createdAt
-              ? new Date(currentUser.createdAt).getFullYear()
-              : "—"}
-          </InfoRow>
+        <Box padding="system">
+          <SimpleGrid columns={2} gap={12}>
+            <InfoRow header="Поездок совершено">{currentUser.tripsCount}</InfoRow>
+            <InfoRow header="На сервисе с">
+              {currentUser.createdAt
+                ? new Date(currentUser.createdAt).getFullYear()
+                : "—"}
+            </InfoRow>
+          </SimpleGrid>
         </Box>
 
         <Box padding="system">
@@ -135,13 +137,12 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         <Group header={<Header size="s">Автомобиль</Header>}>
           {currentUser.car ? (
             <>
-              <Box
-                padding="system"
-                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-              >
-                <InfoRow header="Модель">{currentUser.car.model}</InfoRow>
-                <InfoRow header="Цвет">{currentUser.car.color}</InfoRow>
-                <InfoRow header="Номер">{currentUser.car.plate}</InfoRow>
+              <Box padding="system">
+                <SimpleGrid columns={2} gap={12}>
+                  <InfoRow header="Модель">{currentUser.car.model}</InfoRow>
+                  <InfoRow header="Цвет">{currentUser.car.color}</InfoRow>
+                  <InfoRow header="Номер">{currentUser.car.plate}</InfoRow>
+                </SimpleGrid>
               </Box>
 
               <Box padding="system" style={{ paddingTop: 0 }}>

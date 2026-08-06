@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, type FC } from "react";
-import { Box, Button, Caption, Group, Header, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
+import { Box, Button, Caption, Flex, Group, Header, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
@@ -133,7 +133,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
         </Box>
         {showFilters && (
           <Box padding="system" style={{ paddingTop: 0 }}>
-            <div style={{ display: "flex", gap: 8 }}>
+            <Flex gap={8}>
               <div style={{ flex: 1 }}>
                 <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата от</Caption>
                 <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -142,22 +142,24 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
                 <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)", marginBottom: 4 }}>Дата до</Caption>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
-            </div>
+            </Flex>
           </Box>
         )}
       </Group>
 
       <Group>
         {isLoading && results.length === 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy="true"
-            aria-label="Загрузка списка поездок"
-          >
-            <TripCardSkeleton />
-            <TripCardSkeleton />
-            <TripCardSkeleton />
+          <Box padding="system">
+            <Flex
+              direction="column"
+              gap={12}
+              aria-busy="true"
+              aria-label="Загрузка списка поездок"
+            >
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+            </Flex>
           </Box>
         )}
 
@@ -180,16 +182,14 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
         )}
 
         {results.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy={isFetching}
-          >
-            {results.map((trip) => (
-              <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
-            ))}
-            <div ref={sentinelRef} style={{ height: 1 }} />
-            {isFetchingNextPage && <TripCardSkeleton />}
+          <Box padding="system">
+            <Flex direction="column" gap={12} aria-busy={isFetching}>
+              {results.map((trip) => (
+                <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
+              ))}
+              <div ref={sentinelRef} style={{ height: 1 }} />
+              {isFetchingNextPage && <TripCardSkeleton />}
+            </Flex>
           </Box>
         )}
 

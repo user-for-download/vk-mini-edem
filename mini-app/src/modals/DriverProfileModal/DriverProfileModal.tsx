@@ -3,6 +3,7 @@ import {
   Avatar,
   Box,
   Button,
+  Flex,
   ModalCard,
   Separator,
   Spacing,
@@ -94,9 +95,9 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
         <Avatar src={resolveAvatar(driver.avatar)} size={72} style={{ margin: "0 auto 12px" }} />
 
-        <div style={{ display: "flex", justifyContent: "center" }}>
+        <Flex justify="center">
           <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
-        </div>
+        </Flex>
 
         <Text
           style={{

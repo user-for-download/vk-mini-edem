@@ -4,6 +4,7 @@ import {
   Banner,
   Button,
   Box,
+  Flex,
   Group,
   Header,
   Panel,
@@ -70,9 +71,11 @@ export const HomePanel: FC<HomePanelProps> = ({
     return (
       <Panel id={id}>
         <AppPanelHeader>Едем</AppPanelHeader>
-        <Box padding="system" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <TripCardSkeleton />
-          <TripCardSkeleton />
+        <Box padding="system">
+          <Flex direction="column" gap={12}>
+            <TripCardSkeleton />
+            <TripCardSkeleton />
+          </Flex>
         </Box>
       </Panel>
     );
@@ -210,14 +213,16 @@ export const HomePanel: FC<HomePanelProps> = ({
 
       <Group header={<Header size="s">Едут скоро</Header>}>
         {tripsLoading && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy="true"
-            aria-label="Загрузка списка поездок"
-          >
-            <TripCardSkeleton />
-            <TripCardSkeleton />
+          <Box padding="system">
+            <Flex
+              direction="column"
+              gap={12}
+              aria-busy="true"
+              aria-label="Загрузка списка поездок"
+            >
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+            </Flex>
           </Box>
         )}
 
@@ -236,13 +241,12 @@ export const HomePanel: FC<HomePanelProps> = ({
         )}
 
         {!tripsLoading && !tripsError && nearbyTrips.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            {nearbyTrips.map((trip) => (
-              <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
-            ))}
+          <Box padding="system">
+            <Flex direction="column" gap={12}>
+              {nearbyTrips.map((trip) => (
+                <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
+              ))}
+            </Flex>
           </Box>
         )}
 

@@ -3,6 +3,7 @@ import { type FC, useState, useCallback } from "react";
 import {
   Button,
   Box,
+  Flex,
   FormItem,
   FormLayoutGroup,
   Group,
@@ -425,8 +426,9 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
             top="Свободных мест"
             status={showError("seats") ? "error" : "default"}
           >
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 16 }}
+            <Flex
+              align="center"
+              gap={16}
               role="group"
               aria-label="Количество свободных мест"
             >
@@ -460,7 +462,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               >
                 +
               </Button>
-            </div>
+            </Flex>
           </FormItem>
         </FormLayoutGroup>
       </Group>

@@ -3,6 +3,7 @@ import { type FC } from "react";
 import {
   Box,
   Button,
+  Flex,
   Group,
   Header,
   ModalPage,
@@ -69,12 +70,11 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
       }
     >
       {isLoading && (
-        <Box
-          padding="system"
-          style={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <TripCardSkeleton />
-          <TripCardSkeleton />
+        <Box padding="system">
+          <Flex direction="column" gap={12}>
+            <TripCardSkeleton />
+            <TripCardSkeleton />
+          </Flex>
         </Box>
       )}
 
@@ -105,22 +105,17 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
 
       {!isLoading && !isError && visibleTrips.length > 0 && (
         <Group header={<Header size="s">Ваши поездки</Header>}>
-          <Box
-            padding="system"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {visibleTrips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                onOpen={onSelectTrip}
-                hideSeats
-              />
-            ))}
+          <Box padding="system">
+            <Flex direction="column" gap={12}>
+              {visibleTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onOpen={onSelectTrip}
+                  hideSeats
+                />
+              ))}
+            </Flex>
           </Box>
         </Group>
       )}

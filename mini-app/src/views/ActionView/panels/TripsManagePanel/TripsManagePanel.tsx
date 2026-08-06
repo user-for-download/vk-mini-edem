@@ -3,6 +3,7 @@ import { useMemo, useEffect, useRef, useState, type FC } from "react";
 import {
   Box,
   Button,
+  Flex,
   Group,
   Panel,
   PanelHeaderButton,
@@ -108,14 +109,16 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
 
       <Group>
         {isLoading && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-            aria-busy="true"
-            aria-label="Загрузка списка поездок"
-          >
-            <TripCardSkeleton />
-            <TripCardSkeleton />
+          <Box padding="system">
+            <Flex
+              direction="column"
+              gap={12}
+              aria-busy="true"
+              aria-label="Загрузка списка поездок"
+            >
+              <TripCardSkeleton />
+              <TripCardSkeleton />
+            </Flex>
           </Box>
         )}
 
@@ -138,26 +141,25 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
         )}
 
         {!isLoading && !isError && myTrips.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            {myTrips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                onOpen={onOpenTrip}
-                requestsCount={trip.pendingRequestsCount ?? 0}
-                hideSeats
-                archivedStatus={
-                  tab === "archive"
-                    ? (trip.status as "completed" | "cancelled")
-                    : undefined
-                }
-              />
-            ))}
-            <div ref={sentinelRef} style={{ height: 1 }} />
-            {isFetchingNextPage && <TripCardSkeleton />}
+          <Box padding="system">
+            <Flex direction="column" gap={12}>
+              {myTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onOpen={onOpenTrip}
+                  requestsCount={trip.pendingRequestsCount ?? 0}
+                  hideSeats
+                  archivedStatus={
+                    tab === "archive"
+                      ? (trip.status as "completed" | "cancelled")
+                      : undefined
+                  }
+                />
+              ))}
+              <div ref={sentinelRef} style={{ height: 1 }} />
+              {isFetchingNextPage && <TripCardSkeleton />}
+            </Flex>
           </Box>
         )}
 

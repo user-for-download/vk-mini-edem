@@ -4,6 +4,7 @@ import {
   Button,
   Box,
   Caption,
+  Flex,
   FormItem,
   ModalCard,
   Text,
@@ -66,8 +67,9 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
   );
 
   return (
-    <div
-      style={{ display: "flex", gap: 8, justifyContent: "center" }}
+    <Flex
+      gap={8}
+      justify="center"
       role="radiogroup"
       aria-label="Оценка поездки от 1 до 5"
       onKeyDown={handleKeyDown}
@@ -102,7 +104,7 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           </svg>
         </button>
       ))}
-    </div>
+    </Flex>
   );
 };
 
