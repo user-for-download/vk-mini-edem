@@ -71,6 +71,10 @@ export function createRateLimiter(options: RateLimiterOptions) {
 
 function resolveClientIp(c: Context): string {
   if (env.TRUST_PROXY) {
+    // Прокси (Nginx) должен перезаписывать заголовки, а не дополнять:
+    //   proxy_set_header X-Real-IP $remote_addr;
+    //   proxy_set_header X-Forwarded-For $remote_addr;
+    // Иначе левый (первый) хоп в X-Forwarded-For подделывается клиентом.
     return (
       c.req.header("x-real-ip") ||
       c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -83,7 +87,12 @@ function resolveClientIp(c: Context): string {
     return connInfo.remote.address || "unknown";
   } catch {
     // Фоллбек для сред, где getConnInfo недоступен (например, vitest app.request).
-    return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    // X-Forwarded-For без доверенного прокси подделывается клиентом —
+    // в production не используем его, иначе лимитер обходится по заголовку.
+    if (env.TRUST_PROXY) {
+      return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    }
+    return "unknown";
   }
 }
 

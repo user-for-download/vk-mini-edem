@@ -70,6 +70,9 @@ export const GlobalWsListener: React.FC = () => {
   useWsEvent("trip:details_changed", ({ tripId }) => {
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
+    // Публичные списки (поиск/главная) тоже могут показывать изменённые
+    // маршрут/цену/время — инвалидируем, чтобы не отдавать устаревшее.
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.lists() });
 
     enqueueSnackbar({
       type: "info",

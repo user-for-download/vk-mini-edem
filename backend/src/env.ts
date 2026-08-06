@@ -31,6 +31,16 @@ function intEnv(name: string, fallback: number): number {
   return parsed;
 }
 
+function boolEnv(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+
+  return ["true", "1", "yes", "on"].includes(value.toLowerCase());
+}
+
 /**
  * В development можно временно сгенерировать эфемерный секрет,
  * чтобы не блокировать локальный запуск.
@@ -107,7 +117,7 @@ export const env = {
    * перезаписывает X-Real-IP / X-Forwarded-For, и им можно доверять.
    * Иначе используем IP из TCP-сокета (неподделываемый).
    */
-  TRUST_PROXY: process.env.TRUST_PROXY === "true",
+  TRUST_PROXY: boolEnv("TRUST_PROXY", false),
 
   /**
    * Rate limit для auth.

@@ -467,24 +467,27 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
       select: { passengerId: true },
     });
 
-    for (const booking of confirmedBookings) {
-      await createNotification(
-        booking.passengerId,
-        "trip_details_changed",
-        "Детали поездки изменены",
-        `Водитель изменил детали поездки ${updated.fromCity} → ${updated.toCity}. Проверьте время и место встречи.`
-      );
+    // createNotification глотает ошибки внутри, поэтому параллелим безопасно.
+    await Promise.all(
+      confirmedBookings.map(async (booking) => {
+        await createNotification(
+          booking.passengerId,
+          "trip_details_changed",
+          "Детали поездки изменены",
+          `Водитель изменил детали поездки ${updated.fromCity} → ${updated.toCity}. Проверьте время и место встречи.`
+        );
 
-      wsManager.sendToUser(booking.passengerId, {
-        type: "trip:details_changed",
-        payload: { tripId: trip.id },
-      });
-      // Подсказываем онлайн-клиенту обновить список/счётчик уведомлений.
-      wsManager.sendToUser(booking.passengerId, {
-        type: "notification:new",
-        payload: { id: "refresh" },
-      });
-    }
+        wsManager.sendToUser(booking.passengerId, {
+          type: "trip:details_changed",
+          payload: { tripId: trip.id },
+        });
+        // Подсказываем онлайн-клиенту обновить список/счётчик уведомлений.
+        wsManager.sendToUser(booking.passengerId, {
+          type: "notification:new",
+          payload: { id: "refresh" },
+        });
+      })
+    );
   }
 
   return c.json(serializeTrip(updated));

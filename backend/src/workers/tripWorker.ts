@@ -91,39 +91,44 @@ export async function processExpiredTrips() {
 
         // 2. Уведомления и WS — ВНЕ транзакции (паттерн как в ручном
         //    завершении/отмене): персистентные записи + события онлайн-клиентам.
-        for (const pId of confirmedPassengerIds) {
-          await createNotification(
-            pId,
-            "trip_status_changed",
-            "Поездка завершена",
-            `Поездка ${trip.fromCity} → ${trip.toCity} завершена. Вы можете оставить отзыв.`
-          );
-          wsManager.sendToUser(pId, {
-            type: "trip:status_changed",
-            payload: { tripId: trip.id, status: "completed" },
-          });
-          wsManager.sendToUser(pId, {
-            type: "notification:new",
-            payload: { id: "refresh" },
-          });
-        }
+        //    createNotification глотает ошибки внутри, поэтому параллелим безопасно.
+        await Promise.all(
+          confirmedPassengerIds.map(async (pId) => {
+            await createNotification(
+              pId,
+              "trip_status_changed",
+              "Поездка завершена",
+              `Поездка ${trip.fromCity} → ${trip.toCity} завершена. Вы можете оставить отзыв.`
+            );
+            wsManager.sendToUser(pId, {
+              type: "trip:status_changed",
+              payload: { tripId: trip.id, status: "completed" },
+            });
+            wsManager.sendToUser(pId, {
+              type: "notification:new",
+              payload: { id: "refresh" },
+            });
+          })
+        );
 
-        for (const pId of declinedPassengerIds) {
-          await createNotification(
-            pId,
-            "trip_status_changed",
-            "Поездка завершена",
-            `Поездка ${trip.fromCity} → ${trip.toCity} завершена, ваша заявка отклонена.`
-          );
-          wsManager.sendToUser(pId, {
-            type: "trip:status_changed",
-            payload: { tripId: trip.id, status: "completed" },
-          });
-          wsManager.sendToUser(pId, {
-            type: "notification:new",
-            payload: { id: "refresh" },
-          });
-        }
+        await Promise.all(
+          declinedPassengerIds.map(async (pId) => {
+            await createNotification(
+              pId,
+              "trip_status_changed",
+              "Поездка завершена",
+              `Поездка ${trip.fromCity} → ${trip.toCity} завершена, ваша заявка отклонена.`
+            );
+            wsManager.sendToUser(pId, {
+              type: "trip:status_changed",
+              payload: { tripId: trip.id, status: "completed" },
+            });
+            wsManager.sendToUser(pId, {
+              type: "notification:new",
+              payload: { id: "refresh" },
+            });
+          })
+        );
 
         // Водителя тоже уведомляем о завершении.
         await createNotification(
