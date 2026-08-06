@@ -396,7 +396,7 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
         throw new BookingError("Driver cannot book own trip", 400, ERROR_CODES.FORBIDDEN);
       }
 
-      if (seat > trip.seatsTotal) {
+      if (seat < 1 || seat > trip.seatsTotal) {
         throw new BookingError("Seat is out of range", 400, ERROR_CODES.VALIDATION_FAILED);
       }
 

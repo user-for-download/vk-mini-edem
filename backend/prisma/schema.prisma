@@ -103,7 +103,7 @@ model Booking {
   tripId      String
   passengerId String
   seat        Int
-  status      String   @default("pending") // pending, confirmed, declined
+  status      String   @default("pending") // pending, confirmed, declined, cancelled
   comment     String?
   createdAt   DateTime @default(now())
 

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "../db.js";
@@ -103,10 +104,7 @@ usersRouter.patch("/me", requireUser, async (c) => {
   return c.json(serializeUser(updated));
 });
 
-/**
- * Создать или обновить машину текущего пользователя.
- */
-usersRouter.post("/me/car", requireUser, async (c) => {
+async function upsertCar(c: Context<AuthEnv>) {
   const user = c.get("user");
 
   const body = await getSanitizedBody(c);
@@ -135,41 +133,17 @@ usersRouter.post("/me/car", requireUser, async (c) => {
   });
 
   return c.json(serializeUser(updated));
-});
+}
+
+/**
+ * Создать или обновить машину текущего пользователя.
+ */
+usersRouter.post("/me/car", requireUser, upsertCar);
 
 /**
  * Алиас для обновления машины.
  */
-usersRouter.patch("/me/car", requireUser, async (c) => {
-  const user = c.get("user");
-
-  const body = await getSanitizedBody(c);
-  const parseResult = carFormSchema.safeParse(body);
-
-  if (!parseResult.success) {
-    return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
-      400
-    );
-  }
-
-  const updated = await db.user.update({
-    where: { id: user.id },
-    data: {
-      car: {
-        upsert: {
-          create: parseResult.data,
-          update: parseResult.data,
-        },
-      },
-    },
-    include: {
-      car: true,
-    },
-  });
-
-  return c.json(serializeUser(updated));
-});
+usersRouter.patch("/me/car", requireUser, upsertCar);
 
 /**
  * Публичный профиль пользователя.

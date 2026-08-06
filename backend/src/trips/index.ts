@@ -542,15 +542,6 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
       },
     });
 
-    const activeBookings = await tx.booking.findMany({
-      where: {
-        tripId: trip.id,
-        status: "cancelled", // they are now cancelled
-      },
-    });
-    
-    // We will extract passengerIds below, outside the transaction map
-
     return tx.trip.update({
       where: { id: trip.id },
       data: {
@@ -575,17 +566,27 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   });
 
   const uniquePassengers = Array.from(new Set(passengersToNotify.map(b => b.passengerId)));
-  
-  for (const pid of uniquePassengers) {
-    wsManager.sendToUser(pid, {
-      type: "trip:status_changed",
-      payload: { tripId: trip.id, status: "cancelled" },
-    });
-    wsManager.sendToUser(pid, {
-      type: "notification:new",
-      payload: { id: "refresh" },
-    });
-  }
+
+  // createNotification глотает ошибки внутри, поэтому параллелим безопасно.
+  await Promise.all(
+    uniquePassengers.map(async (pid) => {
+      await createNotification(
+        pid,
+        "trip_cancelled",
+        "Поездка отменена",
+        `Водитель отменил поездку ${trip.fromCity} → ${trip.toCity}`
+      );
+
+      wsManager.sendToUser(pid, {
+        type: "trip:status_changed",
+        payload: { tripId: trip.id, status: "cancelled" },
+      });
+      wsManager.sendToUser(pid, {
+        type: "notification:new",
+        payload: { id: "refresh" },
+      });
+    })
+  );
 
   logBusinessEvent("trip.cancelled", {
     tripId: trip.id,
