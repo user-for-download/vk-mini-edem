@@ -78,9 +78,17 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
 
-  // Запрос заявок для водителя
+  // Принадлежность поездки определяется ТОЛЬКО данными с сервера.
+  // Клиентский role — это лишь переключатель вкладок и не должен
+  // участвовать в проверках прав (иначе водитель, открывший свою поездку
+  // в роли «пассажир», увидит кнопку бронирования своей же поездки).
+  const isOwnTrip = !!currentUser && !!trip && trip.driver.id === currentUser.id;
+
+  // Заявки на места видны только водителю поездки — пассажиру бэкенд
+  // вернёт 403 (driver-only эндпоинт), поэтому запрос не делаем вовсе.
   const { data: tripBookings, isLoading: isLoadingBookings } = useTripBookingsQuery(
-    trip?.id ?? ""
+    trip?.id ?? "",
+    { enabled: isOwnTrip }
   );
   const updateBookingStatus = useUpdateBookingStatusMutation();
 
@@ -133,8 +141,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   // Клиентский role — это лишь переключатель вкладок и не должен
   // участвовать в проверках прав (иначе водитель, открывший свою поездку
   // в роли «пассажир», увидит кнопку бронирования своей же поездки).
-  const isOwnTrip = !!currentUser && trip.driver.id === currentUser.id;
-
   const isTripActive = trip.status ? trip.status === "active" : true;
   const isTripCompleted = trip.status === "completed";
   const isTripCancelled = trip.status === "cancelled";

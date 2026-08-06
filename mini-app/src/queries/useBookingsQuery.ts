@@ -46,14 +46,14 @@ export function usePassengerHistoryQuery() {
   });
 }
 
-export function useTripBookingsQuery(tripId: string) {
+export function useTripBookingsQuery(tripId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: BOOKING_KEYS.trip(tripId),
     queryFn: async () => {
       const res = await bookingsApi.getTripBookings(tripId);
       return res as unknown as Booking[];
     },
-    enabled: Boolean(tripId),
+    enabled: Boolean(tripId) && (options?.enabled ?? true),
     placeholderData: keepPreviousData,
   });
 }

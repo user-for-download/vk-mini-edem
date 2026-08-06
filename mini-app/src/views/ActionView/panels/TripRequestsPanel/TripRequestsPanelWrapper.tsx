@@ -8,6 +8,7 @@ import {
   useUpdateBookingStatusMutation,
 } from "@/queries/useBookingsQuery";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { DriverBookingAction } from "@edem/contracts";
 
 export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
@@ -17,12 +18,17 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const tripId = params?.tripId;
 
   const { data: trip } = useTripDetailQuery(tripId ?? "");
+  const currentUser = useCurrentUser();
+
+  // Заявки видит только водитель поездки (driver-only эндпоинт, иначе 403).
+  const isOwnTrip = !!currentUser && !!trip && trip.driver.id === currentUser.id;
+
   const {
     data: bookings,
     isLoading,
     isError,
     refetch,
-  } = useTripBookingsQuery(tripId ?? "");
+  } = useTripBookingsQuery(tripId ?? "", { enabled: isOwnTrip });
 
   const updateBooking = useUpdateBookingStatusMutation();
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
