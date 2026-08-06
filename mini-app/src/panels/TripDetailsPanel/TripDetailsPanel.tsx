@@ -4,7 +4,6 @@ import {
   Avatar,
   Button,
   Caption,
-  Card,
   Box,
   FormItem,
   FormStatus,
@@ -14,6 +13,7 @@ import {
   Panel,
   PanelHeaderBack,
   Paragraph,
+  RichCell,
   ScreenSpinner,
   Separator,
   Spacing,
@@ -44,6 +44,7 @@ import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useModalApi } from "@/providers/ModalProvider";
 import { BookingRequestRow } from "@/components/BookingRequestRow";
+import { TripPassengerRow } from "@/components/TripPassengerRow";
 import type { DriverBookingAction } from "@edem/contracts";
 
 export interface TripDetailsPanelProps {
@@ -92,6 +93,13 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     { enabled: isOwnTrip }
   );
   const updateBookingStatus = useUpdateBookingStatusMutation();
+
+  const confirmedPassengers = (tripBookings ?? []).filter(
+    (booking) => booking.status === "confirmed"
+  );
+  const pendingBookings = (tripBookings ?? []).filter(
+    (booking) => booking.status === "pending"
+  );
 
   const handleSetBookingStatus = (bookingId: string, status: DriverBookingAction) => {
     updateBookingStatus.mutate(
@@ -363,41 +371,44 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       </Group>
 
       <Group header={<Header size="s">Водитель</Header>}>
-        <Card
-          mode="outline"
+        <RichCell
+          before={<Avatar src={resolveAvatar(trip.driver.avatar)} size={48} />}
+          subtitle={
+            <RatingBadge
+              value={trip.driver.rating}
+              reviewsCount={trip.driver.reviewsCount}
+              size="s"
+            />
+          }
+          bottom={
+            trip.driver.car ? (
+              <Caption
+                level="1"
+                style={{ color: "var(--vkui--color_text_secondary)" }}
+              >
+                {trip.driver.car.model}, {trip.driver.car.color}
+              </Caption>
+            ) : undefined
+          }
+          multiline
+          hasHover
+          hasActive
           onClick={onOpenDriver}
-          style={{ cursor: "pointer", margin: "0 12px 12px" }}
         >
-          <Box
-            padding="system"
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
-            <Avatar src={resolveAvatar(trip.driver.avatar)} size={48} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text weight="2">{trip.driver.name}</Text>
-              <RatingBadge
-                value={trip.driver.rating}
-                reviewsCount={trip.driver.reviewsCount}
-                size="s"
-              />
-              {trip.driver.car && (
-                <Caption
-                  level="1"
-                  style={{
-                    color: "var(--vkui--color_text_secondary)",
-                    marginTop: 2,
-                  }}
-                >
-                  {trip.driver.car.model}, {trip.driver.car.color}
-                </Caption>
-              )}
-            </div>
-          </Box>
-        </Card>
+          {trip.driver.name}
+        </RichCell>
       </Group>
 
+      {confirmedPassengers.length > 0 && (
+        <Group header={<Header size="s">Пассажиры ({confirmedPassengers.length})</Header>}>
+          {confirmedPassengers.map((booking) => (
+            <TripPassengerRow key={booking.id} booking={booking} />
+          ))}
+        </Group>
+      )}
+
       {isOwnTrip && (
-        <Group header={<Header size="s">Заявки пассажиров ({tripBookings?.length ?? 0})</Header>}>
+        <Group header={<Header size="s">Заявки ({pendingBookings.length})</Header>}>
           {isLoadingBookings && (
             <Box padding="system">
               <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
@@ -406,7 +417,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </Box>
           )}
 
-          {!isLoadingBookings && tripBookings && tripBookings.length === 0 && (
+          {!isLoadingBookings && pendingBookings.length === 0 && (
             <Box padding="system">
               <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
                 На эту поездку пока нет заявок.
@@ -414,9 +425,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </Box>
           )}
 
-          {!isLoadingBookings && tripBookings && tripBookings.length > 0 && (
-            <Box aria-live="polite" aria-label={`Список заявок, ${tripBookings.length}`}>
-              {tripBookings.map((booking) => (
+          {!isLoadingBookings && pendingBookings.length > 0 && (
+            <Box aria-live="polite" aria-label={`Список заявок, ${pendingBookings.length}`}>
+              {pendingBookings.map((booking) => (
                 <BookingRequestRow
                   key={booking.id}
                   booking={booking}
