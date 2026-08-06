@@ -14,6 +14,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useUserQuery } from "@/queries/useUsersQuery";
 import { useUserReviewsQuery } from "@/queries/useReviewsQuery";
+import { resolveAvatar } from "@/helpers/avatar";
 
 export interface DriverProfileModalProps
   extends CustomModalProps<OpenModalCardProps, { driverId: string }> {}
@@ -91,7 +92,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       description={driver.isVerified ? "Личность подтверждена" : undefined}
     >
       <Box padding="system" style={{ paddingTop: 0, textAlign: "center" }}>
-        <Avatar src={driver.avatar} size={72} style={{ margin: "0 auto 12px" }} />
+        <Avatar src={resolveAvatar(driver.avatar)} size={72} style={{ margin: "0 auto 12px" }} />
 
         <div style={{ display: "flex", justifyContent: "center" }}>
           <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />

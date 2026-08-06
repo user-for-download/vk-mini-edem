@@ -26,6 +26,7 @@ import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
 import { SeatScheme } from "@/components/SeatScheme";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
+import { resolveAvatar } from "@/helpers/avatar";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -371,7 +372,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             padding="system"
             style={{ display: "flex", alignItems: "center", gap: 12 }}
           >
-            <Avatar src={trip.driver.avatar} size={48} />
+            <Avatar src={resolveAvatar(trip.driver.avatar)} size={48} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <Text weight="2">{trip.driver.name}</Text>
               <RatingBadge

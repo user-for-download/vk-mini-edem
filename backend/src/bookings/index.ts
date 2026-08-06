@@ -10,6 +10,7 @@ import {
   isActiveBookingStatus,
 } from "@edem/contracts";
 import { db } from "../db.js";
+import { DEFAULT_AVATAR_URL } from "../constants.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
@@ -127,7 +128,7 @@ bookingsRouter.get("/my", async (c) => {
       passenger: {
         id: b.passenger.id,
         name: b.passenger.name,
-        avatar: b.passenger.avatar,
+        avatar: b.passenger.avatar || DEFAULT_AVATAR_URL,
         rating: b.passenger.rating,
         reviewsCount: b.passenger.reviewsCount,
         tripsCount: b.passenger.tripsCount,
@@ -156,7 +157,7 @@ bookingsRouter.get("/my", async (c) => {
         driver: {
           id: b.trip.driver.id,
           name: b.trip.driver.name,
-          avatar: b.trip.driver.avatar,
+          avatar: b.trip.driver.avatar || DEFAULT_AVATAR_URL,
           rating: b.trip.driver.rating,
           reviewsCount: b.trip.driver.reviewsCount,
           tripsCount: b.trip.driver.tripsCount,

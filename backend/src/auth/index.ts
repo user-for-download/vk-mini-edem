@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { env } from "../env.js";
+import { DEFAULT_AVATAR_URL } from "../constants.js";
 import { serializeUser } from "../serializers/index.js";
 
 import { verifyVkLaunchSignature } from "./vkSign.js";
@@ -71,7 +72,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
       data: {
         vkUserId,
         name: `Пользователь VK ${vkUserId}`,
-        avatar: `https://i.pravatar.cc/200?u=${vkUserId}`,
+        avatar: DEFAULT_AVATAR_URL,
         rating: 5.0,
         reviewsCount: 0,
         tripsCount: 0,

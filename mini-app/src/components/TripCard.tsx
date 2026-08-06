@@ -3,6 +3,7 @@ import { type FC, type KeyboardEvent } from "react";
 import { Avatar, Card, Caption, Spacing, Text, Title, Box, Subhead, Separator, ContentBadge } from "@vkontakte/vkui";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
+import { resolveAvatar } from "@/helpers/avatar";
 import type { Trip } from "@/types";
 
 export interface TripCardProps {
@@ -114,7 +115,7 @@ export const TripCard: FC<TripCardProps> = ({
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <Avatar src={trip.driver.avatar} size={32} />
+            <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
             <div style={{ minWidth: 0 }}>
               <Text weight="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {trip.driver.name}

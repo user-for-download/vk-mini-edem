@@ -1,6 +1,7 @@
 // backend/src/serializers/index.ts
 import type { Prisma } from "@prisma/client";
 import type { BookingStatus, TripStatus } from "@edem/contracts";
+import { DEFAULT_AVATAR_URL } from "../constants.js";
 
 export type UserWithCar = Prisma.UserGetPayload<{
   include: {
@@ -66,7 +67,7 @@ export function serializeUser(user: UserWithCar) {
   return {
     id: user.id,
     name: user.name,
-    avatar: user.avatar,
+    avatar: user.avatar || DEFAULT_AVATAR_URL,
     rating: user.rating,
     reviewsCount: user.reviewsCount,
     tripsCount: user.tripsCount,
@@ -157,7 +158,7 @@ export function serializeReview(review: ReviewWithAuthor) {
     author: {
       id: review.author.id,
       name: review.author.name,
-      avatar: review.author.avatar,
+      avatar: review.author.avatar || DEFAULT_AVATAR_URL,
       rating: review.author.rating,
       reviewsCount: review.author.reviewsCount,
       tripsCount: review.author.tripsCount,

@@ -4,6 +4,7 @@ import { Avatar, Button, Caption, Box, Separator, Subhead, Text } from "@vkontak
 import type { DriverBookingAction } from "@edem/contracts";
 import type { Booking, BookingStatus } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
+import { resolveAvatar } from "@/helpers/avatar";
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
   pending: "Ждёт решения",
@@ -29,7 +30,7 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
     return (
       <>
         <Box padding="system" style={{ display: "flex", gap: 10 }}>
-          <Avatar src={booking.passenger.avatar} size={44} />
+          <Avatar src={resolveAvatar(booking.passenger.avatar)} size={44} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div

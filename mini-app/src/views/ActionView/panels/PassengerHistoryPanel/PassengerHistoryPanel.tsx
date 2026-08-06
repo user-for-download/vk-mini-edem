@@ -21,6 +21,7 @@ import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { resolveAvatar } from "@/helpers/avatar";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { usePassengerHistoryQuery } from "@/queries/useBookingsQuery";
 
@@ -157,7 +158,7 @@ const HistoryCard: FC<{
               minWidth: 0,
             }}
           >
-            <Avatar src={trip.driver.avatar} size={32} />
+            <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
 
             <div style={{ minWidth: 0 }}>
               <Text

@@ -6,6 +6,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { ReviewCard } from "@/components/ReviewCard";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
+import { resolveAvatar } from "@/helpers/avatar";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserReviewsQuery, useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
@@ -84,7 +85,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       <AppPanelHeader>Профиль</AppPanelHeader>
       <Group>
         <Box padding="system" style={{ textAlign: "center" }}>
-          <Avatar src={currentUser.avatar} size={80} style={{ margin: "0 auto 12px" }} />
+          <Avatar src={resolveAvatar(currentUser.avatar)} size={80} style={{ margin: "0 auto 12px" }} />
           <Title level="2" weight="2">
             {currentUser.name}
           </Title>
