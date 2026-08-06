@@ -5,8 +5,15 @@ import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const AUTO_DELETE_DELAY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+/**
+ * Воркер только АВТО-ЗАВЕРШАЕТ просроченные active-поездки.
+ *
+ * Отменённые поездки НИКОГДА не удаляем физически: CASCADE в схеме стёр бы
+ * связанные брони и отзывы, и у пассажиров пропала бы история поездок
+ * (экран «История»). Отменённые поездки не попадают в поиск (фильтр
+ * status: "active") и не мешают работе — пусть лежат в БД.
+ */
 export async function processExpiredTrips() {
   try {
     const expiredTrips = await db.trip.findMany({
@@ -141,33 +148,6 @@ export async function processExpiredTrips() {
         logger.error({ err, tripId: trip.id }, "Failed to auto-complete trip");
       }
     }
-
-    // 2. Авто-удаление отменённых поездок старше 24 часов (ВНЕ транзакций,
-    //    CASCADE в схеме удалит связанные брони и отзывы).
-    const deleteThreshold = new Date(Date.now() - AUTO_DELETE_DELAY_MS);
-    const oldCancelledTrips = await db.trip.findMany({
-      where: {
-        status: "cancelled",
-        updatedAt: { lt: deleteThreshold },
-      },
-      select: { id: true },
-    });
-
-    if (oldCancelledTrips.length > 0) {
-      logger.info(
-        { count: oldCancelledTrips.length },
-        "Found old cancelled trips. Deleting..."
-      );
-
-      for (const trip of oldCancelledTrips) {
-        try {
-          await db.trip.delete({ where: { id: trip.id } });
-          logBusinessEvent("trip.auto_deleted", { tripId: trip.id });
-        } catch (err) {
-          logger.error({ err, tripId: trip.id }, "Failed to delete cancelled trip");
-        }
-      }
-    }
   } catch (error) {
     logger.error({ err: error }, "Error in processExpiredTrips worker");
   }
@@ -183,7 +163,7 @@ export function startTripWorker() {
     void processExpiredTrips();
   }, CHECK_INTERVAL_MS);
 
-  logger.info("Trip auto-completion and cleanup worker started");
+  logger.info("Trip auto-completion worker started");
 }
 
 export function stopTripWorker() {
