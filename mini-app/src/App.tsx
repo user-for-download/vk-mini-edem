@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Epic, SplitCol, SplitLayout, PanelHeader } from "@vkontakte/vkui";
 import {
   useActiveVkuiLocation,
@@ -47,6 +47,15 @@ export default function App() {
   const routerPopout = usePopout();
   const modalApi = useModalApi();
 
+  const openDriverProfile = useCallback(async (driverOrId: User | string) => {
+    const driverId = typeof driverOrId === "string" ? driverOrId : driverOrId.id;
+    const { DriverProfileModal } = await import("@/modals/DriverProfileModal/DriverProfileModal");
+    modalApi.openCustomModalCard({
+      component: DriverProfileModal,
+      additionalProps: { driverId },
+    });
+  }, [modalApi]);
+
   useEffect(() => {
     const deepLink = parseDeepLink();
 
@@ -61,9 +70,11 @@ export default function App() {
     }
 
     if (deepLink.driverId) {
-      void openDriverProfile(deepLink.driverId);
+      openDriverProfile(deepLink.driverId).catch(() => {
+        // deeplink fallback: молча игнорируем, пользователь останется на главной
+      });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [routeNavigator, openDriverProfile]);
 
   useSwipeBackSync();
 
@@ -84,15 +95,6 @@ export default function App() {
       component: CreateTripModal,
       additionalProps: { onTripCreated: handleTripCreated },
       baseProps: { settlingHeight: 100 },
-    });
-  };
-
-  const openDriverProfile = async (driverOrId: User | string) => {
-    const driverId = typeof driverOrId === "string" ? driverOrId : driverOrId.id;
-    const { DriverProfileModal } = await import("@/modals/DriverProfileModal/DriverProfileModal");
-    modalApi.openCustomModalCard({
-      component: DriverProfileModal,
-      additionalProps: { driverId },
     });
   };
 

@@ -561,6 +561,9 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   const passengersToNotify = await db.booking.findMany({
     where: {
       tripId: trip.id,
+      status: {
+        in: ["pending", "confirmed"],
+      },
     },
     select: { passengerId: true }
   });
