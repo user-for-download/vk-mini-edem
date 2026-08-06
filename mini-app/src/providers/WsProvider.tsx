@@ -76,16 +76,19 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       if (e.code === 1008 || e.code === 4401) {
         console.warn("[WS] Auth failed, trying to refresh token...");
         isRefreshingRef.current = true;
+        let refreshed = false;
         try {
-          const refreshed = await apiClient.tryRefresh();
-          if (refreshed) {
-            connect();
-          } else {
-            // Refresh не удался — сессия мертва, полный логаут.
-            useAuthStore.getState().clearSession("WS Auth failed");
-          }
+          refreshed = await apiClient.tryRefresh();
         } finally {
+          // Флаг снимаем ДО connect(), иначе он отсечёт переподключение
+          // (guard в начале connect()).
           isRefreshingRef.current = false;
+        }
+        if (refreshed) {
+          connect();
+        } else {
+          // Refresh не удался — сессия мертва, полный логаут.
+          useAuthStore.getState().clearSession("WS Auth failed");
         }
         return;
       }

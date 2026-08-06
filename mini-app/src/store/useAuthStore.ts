@@ -132,22 +132,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         console.log("[Auth] Refreshing session...");
 
-        const response = await authApi.refreshToken({
-          refreshToken: state.session.refreshToken,
-        });
+        // Единая точка refresh — apiClient.tryRefresh() (single-flight):
+        // тот же путь, что и при 401/WS-сбое. Ротация токенов происходит
+        // один раз; store обновляется через onTokenUpdate (AuthGate).
+        apiClient.setToken(state.session.accessToken);
+        apiClient.setRefreshToken(state.session.refreshToken);
 
-        apiClient.setToken(response.accessToken);
-        apiClient.setRefreshToken(response.refreshToken);
+        const refreshed = await apiClient.tryRefresh();
 
-        set({
-          status: "authenticated",
-          user: response.user as User,
-          session: {
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken,
-            expiresAt: Date.now() + response.expiresIn * 1000,
-          },
-        });
+        if (!refreshed) {
+          await get().clearSession("Refresh failed");
+        }
       } catch (error) {
         console.error("[Auth] Refresh failed:", error);
         await get().clearSession("Refresh failed");
@@ -190,6 +185,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearSession: async (reason) => {
     console.log(`[Auth] Clearing session. Reason: ${reason}`);
 
+    // In-flight refresh не должен воскресить сессию после логаута.
+    apiClient.invalidatePendingRefresh();
     apiClient.setToken(null);
     apiClient.setRefreshToken(null);
 

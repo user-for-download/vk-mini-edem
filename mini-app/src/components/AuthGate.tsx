@@ -25,6 +25,12 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
    */
   useEffect(() => {
     return apiClient.onTokenUpdate((tokens) => {
+      const state = useAuthStore.getState();
+      // Не воскрешаем сессию, если пользователь вышел (clearSession) или
+      // авторизация в состоянии ошибки — refresh мог стартовать ДО логаута.
+      if (state.status === "unauthenticated" || state.status === "error") {
+        return;
+      }
       useAuthStore.setState({
         status: "authenticated",
         session: {

@@ -479,6 +479,11 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
         type: "trip:details_changed",
         payload: { tripId: trip.id },
       });
+      // Подсказываем онлайн-клиенту обновить список/счётчик уведомлений.
+      wsManager.sendToUser(booking.passengerId, {
+        type: "notification:new",
+        payload: { id: "refresh" },
+      });
     }
   }
 

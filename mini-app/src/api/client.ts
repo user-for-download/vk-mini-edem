@@ -25,6 +25,7 @@ class ApiClient {
   private token: string | null = null;
   private refreshTokenValue: string | null = null;
   private refreshPromise: Promise<boolean> | null = null;
+  private refreshGeneration = 0;
   private tokenListeners: Set<TokenUpdateListener> = new Set();
 
   setToken(token: string | null) {
@@ -50,6 +51,14 @@ class ApiClient {
 
   private emitTokenUpdate(tokens: TokenUpdate) {
     this.tokenListeners.forEach((listener) => listener(tokens));
+  }
+
+  /**
+   * Отменяет применение результатов in-flight refresh (пользователь вышел
+   * из аккаунта, пока обновление токена выполнялось).
+   */
+  invalidatePendingRefresh() {
+    this.refreshGeneration++;
   }
 
   async request<T>(endpoint: string, options: RequestInit = {}, schema?: ZodType<T>): Promise<T> {
@@ -154,6 +163,8 @@ class ApiClient {
       return false;
     }
 
+    const generationAtStart = this.refreshGeneration;
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -170,6 +181,13 @@ class ApiClient {
         }
 
         const data = await response.json();
+
+        // Сессия была очищена, пока шёл запрос (invalidatePendingRefresh) —
+        // не применяем токены и не воскрешаем сессию.
+        if (this.refreshGeneration !== generationAtStart) {
+          return false;
+        }
+
         this.token = data.accessToken;
         this.refreshTokenValue = data.refreshToken;
 

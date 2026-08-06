@@ -29,6 +29,102 @@ class ReviewError extends Error {
   }
 }
 
+interface CreateReviewParams {
+  authorId: string;
+  tripId: string;
+  targetUserId: string;
+  targetRole: string;
+  rating: number;
+  text: string;
+  tripRoute: string;
+}
+
+/**
+ * Создание отзыва в Serializable-транзакции.
+ *
+ * P2034 (serialization failure) — при параллельных записях в одни и те же
+ * строки (агрегат рейтинга target-пользователя) SSI-конфликт временный:
+ * повторяем транзакцию один раз. При true-дубле сработает повторная проверка
+ * внутри транзакции или уникальный индекс (unique_review_per_trip).
+ */
+async function createReviewTransaction(params: CreateReviewParams) {
+  const run = () =>
+    db.$transaction(
+      async (tx) => {
+        // Повторная проверка внутри транзакции с Serializable-изоляцией:
+        // при параллельных запросах уникальный индекс (unique_review_per_trip)
+        // и отлов P2002 гарантируют отсутствие дублей.
+        const duplicate = await tx.review.findFirst({
+          where: {
+            authorId: params.authorId,
+            tripId: params.tripId,
+            targetUserId: params.targetUserId,
+          },
+        });
+
+        if (duplicate) {
+          throw new ReviewError(
+            "You already reviewed this user for this trip",
+            409,
+            ERROR_CODES.ALREADY_REVIEWED
+          );
+        }
+
+        const created = await tx.review.create({
+          data: {
+            authorId: params.authorId,
+            targetUserId: params.targetUserId,
+            targetRole: params.targetRole,
+            rating: params.rating,
+            text: params.text,
+            tripRoute: params.tripRoute,
+            tripId: params.tripId,
+          },
+          include: {
+            author: true,
+          },
+        });
+
+        const aggregate = await tx.review.aggregate({
+          where: {
+            targetUserId: params.targetUserId,
+          },
+          _avg: {
+            rating: true,
+          },
+          _count: {
+            _all: true,
+          },
+        });
+
+        const avgRating = aggregate._avg.rating ?? 0;
+
+        await tx.user.update({
+          where: { id: params.targetUserId },
+          data: {
+            rating: Number(avgRating.toFixed(1)),
+            reviewsCount: aggregate._count._all,
+          },
+        });
+
+        return created;
+      },
+      { isolationLevel: "Serializable" }
+    );
+
+  try {
+    return await run();
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return await run();
+    }
+    throw error;
+  }
+}
+
 /**
  * Отзывы, оставленные текущим пользователем.
  */
@@ -304,68 +400,15 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   }
 
   try {
-    const review = await db.$transaction(
-      async (tx) => {
-        // Повторная проверка внутри транзакции с Serializable-изоляцией:
-        // при параллельных запросах уникальный индекс (unique_review_per_trip)
-        // и отлов P2002 гарантируют отсутствие дублей.
-        const duplicate = await tx.review.findFirst({
-          where: {
-            authorId: author.id,
-            tripId: trip.id,
-            targetUserId,
-          },
-        });
-
-        if (duplicate) {
-          throw new ReviewError(
-            "You already reviewed this user for this trip",
-            409,
-            ERROR_CODES.ALREADY_REVIEWED
-          );
-        }
-
-        const created = await tx.review.create({
-          data: {
-            authorId: author.id,
-            targetUserId,
-            targetRole,
-            rating,
-            text,
-            tripRoute,
-            tripId: trip.id,
-          },
-          include: {
-            author: true,
-          },
-        });
-
-        const aggregate = await tx.review.aggregate({
-          where: {
-            targetUserId,
-          },
-          _avg: {
-            rating: true,
-          },
-          _count: {
-            _all: true,
-          },
-        });
-
-        const avgRating = aggregate._avg.rating ?? 0;
-
-        await tx.user.update({
-          where: { id: targetUserId },
-          data: {
-            rating: Number(avgRating.toFixed(1)),
-            reviewsCount: aggregate._count._all,
-          },
-        });
-
-        return created;
-      },
-      { isolationLevel: "Serializable" }
-    );
+    const review = await createReviewTransaction({
+      authorId: author.id,
+      tripId: trip.id,
+      targetUserId,
+      targetRole,
+      rating,
+      text,
+      tripRoute,
+    });
 
     logBusinessEvent("review.created", {
       reviewId: review.id,
@@ -379,11 +422,12 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
+      (error.code === "P2002" || error.code === "P2034")
     ) {
-      // Уникальный индекс сработал: параллельный запрос уже создал отзыв.
+      // Уникальный индекс сработал (P2002) или SSI-конфликт повторился
+      // после ретрая (P2034): параллельный запрос уже создал отзыв.
       return c.json(
-        { code: ERROR_CODES.ALREADY_REVIEWED, message: "Отзыв уже оставлен" },
+        { code: ERROR_CODES.ALREADY_REVIEWED, message: "You already reviewed this user for this trip" },
         409
       );
     }
