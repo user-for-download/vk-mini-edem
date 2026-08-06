@@ -59,9 +59,9 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
             <ErrorBoundary>
               <AuthGate>
                 <WsProvider>
-                  <GlobalWsListener />
                   <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
                     <SnackbarProvider>
+                      <GlobalWsListener />
                       <ModalProvider>{children}</ModalProvider>
                     </SnackbarProvider>
                   </AppRoot>
