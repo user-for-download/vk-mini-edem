@@ -68,6 +68,9 @@ jobs:
       - name: Typecheck mini-app
         run: npm run --workspace mini-app typecheck
 
+      - name: Lint mini-app
+        run: npm run --workspace mini-app lint
+
       - name: Build mini-app
         run: npm run --workspace mini-app build
 
