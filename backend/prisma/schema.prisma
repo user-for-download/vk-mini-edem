@@ -133,4 +133,5 @@ model Review {
 
   @@index([targetUserId, createdAt(sort: Desc)])
   @@index([authorId, tripId])
+  @@unique([authorId, tripId, targetUserId], name: "unique_review_per_trip")
 }

@@ -1,6 +1,8 @@
 // backend/src/middleware/rateLimit.ts
 import type { Context, Next } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { ERROR_CODES } from "../errors.js";
+import { env } from "../env.js";
 
 interface RateLimiterOptions {
   windowMs: number;
@@ -17,6 +19,11 @@ interface RateBucket {
  *
  * Подходит для одного инстанса.
  * Для production с несколькими инстансами лучше использовать Redis.
+ *
+ * Ключ строится по IP клиента:
+ * - за доверенным прокси (env.TRUST_PROXY) — из заголовков X-Real-IP / X-Forwarded-For,
+ *   которые прокси перезаписывает (подделать их снаружи нельзя);
+ * - при прямом подключении — из TCP-сокета (getConnInfo), неподделываемый.
  */
 export function createRateLimiter(options: RateLimiterOptions) {
   const buckets = new Map<string, RateBucket>();
@@ -40,13 +47,7 @@ export function createRateLimiter(options: RateLimiterOptions) {
   }
 
   return async function rateLimiter(c: Context, next: Next) {
-    const forwardedFor = c.req.header("x-forwarded-for");
-    const realIp = c.req.header("x-real-ip");
-
-    const ip =
-      forwardedFor?.split(",")[0]?.trim() ||
-      realIp ||
-      "unknown";
+    const ip = resolveClientIp(c);
 
     const key = `${options.keyPrefix}:${ip}`;
     const now = Date.now();
@@ -66,6 +67,24 @@ export function createRateLimiter(options: RateLimiterOptions) {
 
     return next();
   };
+}
+
+function resolveClientIp(c: Context): string {
+  if (env.TRUST_PROXY) {
+    return (
+      c.req.header("x-real-ip") ||
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+      "unknown"
+    );
+  }
+
+  try {
+    const connInfo = getConnInfo(c);
+    return connInfo.remote.address || "unknown";
+  } catch {
+    // Фоллбек для сред, где getConnInfo недоступен (например, vitest app.request).
+    return c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  }
 }
 
 // ─── Пресеты лимитеров ──────────────────────────────────────────────────────

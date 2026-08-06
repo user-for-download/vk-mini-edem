@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { apiClient } from "../api/client";
+import { useAuthStore } from "../store/useAuthStore";
 import type { WsClientEvent, WsServerEvent } from "@edem/contracts";
 
 interface WsContextValue {
@@ -33,15 +34,18 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const isRefreshingRef = useRef(false);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (isRefreshingRef.current) return;
 
     const token = apiClient.getToken();
     if (!token) return; // Wait until token is available
 
-    const wsUrl = `${getWsUrl()}?token=${encodeURIComponent(token)}`;
-    const ws = new WebSocket(wsUrl);
+    // Токен передаём только в auth-сообщении, чтобы не светить его в URL
+    // (query-параметры попадают в логи прокси/браузера).
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -63,15 +67,30 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
     };
 
-    ws.onclose = (e) => {
+    ws.onclose = async (e) => {
       setIsConnected(false);
       wsRef.current = null;
 
-      // 1008 Policy Violation usually means token is invalid/expired
-      if (e.code === 1008) return;
+      // 1008 Policy Violation (стандарт), 4401 (наш кастомный код) —
+      // токен протух/невалиден: пробуем обновить и переподключиться.
+      if (e.code === 1008 || e.code === 4401) {
+        console.warn("[WS] Auth failed, trying to refresh token...");
+        isRefreshingRef.current = true;
+        try {
+          const refreshed = await apiClient.tryRefresh();
+          if (refreshed) {
+            connect();
+          } else {
+            // Refresh не удался — сессия мертва, полный логаут.
+            useAuthStore.getState().clearSession("WS Auth failed");
+          }
+        } finally {
+          isRefreshingRef.current = false;
+        }
+        return;
+      }
 
-      // Auto-reconnect with exponential backoff could be added here, 
-      // simple 3s delay for now:
+      // Обычный реконнект при обрыве сети
       reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
     };
 

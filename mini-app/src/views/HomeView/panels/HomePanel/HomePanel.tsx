@@ -74,8 +74,16 @@ export const HomePanel: FC<HomePanelProps> = ({
 
   const myTrips = myTripsData ?? [];
 
+  // Бэкенд сортирует GET /trips/my по departureAt: desc,
+  // поэтому сортируем на клиенте по возрастанию — ближайшая поездка первой.
   const activeOwnTrip =
-    myTrips.find((trip) => trip.status === "active") ?? null;
+    myTrips
+      .filter((trip) => trip.status === "active")
+      .sort((a, b) => {
+        const aTime = a.departureAt ? Date.parse(a.departureAt) : 0;
+        const bTime = b.departureAt ? Date.parse(b.departureAt) : 0;
+        return aTime - bTime;
+      })[0] ?? null;
 
   return (
     <Panel id={id}>

@@ -129,7 +129,11 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     );
   }
 
-  const isOwnTrip = role === "driver" && trip.driver.id === currentUser.id;
+  // Принадлежность поездки определяется ТОЛЬКО данными с сервера.
+  // Клиентский role — это лишь переключатель вкладок и не должен
+  // участвовать в проверках прав (иначе водитель, открывший свою поездку
+  // в роли «пассажир», увидит кнопку бронирования своей же поездки).
+  const isOwnTrip = !!currentUser && trip.driver.id === currentUser.id;
 
   const isTripActive = trip.status ? trip.status === "active" : true;
   const isTripCompleted = trip.status === "completed";

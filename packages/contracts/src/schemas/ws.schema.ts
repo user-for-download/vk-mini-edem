@@ -19,6 +19,10 @@ export const wsServerEventSchema = z.discriminatedUnion("type", [
     payload: z.object({ tripId: z.string(), status: z.string() }),
   }),
   z.object({
+    type: z.literal("trip:details_changed"),
+    payload: z.object({ tripId: z.string() }),
+  }),
+  z.object({
     type: z.literal("notification:new"),
     payload: z.object({ id: z.string() }),
   }),

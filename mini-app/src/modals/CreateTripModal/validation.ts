@@ -1,4 +1,5 @@
 // mini-app/src/modals/CreateTripModal/validation.ts
+import { MAX_SEATS } from "@edem/contracts";
 
 export interface TripFormValues {
   fromCity: string;
@@ -79,6 +80,19 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
 
       if (dateValue < today) {
         errors.date = "Дата поездки уже прошла";
+      } else if (
+        dateValue.getTime() === today.getTime() &&
+        values.time.trim() &&
+        TIME_REGEX.test(values.time.trim())
+      ) {
+        // Дата сегодняшняя — проверяем, что время ещё в будущем.
+        const [hours, minutes] = values.time.split(":").map(Number);
+        const departureTime = new Date();
+        departureTime.setHours(hours, minutes, 0, 0);
+
+        if (departureTime <= new Date()) {
+          errors.time = "Укажите время в будущем";
+        }
       }
     }
   }
@@ -134,8 +148,8 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
   }
 
   // Места
-  if (values.seats < 1 || values.seats > 4) {
-    errors.seats = "От 1 до 4 мест";
+  if (values.seats < 1 || values.seats > MAX_SEATS) {
+    errors.seats = `От 1 до ${MAX_SEATS} мест`;
   }
 
   // Комментарий

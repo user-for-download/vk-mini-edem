@@ -1,7 +1,7 @@
 // backend/src/trips/index.ts
 import { Hono } from "hono";
 import type { Prisma } from "@prisma/client";
-import { createTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
+import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
 import { logger } from "../logger.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
@@ -11,6 +11,7 @@ import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
+import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
 
 async function getActiveBookingSeatsByTripIds(
@@ -395,8 +396,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const user = c.get("user");
   const body = await getSanitizedBody(c);
   
-  const updateTripSchema = createTripDtoSchema.partial();
-  const parseResult = updateTripSchema.safeParse(body);
+  const parseResult = updateTripDtoSchema.safeParse(body);
   if (!parseResult.success) {
     return c.json({ message: "Invalid payload", errors: parseResult.error.format() }, 400);
   }
@@ -447,6 +447,40 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
     data: updateData,
     include: { driver: { include: { car: true } } },
   });
+
+  /**
+   * Если изменились важные для пассажиров поля — уведомляем подтверждённых пассажиров
+   * (персистентное уведомление + WS-событие для онлайн-клиентов).
+   */
+  const importantFieldsChanged =
+    (dto.departureAt !== undefined &&
+      trip.departureAt.toISOString() !== updated.departureAt.toISOString()) ||
+    (dto.fromCity !== undefined && trip.fromCity !== updated.fromCity) ||
+    (dto.toCity !== undefined && trip.toCity !== updated.toCity) ||
+    (dto.fromAddress !== undefined && trip.fromAddress !== updated.fromAddress) ||
+    (dto.toAddress !== undefined && trip.toAddress !== updated.toAddress) ||
+    (dto.price !== undefined && trip.price !== updated.price);
+
+  if (importantFieldsChanged) {
+    const confirmedBookings = await db.booking.findMany({
+      where: { tripId: trip.id, status: "confirmed" },
+      select: { passengerId: true },
+    });
+
+    for (const booking of confirmedBookings) {
+      await createNotification(
+        booking.passengerId,
+        "trip_details_changed",
+        "Детали поездки изменены",
+        `Водитель изменил детали поездки ${updated.fromCity} → ${updated.toCity}. Проверьте время и место встречи.`
+      );
+
+      wsManager.sendToUser(booking.passengerId, {
+        type: "trip:details_changed",
+        payload: { tripId: trip.id },
+      });
+    }
+  }
 
   return c.json(serializeTrip(updated));
 });

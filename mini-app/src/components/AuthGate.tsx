@@ -2,6 +2,7 @@
 import { type FC, type PropsWithChildren, useEffect } from "react";
 import { ScreenSpinner, Placeholder, Button, Panel, View } from "@vkontakte/vkui";
 import { useAuthStore } from "@/store/useAuthStore";
+import { apiClient } from "@/api/client";
 
 /**
  * Обёртка, которая запускает авторизацию при первом рендере
@@ -16,6 +17,24 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
       void bootstrap();
     }
   }, [status, bootstrap]);
+
+  /**
+   * Подписка на тихое обновление токенов в apiClient (silent refresh по 401).
+   * Без этого Zustand-стор хранит отозванный refresh-токен, и ручной
+   * refreshSession() (возврат из фона) приводит к ложному логауту.
+   */
+  useEffect(() => {
+    return apiClient.onTokenUpdate((tokens) => {
+      useAuthStore.setState({
+        status: "authenticated",
+        session: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: Date.now() + tokens.expiresIn * 1000,
+        },
+      });
+    });
+  }, []);
 
   if (status === "idle" || status === "initializing") {
     return <ScreenSpinner />;

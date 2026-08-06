@@ -8,7 +8,6 @@ import {
 } from "@tanstack/react-query";
 import { tripsApi, type SearchTripsFilters, type UpdateTripDto } from "../api/trips.api";
 import type { CreateTripDto } from "@edem/contracts";
-import type { Trip } from "@/types";
 
 export const TRIP_KEYS = {
   all: ["trips"] as const,
@@ -24,7 +23,7 @@ export function useInfiniteTripsQuery(filters?: SearchTripsFilters) {
     queryKey: [...TRIP_KEYS.lists(), "infinite", filters],
     queryFn: async ({ pageParam = 1 }) => {
       const res = await tripsApi.getTrips({ ...filters, page: pageParam as number, limit: 20 });
-      return { ...res, items: res.items as unknown as Trip[] };
+      return res;
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
@@ -48,11 +47,7 @@ export function useTripsQuery(filters?: SearchTripsFilters) {
   return useQuery({
     queryKey: TRIP_KEYS.list(filters),
     queryFn: async () => {
-      const res = await tripsApi.getTrips(filters);
-      return {
-        ...res,
-        items: res.items as unknown as Trip[],
-      };
+      return tripsApi.getTrips(filters);
     },
     staleTime: 60_000,
     placeholderData: keepPreviousData,
@@ -64,7 +59,7 @@ export function useMyTripsQuery(options?: { enabled?: boolean }) {
     queryKey: TRIP_KEYS.my(),
     queryFn: async () => {
       const res = await tripsApi.getMyTrips();
-      return res.items as unknown as Trip[];
+      return res.items;
     },
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
@@ -76,7 +71,7 @@ export function useInfiniteMyTripsQuery(options?: { enabled?: boolean }) {
     queryKey: [...TRIP_KEYS.my(), "infinite"],
     queryFn: async ({ pageParam = 1 }) => {
       const res = await tripsApi.getMyTrips({ page: pageParam as number, limit: 20 });
-      return { ...res, items: res.items as unknown as Trip[] };
+      return res;
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
@@ -90,8 +85,7 @@ export function useTripDetailQuery(id: string) {
   return useQuery({
     queryKey: TRIP_KEYS.detail(id),
     queryFn: async () => {
-      const res = await tripsApi.getTripById(id);
-      return res as unknown as Trip;
+      return tripsApi.getTripById(id);
     },
     enabled: Boolean(id),
     placeholderData: keepPreviousData,

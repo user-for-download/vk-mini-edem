@@ -1,6 +1,7 @@
 // backend/src/reviews/index.ts
 import { Hono } from "hono";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createReviewDtoSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
@@ -12,6 +13,21 @@ import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 
 export const reviewsRouter = new Hono<AuthEnv>();
+
+class ReviewError extends Error {
+  statusCode: number;
+  code: string;
+
+  constructor(
+    message: string,
+    statusCode: number = 400,
+    code: string = ERROR_CODES.VALIDATION_FAILED
+  ) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
 
 /**
  * Отзывы, оставленные текущим пользователем.
@@ -270,6 +286,7 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
   /**
    * Запрещаем повторный отзыв тому же пользователю по той же поездке.
+   * Быстрый путь для уже существующего отзыва (без Serializable-транзакции).
    */
   const existingReview = await db.review.findFirst({
     where: {
@@ -287,47 +304,68 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   }
 
   try {
-    const review = await db.$transaction(async (tx) => {
-      // ... transaction logic
-      const created = await tx.review.create({
-        data: {
-          authorId: author.id,
-          targetUserId,
-          targetRole,
-          rating,
-          text,
-          tripRoute,
-          tripId: trip.id,
-        },
-        include: {
-          author: true,
-        },
-      });
+    const review = await db.$transaction(
+      async (tx) => {
+        // Повторная проверка внутри транзакции с Serializable-изоляцией:
+        // при параллельных запросах уникальный индекс (unique_review_per_trip)
+        // и отлов P2002 гарантируют отсутствие дублей.
+        const duplicate = await tx.review.findFirst({
+          where: {
+            authorId: author.id,
+            tripId: trip.id,
+            targetUserId,
+          },
+        });
 
-      const aggregate = await tx.review.aggregate({
-        where: {
-          targetUserId,
-        },
-        _avg: {
-          rating: true,
-        },
-        _count: {
-          _all: true,
-        },
-      });
+        if (duplicate) {
+          throw new ReviewError(
+            "You already reviewed this user for this trip",
+            409,
+            ERROR_CODES.ALREADY_REVIEWED
+          );
+        }
 
-      const avgRating = aggregate._avg.rating ?? 0;
+        const created = await tx.review.create({
+          data: {
+            authorId: author.id,
+            targetUserId,
+            targetRole,
+            rating,
+            text,
+            tripRoute,
+            tripId: trip.id,
+          },
+          include: {
+            author: true,
+          },
+        });
 
-      await tx.user.update({
-        where: { id: targetUserId },
-        data: {
-          rating: Number(avgRating.toFixed(1)),
-          reviewsCount: aggregate._count._all,
-        },
-      });
+        const aggregate = await tx.review.aggregate({
+          where: {
+            targetUserId,
+          },
+          _avg: {
+            rating: true,
+          },
+          _count: {
+            _all: true,
+          },
+        });
 
-      return created;
-    });
+        const avgRating = aggregate._avg.rating ?? 0;
+
+        await tx.user.update({
+          where: { id: targetUserId },
+          data: {
+            rating: Number(avgRating.toFixed(1)),
+            reviewsCount: aggregate._count._all,
+          },
+        });
+
+        return created;
+      },
+      { isolationLevel: "Serializable" }
+    );
 
     logBusinessEvent("review.created", {
       reviewId: review.id,
@@ -339,6 +377,24 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
     return c.json(serializeReview(review), 201);
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Уникальный индекс сработал: параллельный запрос уже создал отзыв.
+      return c.json(
+        { code: ERROR_CODES.ALREADY_REVIEWED, message: "Отзыв уже оставлен" },
+        409
+      );
+    }
+
+    if (error instanceof ReviewError) {
+      return c.json(
+        { code: error.code, message: error.message },
+        error.statusCode as ContentfulStatusCode
+      );
+    }
+
     logger.error(
       {
         err: error,

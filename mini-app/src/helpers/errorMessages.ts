@@ -1,0 +1,29 @@
+// mini-app/src/helpers/errorMessages.ts
+// Словарь серверных кодов ошибок → русские тексты.
+// Бэкенд возвращает коды в поле `code` (см. backend/src/errors.ts).
+
+const ERROR_MESSAGES: Record<string, string> = {
+  VALIDATION_FAILED: "Проверьте введенные данные",
+  UNAUTHORIZED: "Необходима авторизация",
+  FORBIDDEN: "Доступ запрещен",
+  NOT_FOUND: "Объект не найден",
+  CONFLICT: "Конфликт данных",
+  RATE_LIMITED: "Слишком много запросов, попробуйте позже",
+  PAYLOAD_TOO_LARGE: "Размер запроса слишком велик",
+  TRIP_NOT_ACTIVE: "Поездка больше не активна",
+  TRIP_IN_PAST: "Время отправления уже прошло",
+  NO_CAR: "Сначала добавьте автомобиль в профиле",
+  SEAT_TAKEN: "Это место только что заняли",
+  ALREADY_BOOKED: "Вы уже забронировали место в этой поездке",
+  ALREADY_REVIEWED: "Вы уже оставляли отзыв об этой поездке",
+  NOT_PARTICIPANT: "Вы не участвовали в этой поездке",
+  SELF_REVIEW: "Нельзя оставить отзыв самому себе",
+  INTERNAL_ERROR: "Внутренняя ошибка сервера",
+};
+
+export function getErrorMessage(code?: string, fallback?: string): string {
+  if (code && ERROR_MESSAGES[code]) {
+    return ERROR_MESSAGES[code];
+  }
+  return fallback || "Произошла неизвестная ошибка";
+}

@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { userSchema } from "./user.schema.js";
 
+/**
+ * Единый источник правды для лимита мест в легковом автомобиле.
+ * Используется в Zod-схемах (создание/редактирование поездки) и в UI-формах.
+ */
+export const MAX_SEATS = 4;
+
 export const tripTagSchema = z.enum([
   "Можно с животными",
   "Можно курить",
@@ -42,7 +48,7 @@ export const tripSchema = z.object({
   durationMinutes: z.number().int().positive(),
   distanceKm: z.number().positive(),
   price: z.number().int().positive(),
-  seatsTotal: z.number().int().min(1).max(8),
+  seatsTotal: z.number().int().min(1).max(MAX_SEATS),
   seatsAvailable: z.number().int().min(0),
   driver: userSchema,
   tags: z.array(tripTagSchema),

@@ -103,6 +103,13 @@ export const env = {
   JWT_REFRESH_TTL_SECONDS: intEnv("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60),
 
   /**
+   * Если приложение стоит за доверенным прокси (Nginx), прокси
+   * перезаписывает X-Real-IP / X-Forwarded-For, и им можно доверять.
+   * Иначе используем IP из TCP-сокета (неподделываемый).
+   */
+  TRUST_PROXY: process.env.TRUST_PROXY === "true",
+
+  /**
    * Rate limit для auth.
    */
   AUTH_RATE_WINDOW_MS: intEnv("AUTH_RATE_WINDOW_MS", 15 * 60 * 1000),

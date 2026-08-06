@@ -17,6 +17,7 @@ import {
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
+import { MAX_SEATS } from "@edem/contracts";
 import type { UpdateTripDto, TripTag } from "@edem/contracts";
 import type { Trip } from "@/types";
 import { TRIP_TAGS } from "@/consts/tags";
@@ -39,14 +40,19 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   trip,
 }) => {
   const [values, setValues] = useState<TripFormValues>(() => {
-    // extract date and time from departureAt (assuming UTC or Local? For now just split 'T')
+    // Извлекаем дату и время в ЛОКАЛЬНОМ времени пользователя.
+    // Смешение toISOString() (UTC) и toLocaleTimeString() (local) сдвигало
+    // дату на день назад при сохранении (например, 01:00 МСК = 22:00 UTC предыдущего дня).
     let date = "";
     let time = "";
     if (trip.departureAt) {
       try {
         const d = new Date(trip.departureAt);
-        date = d.toISOString().split("T")[0];
-        time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        date = `${year}-${month}-${day}`;
+        time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       } catch (e) {
         // fallback
       }
@@ -457,10 +463,10 @@ export const EditTripModal: FC<EditTripModalProps> = ({
                 mode="secondary"
                 appearance="neutral"
                 onClick={() =>
-                  handleChange("seats", Math.min(4, values.seats + 1))
+                  handleChange("seats", Math.min(MAX_SEATS, values.seats + 1))
                 }
                 aria-label="Больше мест"
-                disabled={values.seats >= 4}
+                disabled={values.seats >= MAX_SEATS}
               >
                 +
               </Button>

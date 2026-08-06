@@ -16,6 +16,7 @@ import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi, type CarFormDto } from "@/api/users.api";
 import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/helpers/errorMessages";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -38,12 +39,29 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
   const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
 
   const handleChange = (field: keyof CarFormDto, value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }));
+    let processedValue = value;
+
+    // Госномер всегда в верхнем регистре
+    if (field === "plate") {
+      processedValue = value.toUpperCase();
+    }
+
+    // Обрезаем по лимитам бэкенда (users/index.ts):
+    // model ≤ 50, color ≤ 30, plate ≤ 15 — иначе сырая ошибка валидации с бэкенда.
+    if (field === "model") processedValue = processedValue.slice(0, 50);
+    if (field === "color") processedValue = processedValue.slice(0, 30);
+    if (field === "plate") processedValue = processedValue.slice(0, 15);
+
+    setValues((prev) => ({ ...prev, [field]: processedValue }));
 
     if (error) {
       setError(null);
     }
   };
+
+  const isFormValid = Boolean(
+    values.model.trim() && values.color.trim() && values.plate.trim()
+  );
 
   const handleSubmit = async () => {
     const model = values.model.trim();
@@ -85,8 +103,8 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
 
       close();
     } catch (submitError) {
-      if (submitError instanceof ApiError && submitError.code === 'VALIDATION_FAILED') {
-        setError(`Ошибка валидации: ${submitError.message}`);
+      if (submitError instanceof ApiError) {
+        setError(getErrorMessage(submitError.code, submitError.message));
         return;
       }
       enqueueSnackbar({
@@ -171,7 +189,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
           mode="primary"
           onClick={handleSubmit}
           loading={isSubmitting}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !isFormValid}
         >
           Сохранить автомобиль
         </Button>

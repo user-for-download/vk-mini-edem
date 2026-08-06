@@ -13,10 +13,19 @@ export class ApiError extends Error {
   }
 }
 
+export interface TokenUpdate {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+type TokenUpdateListener = (tokens: TokenUpdate) => void;
+
 class ApiClient {
   private token: string | null = null;
   private refreshTokenValue: string | null = null;
   private refreshPromise: Promise<boolean> | null = null;
+  private tokenListeners: Set<TokenUpdateListener> = new Set();
 
   setToken(token: string | null) {
     this.token = token;
@@ -28,6 +37,19 @@ class ApiClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  /**
+   * Подписка на тихие обновления токенов (silent refresh).
+   * Возвращает функцию отписки.
+   */
+  onTokenUpdate(listener: TokenUpdateListener): () => void {
+    this.tokenListeners.add(listener);
+    return () => this.tokenListeners.delete(listener);
+  }
+
+  private emitTokenUpdate(tokens: TokenUpdate) {
+    this.tokenListeners.forEach((listener) => listener(tokens));
   }
 
   async request<T>(endpoint: string, options: RequestInit = {}, schema?: ZodType<T>): Promise<T> {
@@ -65,7 +87,14 @@ class ApiClient {
     if (schema) {
       const parsed = schema.safeParse(data);
       if (!parsed.success) {
-        throw new ApiError("Некорректный ответ сервера", "INVALID_RESPONSE", response.status);
+        // Graceful degradation: при дрейфе схемы не роняем запрос.
+        // В dev — подробности в консоль, в prod — предупреждение.
+        if (import.meta.env.DEV) {
+          console.error("[ApiClient] Zod validation failed:", parsed.error, "Data:", data);
+        } else {
+          console.warn("[ApiClient] Zod validation failed:", parsed.error.issues[0]?.message);
+        }
+        return data as T;
       }
       return parsed.data;
     }
@@ -106,8 +135,9 @@ class ApiClient {
    * Пытаемся обновить токен.
    * Используется паттерн «одного промиса», чтобы при нескольких
    * параллельных 401 refresh произошёл только один раз.
+   * Публичный — вызывается из WsProvider при закрытии соединения с кодом 1008/4401.
    */
-  private async tryRefresh(): Promise<boolean> {
+  async tryRefresh(): Promise<boolean> {
     if (!this.refreshPromise) {
       this.refreshPromise = this.performRefresh();
     }
@@ -142,6 +172,9 @@ class ApiClient {
         const data = await response.json();
         this.token = data.accessToken;
         this.refreshTokenValue = data.refreshToken;
+
+        // Уведомляем подписчиков (Zustand-стор), чтобы сессия не рассинхронизировалась.
+        this.emitTokenUpdate(data);
         return true;
       } finally {
         clearTimeout(timeoutId);

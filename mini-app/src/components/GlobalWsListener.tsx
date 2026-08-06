@@ -2,6 +2,7 @@ import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWsEvent } from "@/providers/useWsEvent";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { TRIP_KEYS } from "@/queries/useTripsQuery";
 
 export const GlobalWsListener: React.FC = () => {
   const queryClient = useQueryClient();
@@ -26,8 +27,8 @@ export const GlobalWsListener: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ["bookings", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "history"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "trip", tripId] });
-    queryClient.invalidateQueries({ queryKey: ["trips", "my"] });
-    queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
 
     if (status === "confirmed") {
       enqueueSnackbar({
@@ -45,10 +46,10 @@ export const GlobalWsListener: React.FC = () => {
   });
 
   useWsEvent("trip:status_changed", ({ tripId, status }) => {
-    queryClient.invalidateQueries({ queryKey: ["trips", "my"] });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
     queryClient.invalidateQueries({ queryKey: ["bookings", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "history"] });
-    queryClient.invalidateQueries({ queryKey: ["trip", tripId] });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
 
     if (status === "cancelled") {
       enqueueSnackbar({
@@ -64,6 +65,18 @@ export const GlobalWsListener: React.FC = () => {
         dedupeKey: `ws_trip_completed_${tripId}`,
       });
     }
+  });
+
+  useWsEvent("trip:details_changed", ({ tripId }) => {
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
+
+    enqueueSnackbar({
+      type: "info",
+      title: "Детали поездки изменены",
+      subtitle: "Водитель внес изменения, проверьте информацию",
+      dedupeKey: `ws_trip_changed_${tripId}`,
+    });
   });
 
   return null;

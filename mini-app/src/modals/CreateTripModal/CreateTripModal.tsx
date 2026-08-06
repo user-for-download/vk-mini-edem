@@ -17,10 +17,13 @@ import {
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
+import { MAX_SEATS } from "@edem/contracts";
 import type { CreateTripDto, TripTag } from "@edem/contracts";
+import { ApiError } from "@/api/client";
 import { TRIP_TAGS } from "@/consts/tags";
 import { TagsScroll } from "@/components/TagsScroll";
 import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { getErrorMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
 import {
   type TripFormValues,
@@ -148,10 +151,14 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
         }
       },
       onError: (error) => {
+        const message =
+          error instanceof ApiError
+            ? getErrorMessage(error.code, error.message)
+            : "Не удалось создать поездку";
+
         enqueueSnackbar({
           type: "error",
-          title: "Не удалось создать поездку",
-          subtitle: error instanceof Error ? error.message : undefined,
+          title: message,
           dedupeKey: "create_trip_error",
         });
       },
@@ -446,10 +453,10 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
                 mode="secondary"
                 appearance="neutral"
                 onClick={() =>
-                  handleChange("seats", Math.min(4, values.seats + 1))
+                  handleChange("seats", Math.min(MAX_SEATS, values.seats + 1))
                 }
                 aria-label="Больше мест"
-                disabled={values.seats >= 4}
+                disabled={values.seats >= MAX_SEATS}
               >
                 +
               </Button>
