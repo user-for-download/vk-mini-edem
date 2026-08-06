@@ -7,7 +7,7 @@ import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { ReviewCard } from "@/components/ReviewCard";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserReviewsQuery, useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
 import { usersApi } from "@/api/users.api";
@@ -43,7 +43,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   onOpenSupport,
   onOpenAbout,
 }) => {
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
   const currentUser = useCurrentUser();
   const routeNavigator = useRouteNavigator();
 

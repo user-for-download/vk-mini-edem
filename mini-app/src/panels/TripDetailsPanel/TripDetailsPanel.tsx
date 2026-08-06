@@ -29,7 +29,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { SeatScheme } from "@/components/SeatScheme";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   useCreateBookingMutation,
@@ -78,7 +78,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
   const [isCompletingTrip, setIsCompletingTrip] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
   const modalApi = useModalApi();

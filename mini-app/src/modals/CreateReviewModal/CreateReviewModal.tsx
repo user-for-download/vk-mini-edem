@@ -14,7 +14,7 @@ import {
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import type { Trip, User } from "@/types";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCreateReviewMutation, REVIEW_KEYS } from "@/queries/useReviewsQuery";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -113,7 +113,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
   const createReview = useCreateReviewMutation();
   const queryClient = useQueryClient();
 

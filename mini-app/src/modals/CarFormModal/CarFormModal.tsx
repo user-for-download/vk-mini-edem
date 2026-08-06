@@ -18,7 +18,7 @@ import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi, type CarFormDto } from "@/api/users.api";
 import { ApiError } from "@/api/client";
 import { getErrorMessage } from "@/helpers/errorMessages";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -36,7 +36,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
 
   const handleChange = (field: keyof CarFormDto, value: string) => {
     let processedValue = value;

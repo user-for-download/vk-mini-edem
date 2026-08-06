@@ -17,7 +17,7 @@ import {
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import { usersApi } from "@/api/users.api";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -32,7 +32,7 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
 
   const handleSubmit = async () => {
     const trimmedName = name.trim();

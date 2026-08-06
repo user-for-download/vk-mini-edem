@@ -24,7 +24,7 @@ import type { UpdateTripDto, TripTag } from "@edem/contracts";
 import type { Trip } from "@/types";
 import { TRIP_TAGS } from "@/consts/tags";
 import { TagsScroll } from "@/components/TagsScroll";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useUpdateTripMutation } from "@/queries/useTripsQuery";
 import {
   type TripFormValues,
@@ -79,7 +79,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<TripTag[]>(trip.tags as TripTag[]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
   const updateTrip = useUpdateTripMutation();
 
   const handleChange = useCallback(

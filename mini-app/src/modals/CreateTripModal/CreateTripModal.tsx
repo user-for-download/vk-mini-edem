@@ -24,7 +24,7 @@ import type { CreateTripDto, TripTag } from "@edem/contracts";
 import { ApiError } from "@/api/client";
 import { TRIP_TAGS } from "@/consts/tags";
 import { TagsScroll } from "@/components/TagsScroll";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { getErrorMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
 import {
@@ -50,7 +50,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<TripTag[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
   const createTrip = useCreateTripMutation();
 
   const handleChange = useCallback(

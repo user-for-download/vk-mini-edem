@@ -7,7 +7,7 @@ import {
   useTripBookingsQuery,
   useUpdateBookingStatusMutation,
 } from "@/queries/useBookingsQuery";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { DriverBookingAction } from "@edem/contracts";
 
@@ -31,7 +31,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   } = useTripBookingsQuery(tripId ?? "", { enabled: isOwnTrip });
 
   const updateBooking = useUpdateBookingStatusMutation();
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
 
   const handleSetStatus = useCallback((bookingId: string, status: DriverBookingAction) => {
     updateBooking.mutate(

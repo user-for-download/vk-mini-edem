@@ -1,12 +1,12 @@
 import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWsEvent } from "@/providers/useWsEvent";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 import { TRIP_KEYS } from "@/queries/useTripsQuery";
 
 export const GlobalWsListener: React.FC = () => {
   const queryClient = useQueryClient();
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
 
   useWsEvent("notification:new", () => {
     queryClient.invalidateQueries({ queryKey: ["notifications"] });

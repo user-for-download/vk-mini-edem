@@ -13,7 +13,6 @@ import {
 import { VIEW_ACTION, VIEW_HOME, VIEW_PROFILE, type ViewId } from "@/consts/views";
 import type { Role, Trip, User } from "@/types";
 import { AppTabbar } from "@/components/AppTabbar";
-import { AppSnackbar } from "@/components/AppSnackbar";
 import { HomeView } from "@/views/HomeView/HomeView";
 import { ActionView } from "@/views/ActionView/ActionView";
 import { ProfileView } from "@/views/ProfileView/ProfileView";
@@ -171,7 +170,6 @@ export default function App() {
         </SplitCol>
       </SplitLayout>
       {routerPopout}
-      <AppSnackbar />
     </>
   );
 }

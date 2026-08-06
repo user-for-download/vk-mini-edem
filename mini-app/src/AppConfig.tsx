@@ -13,6 +13,7 @@ import { router } from "@/router";
 import { WsProvider } from "@/providers/WsProvider";
 import { GlobalWsListener } from "@/components/GlobalWsListener";
 import { ModalProvider } from "@/providers/ModalProvider";
+import { SnackbarProvider } from "@/providers/SnackbarProvider";
 
 import { ApiError } from "@/api/client";
 
@@ -59,11 +60,11 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
               <AuthGate>
                 <WsProvider>
                   <GlobalWsListener />
-                  <ModalProvider>
-                    <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
-                      {children}
-                    </AppRoot>
-                  </ModalProvider>
+                  <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
+                    <SnackbarProvider>
+                      <ModalProvider>{children}</ModalProvider>
+                    </SnackbarProvider>
+                  </AppRoot>
                 </WsProvider>
               </AuthGate>
             </ErrorBoundary>

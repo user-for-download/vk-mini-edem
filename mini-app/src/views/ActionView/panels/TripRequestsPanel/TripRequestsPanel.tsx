@@ -24,7 +24,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useModalApi } from "@/providers/ModalProvider";
 import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTripsQuery";
-import { useSnackbarStore } from "@/store/useSnackbarStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 
 export interface TripRequestsPanelProps {
   id: string;
@@ -50,7 +50,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   const modalApi = useModalApi();
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
-  const enqueueSnackbar = useSnackbarStore((state) => state.enqueue);
+  const { enqueue: enqueueSnackbar } = useSnackbar();
 
   // Date.now() в рендере запрещён (react-hooks/purity) — время обновляем по таймеру
   const [now, setNow] = useState(() => Date.now());
