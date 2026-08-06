@@ -1,28 +1,23 @@
 // mini-app/src/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel.tsx
-import { type FC, memo, useMemo, useState } from "react";
+import { type FC, useMemo, useState } from "react";
 import {
-  Avatar,
   Box,
   Button,
   Caption,
-  Card,
+  Flex,
   Group,
   Panel,
   PanelHeaderBack,
   SegmentedControl,
-  Separator,
   Spacing,
   Subhead,
   Text,
-  Title,
 } from "@vkontakte/vkui";
 import type { PassengerBooking, PassengerBookingScope, Trip } from "@/types";
-import { RouteLine } from "@/components/RouteLine";
-import { RatingBadge } from "@/components/RatingBadge";
+import { TripCard } from "@/components/TripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
-import { resolveAvatar } from "@/helpers/avatar";
 import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
 
 export interface PassengerBookingsPanelProps {
@@ -57,143 +52,62 @@ function getStatusColor(booking: PassengerBooking): string {
   return "var(--vkui--color_text_secondary)";
 }
 
-const BookingCard: FC<{
+const BookingCardFooter: FC<{
   booking: PassengerBooking;
-  onOpenTrip: (trip: Trip) => void;
   onOpenReview: (trip: Trip) => void;
-}> = memo(({ booking, onOpenTrip, onOpenReview }) => {
-  const trip = booking.trip;
-
+}> = ({ booking, onOpenReview }) => {
   return (
-    <Card
-      mode="shadow"
-      onClick={() => onOpenTrip(trip)}
-      style={{ cursor: "pointer" }}
-    >
-      <Box padding="system">
-        <div
+    <>
+      <Flex justify="space-between" align="center">
+        <Caption level="1" weight="2">
+          Место {booking.seat}
+        </Caption>
+        <Subhead weight="2" style={{ color: getStatusColor(booking) }}>
+          {getStatusLabel(booking)}
+        </Subhead>
+      </Flex>
+
+      {booking.comment && (
+        <Text
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
+            marginTop: 10,
+            color: "var(--vkui--color_text_secondary)",
           }}
         >
-          <Subhead
-            weight="2"
-            style={{ color: "var(--vkui--color_text_secondary)" }}
-          >
-            {trip.date} · {trip.time}
-          </Subhead>
+          «{booking.comment}»
+        </Text>
+      )}
 
-          <Title level="3" weight="2">
-            {trip.price.toLocaleString("ru-RU")} ₽
-          </Title>
-        </div>
-
-        <Spacing size={12} />
-
-        <RouteLine
-          from={{ city: trip.fromCity, address: trip.fromAddress }}
-          to={{ city: trip.toCity, address: trip.toAddress }}
-        />
-
-        <Spacing size={12} />
-
-        <Separator />
-
-        <Spacing size={12} />
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
+      {booking.scope === "history" && booking.canReview && (
+        <Button
+          size="s"
+          mode="primary"
+          style={{ marginTop: 12 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenReview(booking.trip);
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              minWidth: 0,
-            }}
-          >
-            <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
+          Оставить отзыв
+        </Button>
+      )}
 
-            <div style={{ minWidth: 0 }}>
-              <Text
-                weight="2"
-                style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {trip.driver.name}
-              </Text>
-
-              <RatingBadge value={trip.driver.rating} size="s" />
-            </div>
-          </div>
-
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <Caption level="1" weight="2">
-              Место {booking.seat}
-            </Caption>
-
-            <Subhead
-              weight="2"
-              style={{ color: getStatusColor(booking) }}
-            >
-              {getStatusLabel(booking)}
-            </Subhead>
-          </div>
-        </div>
-
-        {booking.comment && (
-          <Text
-            style={{
-              marginTop: 10,
-              color: "var(--vkui--color_text_secondary)",
-            }}
-          >
-            «{booking.comment}»
-          </Text>
-        )}
-
-        {booking.scope === "history" && booking.canReview && (
-          <div style={{ marginTop: 12 }}>
-            <Button
-              size="s"
-              mode="primary"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenReview(trip);
-              }}
-            >
-              Оставить отзыв
-            </Button>
-          </div>
-        )}
-
-        {booking.scope === "history" && booking.hasReview && (
-          <Caption
-            level="1"
-            style={{
-              marginTop: 10,
-              color: "var(--vkui--color_text_secondary)",
-            }}
-          >
-            Отзыв оставлен
-          </Caption>
-        )}
-      </Box>
-    </Card>
+      {booking.scope === "history" && booking.hasReview && (
+        <Caption
+          level="1"
+          style={{
+            marginTop: 10,
+            color: "var(--vkui--color_text_secondary)",
+          }}
+        >
+          Отзыв оставлен
+        </Caption>
+      )}
+    </>
   );
-});
+};
 
-BookingCard.displayName = "BookingCard";
+BookingCardFooter.displayName = "BookingCardFooter";
 
 /**
  * Экран пассажира:
@@ -294,12 +208,17 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
             aria-label={`Список поездок, всего ${visibleBookings.length}`}
           >
             {visibleBookings.map((booking) => (
-              <BookingCard
+              <TripCard
                 key={booking.id}
-                booking={booking}
-                onOpenTrip={onOpenTrip}
-                onOpenReview={onOpenReview}
-              />
+                trip={booking.trip}
+                onOpen={() => onOpenTrip(booking.trip)}
+                hideSeats
+              >
+                <BookingCardFooter
+                  booking={booking}
+                  onOpenReview={onOpenReview}
+                />
+              </TripCard>
             ))}
           </Box>
         )}

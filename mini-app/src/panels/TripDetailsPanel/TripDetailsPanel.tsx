@@ -7,6 +7,7 @@ import {
   Box,
   FormItem,
   FormStatus,
+  Flex,
   Group,
   Header,
   InfoRow,
@@ -16,6 +17,7 @@ import {
   RichCell,
   ScreenSpinner,
   Separator,
+  SimpleGrid,
   Spacing,
   Text,
   Textarea,
@@ -321,43 +323,41 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           />
         </Box>
 
-        <Box
-          padding="system"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-        >
-          <InfoRow header="Цена за место">
-            {trip.price.toLocaleString("ru-RU")} ₽
-          </InfoRow>
-          <InfoRow header="Свободно мест">
-            {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
-          </InfoRow>
-          <InfoRow header="В пути">
-            {`${Math.floor(trip.durationMinutes / 60)} ч ${
-              trip.durationMinutes % 60
-            } мин`}
-          </InfoRow>
-          <InfoRow header="Расстояние">{`${trip.distanceKm} км`}</InfoRow>
+        <Box padding="system">
+          <SimpleGrid columns={2} gap={12}>
+            <InfoRow header="Цена за место">
+              {trip.price.toLocaleString("ru-RU")} ₽
+            </InfoRow>
+            <InfoRow header="Свободно мест">
+              {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
+            </InfoRow>
+            <InfoRow header="В пути">
+              {`${Math.floor(trip.durationMinutes / 60)} ч ${
+                trip.durationMinutes % 60
+              } мин`}
+            </InfoRow>
+            <InfoRow header="Расстояние">{`${trip.distanceKm} км`}</InfoRow>
+          </SimpleGrid>
         </Box>
 
         {trip.tags.length > 0 && (
-          <Box
-            padding="system"
-            style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
-          >
-            {trip.tags.map((tag) => (
-              <Caption
-                key={tag}
-                level="1"
-                weight="2"
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 100,
-                  background: "var(--vkui--color_background_secondary)",
-                }}
-              >
-                {tag}
-              </Caption>
-            ))}
+          <Box padding="system">
+            <Flex gap={6} wrap="wrap">
+              {trip.tags.map((tag) => (
+                <Caption
+                  key={tag}
+                  level="1"
+                  weight="2"
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 100,
+                    background: "var(--vkui--color_background_secondary)",
+                  }}
+                >
+                  {tag}
+                </Caption>
+              ))}
+            </Flex>
           </Box>
         )}
 
@@ -481,18 +481,12 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             <Separator style={{ marginBottom: 12 }} />
 
             {bookingOpen && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
+              <Flex justify="space-between" style={{ marginBottom: 12 }}>
                 <Text weight="2">Итого</Text>
                 <Title level="3" weight="2">
                   {trip.price.toLocaleString("ru-RU")} ₽
                 </Title>
-              </div>
+              </Flex>
             )}
 
             <Button

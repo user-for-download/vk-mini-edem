@@ -1,6 +1,18 @@
 // mini-app/src/components/TripCard.tsx
-import { type FC, type KeyboardEvent } from "react";
-import { Avatar, Card, Caption, Spacing, Text, Title, Box, Subhead, Separator, ContentBadge } from "@vkontakte/vkui";
+import { type FC, type KeyboardEvent, type ReactNode } from "react";
+import {
+  Avatar,
+  Card,
+  Caption,
+  Spacing,
+  Text,
+  Title,
+  Box,
+  Subhead,
+  Separator,
+  ContentBadge,
+  Flex,
+} from "@vkontakte/vkui";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
 import { resolveAvatar } from "@/helpers/avatar";
@@ -12,6 +24,8 @@ export interface TripCardProps {
   requestsCount?: number;
   hideSeats?: boolean;
   archivedStatus?: "completed" | "cancelled";
+  /** Дополнительный контент в нижней части карточки (после блока водителя). */
+  children?: ReactNode;
 }
 
 function formatDuration(minutes: number): string {
@@ -28,6 +42,7 @@ export const TripCard: FC<TripCardProps> = ({
   requestsCount = 0,
   hideSeats = false,
   archivedStatus,
+  children,
 }) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -63,14 +78,14 @@ export const TripCard: FC<TripCardProps> = ({
       }}
     >
       <Box padding="system">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Flex justify="space-between" align="baseline">
           <Subhead weight="2" style={{ color: "var(--vkui--color_text_secondary)" }}>
             {trip.date} · {trip.time}
           </Subhead>
           <Title level="3" weight="2">
             {trip.price.toLocaleString("ru-RU")} ₽
           </Title>
-        </div>
+        </Flex>
 
         {isArchived && (
           <Caption
@@ -89,7 +104,10 @@ export const TripCard: FC<TripCardProps> = ({
         )}
 
         <Spacing size={12} />
-        <RouteLine from={{ city: trip.fromCity, address: trip.fromAddress }} to={{ city: trip.toCity, address: trip.toAddress }} />
+        <RouteLine
+          from={{ city: trip.fromCity, address: trip.fromAddress }}
+          to={{ city: trip.toCity, address: trip.toAddress }}
+        />
 
         <Spacing size={8} />
         <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
@@ -99,13 +117,13 @@ export const TripCard: FC<TripCardProps> = ({
         {trip.tags && trip.tags.length > 0 && (
           <>
             <Spacing size={10} />
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <Flex gap={6} wrap="wrap">
               {trip.tags.map((tag) => (
                 <ContentBadge key={tag} mode="secondary">
                   {tag}
                 </ContentBadge>
               ))}
-            </div>
+            </Flex>
           </>
         )}
 
@@ -113,22 +131,36 @@ export const TripCard: FC<TripCardProps> = ({
         <Separator />
         <Spacing size={12} />
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <Flex justify="space-between" align="center">
+          <Flex align="center" gap={8} style={{ minWidth: 0 }}>
             <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
             <div style={{ minWidth: 0 }}>
-              <Text weight="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <Text
+                weight="2"
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {trip.driver.name}
               </Text>
               <RatingBadge value={trip.driver.rating} size="s" />
             </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+          </Flex>
+          <Flex direction="column" align="end">
             {!hideSeats && (
               <Caption
                 level="1"
                 weight="2"
-                style={{ color: trip.seatsAvailable === 0 ? "var(--vkui--color_text_secondary)" : "var(--carpool_accent)", flexShrink: 0, marginLeft: 8 }}
+                style={{
+                  color:
+                    trip.seatsAvailable === 0
+                      ? "var(--vkui--color_text_secondary)"
+                      : "var(--carpool_accent)",
+                  flexShrink: 0,
+                  marginLeft: 8,
+                }}
               >
                 {seatsLabel}
               </Caption>
@@ -138,8 +170,17 @@ export const TripCard: FC<TripCardProps> = ({
                 Новых заявок: {requestsCount}
               </Caption>
             )}
-          </div>
-        </div>
+          </Flex>
+        </Flex>
+
+        {children && (
+          <>
+            <Spacing size={12} />
+            <Separator />
+            <Spacing size={12} />
+            {children}
+          </>
+        )}
       </Box>
     </Card>
   );

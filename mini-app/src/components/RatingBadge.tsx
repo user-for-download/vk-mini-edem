@@ -1,6 +1,6 @@
 // mini-app/src/components/RatingBadge.tsx
 import { type FC } from "react";
-import { Caption } from "@vkontakte/vkui";
+import { Caption, Flex } from "@vkontakte/vkui";
 import { Icon12Star } from "@vkontakte/icons";
 
 export interface RatingBadgeProps {
@@ -11,7 +11,7 @@ export interface RatingBadgeProps {
 
 export const RatingBadge: FC<RatingBadgeProps> = ({ value, reviewsCount, size = "m" }) => {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <Flex align="center" gap={4} style={{ display: "inline-flex" }}>
       <Icon12Star fill="var(--carpool_accent)" />
       <Caption level={size === "s" ? "1" : "2"} weight="2">
         {value.toFixed(1)}
@@ -21,6 +21,6 @@ export const RatingBadge: FC<RatingBadgeProps> = ({ value, reviewsCount, size = 
           </span>
         )}
       </Caption>
-    </div>
+    </Flex>
   );
 };
