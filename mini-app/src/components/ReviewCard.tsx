@@ -1,30 +1,59 @@
 // mini-app/src/components/ReviewCard.tsx
 import { type FC } from "react";
-import { Avatar, Box, Caption, Card, Paragraph, Text } from "@vkontakte/vkui";
-import { RatingBadge } from "@/components/RatingBadge";
+import { RichCell, Avatar, Text } from "@vkontakte/vkui";
+import { Icon16StarAlt } from "@vkontakte/icons";
 import { resolveAvatar } from "@/helpers/avatar";
 import type { Review } from "@/types";
 
 export interface ReviewCardProps {
   review: Review;
+  onClick?: () => void; // если нужно раскрывать полный текст
 }
 
-export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
+/**
+ * Отзыв в виде RichCell: единообразные отступы и типографика VKUI.
+ * before — аватар, overTitle — маршрут, children — имя автора,
+ * subtitle — дата + о ком, after — рейтинг, bottom — текст отзыва.
+ */
+export const ReviewCard: FC<ReviewCardProps> = ({ review, onClick }) => {
+  const roleLabel =
+    review.targetRole === "driver" ? "о водителе" : "о пассажире";
+
   return (
-    <Card mode="shadow" style={{ marginTop: 8 }}>
-      <Box padding="system">
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Avatar src={resolveAvatar(review.author.avatar)} size={32} />
-          <div style={{ flex: 1 }}>
-            <Text weight="2">{review.author.name}</Text>
-            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
-              {review.date}
-            </Caption>
-          </div>
-          <RatingBadge value={review.rating} size="s" />
+    <RichCell
+      before={<Avatar src={resolveAvatar(review.author.avatar)} size={48} />}
+      overTitle={review.tripRoute}
+      subtitle={`${review.date} · ${roleLabel}`}
+      after={
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            color: "var(--carpool_accent)",
+          }}
+        >
+          <Icon16StarAlt />
+          <Text weight="2">{review.rating}</Text>
         </div>
-        <Paragraph style={{ marginTop: 8 }}>«{review.text}»</Paragraph>
-      </Box>
-    </Card>
+      }
+      afterAlign="center"
+      bottom={
+        <Text
+          style={{
+            marginTop: 4,
+            color: "var(--vkui--color_text_primary)",
+          }}
+        >
+          {review.text}
+        </Text>
+      }
+      multiline
+      hasHover={Boolean(onClick)}
+      hasActive={Boolean(onClick)}
+      onClick={onClick}
+    >
+      {review.author.name}
+    </RichCell>
   );
 };
