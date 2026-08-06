@@ -1,8 +1,15 @@
 // backend/src/env.ts
 import dotenv from "dotenv";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Поиск .env: для запуска из src (tsx) и из dist (скопилированный JS)
+const envPathDev = path.resolve(__dirname, "../.env");
+const envPathProd = path.resolve(__dirname, "../../.env");
+dotenv.config({ path: fs.existsSync(envPathDev) ? envPathDev : envPathProd });
 
 const NODE_ENV = process.env.NODE_ENV ?? "development";
 const isProduction = NODE_ENV === "production";
@@ -51,6 +58,11 @@ function secretEnv(name: string): string {
   const value = process.env[name];
 
   if (value) {
+    if (isProduction && name === "JWT_SECRET" && value.length < 32) {
+      throw new Error(
+        `[env] ${name} must be at least 32 characters long in production.`
+      );
+    }
     return value;
   }
 

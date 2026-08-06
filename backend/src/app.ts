@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { bodyLimit } from "hono/body-limit";
 import { createNodeWebSocket } from "@hono/node-ws";
 import fs from "node:fs";
 import path from "node:path";
@@ -86,15 +87,17 @@ app.use("*", async (c, next) => {
 
 /**
  * Ограничение размера тела запроса (100 KB).
+ * bodyLimit учитывает и chunked-запросы (Transfer-Encoding), в отличие от
+ * проверки одного заголовка content-length.
  */
-const MAX_BODY_SIZE = 100 * 1024;
-app.use("*", async (c, next) => {
-  const contentLength = c.req.header("content-length");
-  if (contentLength && Number(contentLength) > MAX_BODY_SIZE) {
-    return c.json({ code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload too large" }, 413);
-  }
-  await next();
-});
+app.use(
+  "*",
+  bodyLimit({
+    maxSize: 100 * 1024,
+    onError: (c) =>
+      c.json({ code: ERROR_CODES.PAYLOAD_TOO_LARGE, message: "Payload too large" }, 413),
+  })
+);
 
 /**
  * Проверка подключения к БД.
@@ -136,27 +139,25 @@ app.route("/api/v1/bookings", bookingsRouter);
 app.route("/api/v1/reviews", reviewsRouter);
 app.route("/api/v1/notifications", notificationsRouter);
 app.route("/api/v1/users", usersRouter);
-app.get("/ws", createWsHandler(upgradeWebSocket));
 app.get("/api/v1/ws", createWsHandler(upgradeWebSocket));
-
-// Legacy fallback для клиентов с закэшированным JS (удалить через 2 недели после деплоя)
-app.route("/api/auth", authRouter);
-app.route("/api/trips", tripsRouter);
-app.route("/api/bookings", bookingsRouter);
-app.route("/api/reviews", reviewsRouter);
-app.route("/api/notifications", notificationsRouter);
-app.route("/api/users", usersRouter);
 
 if (env.isProduction) {
   const distPath = path.resolve(process.cwd(), "mini-app/dist");
+
+  // index.html читаем один раз при старте, а не на каждый SPA-запрос
+  let indexHtml: string | null = null;
+  try {
+    indexHtml = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+  } catch {
+    logger.error("Frontend build (index.html) not found in production mode");
+  }
+
   app.use("/*", serveStatic({ root: path.relative(process.cwd(), distPath) }));
   app.get("*", (c) => {
-    try {
-      const html = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-      return c.html(html);
-    } catch {
-      return c.text("Frontend build not found", 404);
+    if (indexHtml) {
+      return c.html(indexHtml);
     }
+    return c.text("Frontend build not found", 404);
   });
 }
 

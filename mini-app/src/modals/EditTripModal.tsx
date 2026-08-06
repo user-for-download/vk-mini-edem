@@ -199,7 +199,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
             </PanelHeaderButton>
           }
         >
-          Новая поездка
+          Редактировать поездку
         </ModalPageHeader>
       }
     >

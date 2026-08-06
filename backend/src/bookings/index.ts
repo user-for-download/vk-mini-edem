@@ -10,7 +10,6 @@ import {
   isActiveBookingStatus,
 } from "@edem/contracts";
 import { db } from "../db.js";
-import { DEFAULT_AVATAR_URL } from "../constants.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
@@ -125,14 +124,7 @@ bookingsRouter.get("/my", async (c) => {
       canReview,
       hasReview,
 
-      passenger: {
-        id: b.passenger.id,
-        name: b.passenger.name,
-        avatar: b.passenger.avatar || DEFAULT_AVATAR_URL,
-        rating: b.passenger.rating,
-        reviewsCount: b.passenger.reviewsCount,
-        tripsCount: b.passenger.tripsCount,
-      },
+      passenger: serializeUser(b.passenger),
 
       trip: {
         id: b.trip.id,
@@ -154,22 +146,7 @@ bookingsRouter.get("/my", async (c) => {
         status: b.trip.status as "active" | "cancelled" | "completed",
         departureAt: b.trip.departureAt.toISOString(),
 
-        driver: {
-          id: b.trip.driver.id,
-          name: b.trip.driver.name,
-          avatar: b.trip.driver.avatar || DEFAULT_AVATAR_URL,
-          rating: b.trip.driver.rating,
-          reviewsCount: b.trip.driver.reviewsCount,
-          tripsCount: b.trip.driver.tripsCount,
-          isVerified: b.trip.driver.isVerified,
-          car: b.trip.driver.car
-            ? {
-                model: b.trip.driver.car.model,
-                color: b.trip.driver.car.color,
-                plate: b.trip.driver.car.plate,
-              }
-            : undefined,
-        },
+        driver: serializeUser(b.trip.driver),
 
         tags: b.trip.tags,
         comment: b.trip.comment || undefined,
@@ -401,7 +378,7 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
       }
 
       if (trip.seatsAvailable <= 0) {
-        throw new BookingError("Not enough available seats", 400, ERROR_CODES.CONFLICT);
+        throw new BookingError("Not enough available seats", 409, ERROR_CODES.CONFLICT);
       }
 
       const seatConflict = await tx.booking.findFirst({
@@ -650,7 +627,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
         }
 
         if (trip.seatsAvailable <= 0) {
-          throw new BookingError("Not enough available seats", 400, ERROR_CODES.CONFLICT);
+          throw new BookingError("Not enough available seats", 409, ERROR_CODES.CONFLICT);
         }
 
         const activeConflict = await tx.booking.findFirst({

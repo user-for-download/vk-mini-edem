@@ -4,8 +4,8 @@ import type { Prisma } from "@prisma/client";
 import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
 import { logger } from "../logger.js";
-import { requireUser, type AuthEnv } from "../auth/middleware.js";
-import { optionalAuth, type OptionalAuthEnv } from "../auth/optionalMiddleware.js";
+import { requireUser, type AuthUser } from "../auth/middleware.js";
+import { optionalAuth } from "../auth/optionalMiddleware.js";
 import { serializeTrip } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
@@ -47,7 +47,7 @@ async function getActiveBookingSeatsByTripIds(
   return map;
 }
 
-export const tripsRouter = new Hono<AuthEnv>();
+export const tripsRouter = new Hono<{ Variables: { user?: AuthUser } }>();
 
 /**
  * Публичный список активных поездок.
@@ -170,7 +170,7 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
  * Важно: маршрут должен быть объявлен до /:id.
  */
 tripsRouter.get("/my", requireUser, async (c) => {
-  const user = c.get("user");
+  const user = c.get("user")!;
   const pageParam = c.req.query("page");
   const limitParam = c.req.query("limit");
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
@@ -252,7 +252,7 @@ tripsRouter.get("/my", requireUser, async (c) => {
  * Детали поездки.
  * Возвращаем bookedSeats, чтобы фронт мог корректно рисовать SeatScheme.
  */
-tripsRouter.get("/:id", publicReadLimiter, optionalAuth as any, async (c) => {
+tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
 
@@ -331,7 +331,7 @@ tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   }
 
   const dto = parseResult.data;
-  const driver = c.get("user");
+  const driver = c.get("user")!;
 
   // Водитель должен иметь автомобиль
   if (!driver.car) {
@@ -393,7 +393,7 @@ tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
 tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
+  const user = c.get("user")!;
   const body = await getSanitizedBody(c);
   
   const parseResult = updateTripDtoSchema.safeParse(body);
@@ -504,7 +504,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
  */
 tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
+  const user = c.get("user")!;
 
   const trip = await db.trip.findUnique({
     where: { id },
@@ -529,7 +529,14 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
     return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
   }
 
-  const updated = await db.$transaction(async (tx) => {
+  const { updated, uniquePassengers } = await db.$transaction(async (tx) => {
+    // Пассажиров собираем ДО updateMany: после перевода броней в cancelled
+    // выборка по pending/confirmed вернёт пустой массив.
+    const activeBookings = await tx.booking.findMany({
+      where: { tripId: trip.id, status: { in: ["pending", "confirmed"] } },
+      select: { passengerId: true },
+    });
+
     await tx.booking.updateMany({
       where: {
         tripId: trip.id,
@@ -542,7 +549,7 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
       },
     });
 
-    return tx.trip.update({
+    const updated = await tx.trip.update({
       where: { id: trip.id },
       data: {
         status: "cancelled",
@@ -556,19 +563,12 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
         },
       },
     });
-  });
 
-  const passengersToNotify = await db.booking.findMany({
-    where: {
-      tripId: trip.id,
-      status: {
-        in: ["pending", "confirmed"],
-      },
-    },
-    select: { passengerId: true }
+    return {
+      updated,
+      uniquePassengers: Array.from(new Set(activeBookings.map((b) => b.passengerId))),
+    };
   });
-
-  const uniquePassengers = Array.from(new Set(passengersToNotify.map(b => b.passengerId)));
 
   // createNotification глотает ошибки внутри, поэтому параллелим безопасно.
   await Promise.all(
@@ -617,7 +617,7 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
  */
 tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
+  const user = c.get("user")!;
   const force = c.req.query("force") === "1";
 
   const trip = await db.trip.findUnique({

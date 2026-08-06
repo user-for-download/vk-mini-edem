@@ -6,15 +6,18 @@ WORKDIR /app
 COPY package.json package-lock.json* bun.lock* ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
+COPY mini-app/package.json ./mini-app/
 
 RUN npm ci || npm install
 
 COPY tsconfig.json ./
 COPY packages/contracts ./packages/contracts
 COPY backend ./backend
+COPY mini-app ./mini-app
 
 RUN cd packages/contracts && npm run build
 RUN cd backend && npx prisma generate && npm run build
+RUN cd mini-app && npm run build
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
@@ -28,6 +31,7 @@ COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/packages/contracts/dist ./node_modules/@edem/contracts/dist
 COPY --from=builder /app/packages/contracts/package.json ./node_modules/@edem/contracts/
+COPY --from=builder /app/mini-app/dist ./mini-app/dist
 
 EXPOSE 3000
 
