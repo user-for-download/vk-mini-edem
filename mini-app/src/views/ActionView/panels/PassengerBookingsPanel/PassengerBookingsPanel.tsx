@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel.tsx
-import { type FC, useMemo, useState } from "react";
+import { type FC, useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -8,6 +8,7 @@ import {
   Group,
   Panel,
   PanelHeaderBack,
+  PullToRefresh,
   SegmentedControl,
   Spacing,
   Subhead,
@@ -118,6 +119,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
   const {
     data,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -140,6 +142,12 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
     });
   }, [data, tab]);
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const isRefreshing = isFetching && !isLoading;
+
   return (
     <Panel id={id}>
       <AppPanelHeader
@@ -148,6 +156,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
         Мои поездки
       </AppPanelHeader>
 
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
       <Group>
         <Box padding="system">
           <SegmentedControl<PassengerBookingScope>
@@ -237,6 +246,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </PullToRefresh>
     </Panel>
   );
 };

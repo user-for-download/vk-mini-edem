@@ -1,5 +1,5 @@
 // mini-app/src/views/HomeView/panels/HomePanel/HomePanel.tsx
-import type { FC } from "react";
+import { useCallback, type FC } from "react";
 import {
   Banner,
   Button,
@@ -8,6 +8,7 @@ import {
   Group,
   Header,
   Panel,
+  PullToRefresh,
   Search,
   Spacing,
   Title,
@@ -46,6 +47,7 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: tripsData,
     isLoading: tripsLoading,
+    isFetching: tripsFetching,
     isError: tripsError,
     refetch: refetchTrips,
   } = useTripsQuery();
@@ -66,6 +68,12 @@ export const HomePanel: FC<HomePanelProps> = ({
   } = useMyBookingsQuery({
     enabled: role === "passenger",
   });
+
+  const handleRefresh = useCallback(async () => {
+    await refetchTrips();
+  }, [refetchTrips]);
+
+  const isRefreshing = tripsFetching && !tripsLoading;
 
   if (!currentUser) {
     return (
@@ -114,6 +122,7 @@ export const HomePanel: FC<HomePanelProps> = ({
     <Panel id={id}>
       <AppPanelHeader>Едем</AppPanelHeader>
 
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
       <Group>
         <Box padding="system">
           <Title level="1" weight="2">
@@ -259,6 +268,7 @@ export const HomePanel: FC<HomePanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </PullToRefresh>
     </Panel>
   );
 };

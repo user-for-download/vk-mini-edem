@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef, type FC } from "react";
-import { Box, Button, Caption, Flex, Group, Input, Panel, Search, Spacing } from "@vkontakte/vkui";
+import { useCallback, useEffect, useMemo, useState, useRef, type FC } from "react";
+import { Box, Button, Caption, Flex, Group, Input, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
@@ -111,10 +111,17 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
     return trips.filter((trip) => trip.driver.id !== currentUser?.id);
   }, [data, currentUser?.id]);
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const isRefreshing = isFetching && !isLoading;
+
   return (
     <Panel id={id}>
       <AppPanelHeader>Поиск поездок</AppPanelHeader>
 
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
       <Group>
         <Box padding="system">
           <Search
@@ -202,6 +209,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
       </Group>
 
       <Spacing size={24} />
+      </PullToRefresh>
     </Panel>
   );
 };

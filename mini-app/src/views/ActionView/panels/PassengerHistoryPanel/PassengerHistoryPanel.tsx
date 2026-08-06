@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/PassengerHistoryPanel/PassengerHistoryPanel.tsx
-import { type FC, useMemo, useState } from "react";
+import { type FC, useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -8,6 +8,7 @@ import {
   Group,
   Panel,
   PanelHeaderBack,
+  PullToRefresh,
   SegmentedControl,
   Spacing,
   Subhead,
@@ -157,6 +158,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
   const {
     data,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -180,6 +182,12 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
     });
   }, [data, filter]);
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const isRefreshing = isFetching && !isLoading;
+
   return (
     <Panel id={id}>
       <AppPanelHeader
@@ -187,6 +195,8 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
       >
         История поездок
       </AppPanelHeader>
+
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
 
       <Group>
         <Box padding="system">
@@ -292,6 +302,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </PullToRefresh>
     </Panel>
   );
 };

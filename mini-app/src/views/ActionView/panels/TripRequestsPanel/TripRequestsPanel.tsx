@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel.tsx
-import { type FC, useEffect, useState } from "react";
+import { useCallback, type FC, useEffect, useState } from "react";
 import {
   Button,
   ButtonGroup,
@@ -12,6 +12,7 @@ import {
   PanelHeaderContent,
   InfoRow,
   FormStatus,
+  PullToRefresh,
   SimpleGrid,
   Spacing,
   Text,
@@ -32,7 +33,9 @@ export interface TripRequestsPanelProps {
   bookings: Booking[];
   isLoading: boolean;
   isError: boolean;
+  isRefreshing: boolean;
   onBack: () => void;
+  onRefresh: () => void | Promise<void>;
   onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
   onRetry: () => void;
 }
@@ -43,7 +46,9 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   bookings,
   isLoading,
   isError,
+  isRefreshing,
   onBack,
+  onRefresh,
   onSetStatus,
   onRetry,
 }) => {
@@ -120,6 +125,10 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
     departureTime !== null &&
     departureTime <= now;
 
+  const handleRefresh = useCallback(async () => {
+    await onRefresh();
+  }, [onRefresh]);
+
   return (
     <Panel id={id}>
       <AppPanelHeader
@@ -135,6 +144,8 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
           Управление поездкой
         </PanelHeaderContent>
       </AppPanelHeader>
+
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
 
       {trip && (
         <Group>
@@ -260,6 +271,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
           />
         )}
       </Group>
+      </PullToRefresh>
     </Panel>
   );
 };

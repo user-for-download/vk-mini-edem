@@ -17,7 +17,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   const tripId = params?.tripId;
 
-  const { data: trip } = useTripDetailQuery(tripId ?? "");
+  const { data: trip, refetch: refetchTrip } = useTripDetailQuery(tripId ?? "");
   const currentUser = useCurrentUser();
 
   // Заявки видит только водитель поездки (driver-only эндпоинт, иначе 403).
@@ -26,8 +26,9 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const {
     data: bookings,
     isLoading,
+    isFetching,
     isError,
-    refetch,
+    refetch: refetchBookings,
   } = useTripBookingsQuery(tripId ?? "", { enabled: isOwnTrip });
 
   const updateBooking = useUpdateBookingStatusMutation();
@@ -59,6 +60,12 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     );
   }, [updateBooking, enqueueSnackbar]);
 
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchTrip(), refetchBookings()]);
+  }, [refetchTrip, refetchBookings]);
+
+  const isRefreshing = isFetching && !isLoading;
+
   return (
     <TripRequestsPanel
       id={id}
@@ -66,9 +73,11 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
       bookings={bookings ?? []}
       isLoading={isLoading}
       isError={isError}
+      isRefreshing={isRefreshing}
       onBack={() => routeNavigator.push("/trips/my")}
+      onRefresh={handleRefresh}
       onSetStatus={handleSetStatus}
-      onRetry={() => refetch()}
+      onRetry={() => refetchBookings()}
     />
   );
 };

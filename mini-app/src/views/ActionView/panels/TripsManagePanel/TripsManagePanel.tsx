@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripsManagePanel/TripsManagePanel.tsx
-import { useMemo, useEffect, useRef, useState, type FC } from "react";
+import { useCallback, useMemo, useEffect, useRef, useState, type FC } from "react";
 import {
   Box,
   Button,
@@ -7,6 +7,7 @@ import {
   Group,
   Panel,
   PanelHeaderButton,
+  PullToRefresh,
   Spacing,
   SegmentedControl,
 } from "@vkontakte/vkui";
@@ -44,6 +45,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
   const {
     data,
     isLoading,
+    isFetching,
     isError,
     error,
     refetch,
@@ -79,6 +81,12 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
     });
   }, [data, tab]);
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const isRefreshing = isFetching && !isLoading;
+
   return (
     <Panel id={id}>
       <AppPanelHeader
@@ -93,6 +101,8 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       >
         Мои поездки
       </AppPanelHeader>
+
+      <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
 
       <Group>
         <Box padding="system">
@@ -186,6 +196,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </PullToRefresh>
     </Panel>
   );
 };
