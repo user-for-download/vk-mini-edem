@@ -131,12 +131,12 @@ export const TripCard: FC<TripCardProps> = ({
         <Flex justify="space-between" align="center">
           <Flex align="center" gap={8} className="TripCard__driver">
             <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
-            <div className="TripCard__driverInfo">
+            <Flex direction="column" className="TripCard__driverInfo">
               <Text weight="2" className="TripCard__driverName">
                 {trip.driver.name}
               </Text>
               <RatingBadge value={trip.driver.rating} size="s" />
-            </div>
+            </Flex>
           </Flex>
           <Flex direction="column" align="end">
             {!hideSeats && (

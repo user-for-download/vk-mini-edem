@@ -55,6 +55,8 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: myTripsData,
     isLoading: myTripsLoading,
+    isFetching: myTripsFetching,
+    refetch: refetchMyTrips,
   } = useMyTripsQuery({
     enabled: role === "driver",
   });
@@ -64,16 +66,25 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: myBookings,
     isLoading: myBookingsLoading,
+    isFetching: myBookingsFetching,
     isError: myBookingsError,
+    refetch: refetchMyBookings,
   } = useMyBookingsQuery({
     enabled: role === "passenger",
   });
 
   const handleRefresh = useCallback(async () => {
-    await refetchTrips();
-  }, [refetchTrips]);
+    await Promise.all([
+      refetchTrips(),
+      role === "driver" ? refetchMyTrips() : Promise.resolve(),
+      role === "passenger" ? refetchMyBookings() : Promise.resolve(),
+    ]);
+  }, [refetchTrips, refetchMyTrips, refetchMyBookings, role]);
 
-  const isRefreshing = tripsFetching && !tripsLoading;
+  const isRefreshing =
+    (tripsFetching && !tripsLoading) ||
+    (role === "driver" && myTripsFetching && !myTripsLoading) ||
+    (role === "passenger" && myBookingsFetching && !myBookingsLoading);
 
   if (!currentUser) {
     return (

@@ -3,6 +3,7 @@ import { type FC, useEffect, useState } from "react";
 import {
   Avatar,
   Button,
+  ButtonGroup,
   Caption,
   Box,
   FormItem,
@@ -532,28 +533,40 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
               <Spacing size={16} />
 
-              <Button
-                size="m"
-                mode="secondary"
-                stretched
-                disabled={isCancellingTrip || isCompletingTrip}
-                onClick={handleEditTrip}
-              >
-                Редактировать поездку
-              </Button>
+              <ButtonGroup mode="vertical" gap="m" stretched>
+                <Button
+                  size="m"
+                  mode="secondary"
+                  stretched
+                  disabled={isCancellingTrip || isCompletingTrip}
+                  onClick={handleEditTrip}
+                >
+                  Редактировать поездку
+                </Button>
 
-              <Spacing size={12} />
+                <Button
+                  size="m"
+                  mode="primary"
+                  stretched
+                  loading={isCompletingTrip}
+                  disabled={!canCompleteTrip || isCompletingTrip || isCancellingTrip}
+                  onClick={handleCompleteTrip}
+                >
+                  Завершить поездку
+                </Button>
 
-              <Button
-                size="m"
-                mode="primary"
-                stretched
-                loading={isCompletingTrip}
-                disabled={!canCompleteTrip || isCompletingTrip || isCancellingTrip}
-                onClick={handleCompleteTrip}
-              >
-                Завершить поездку
-              </Button>
+                <Button
+                  size="m"
+                  mode="secondary"
+                  appearance="negative"
+                  stretched
+                  loading={isCancellingTrip}
+                  disabled={isCancellingTrip || isCompletingTrip}
+                  onClick={handleCancelTrip}
+                >
+                  Отменить поездку
+                </Button>
+              </ButtonGroup>
 
               {!canCompleteTrip && (
                 <Caption
@@ -563,20 +576,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                   Завершение будет доступно после времени отправления
                 </Caption>
               )}
-
-              <Spacing size={12} />
-
-              <Button
-                size="m"
-                mode="secondary"
-                appearance="negative"
-                stretched
-                loading={isCancellingTrip}
-                disabled={isCancellingTrip || isCompletingTrip}
-                onClick={handleCancelTrip}
-              >
-                Отменить поездку
-              </Button>
             </>
           )}
         </Box>

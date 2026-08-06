@@ -3,6 +3,7 @@ import { type FC, useState, useCallback } from "react";
 import {
   Button,
   Box,
+  ChipsSelect,
   Flex,
   FormItem,
   FormLayoutGroup,
@@ -23,7 +24,6 @@ import { MAX_SEATS } from "@edem/contracts";
 import type { CreateTripDto, TripTag } from "@edem/contracts";
 import { ApiError } from "@/api/client";
 import { TRIP_TAGS } from "@/consts/tags";
-import { TagsScroll } from "@/components/TagsScroll";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { getErrorMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
@@ -468,13 +468,19 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       </Group>
 
       <Group header={<Header size="s">Особенности поездки</Header>}>
-        <Box padding={0}>
-          <TagsScroll
-            tags={TRIP_TAGS}
-            selected={selectedTags}
-            onChange={(next) => setSelectedTags(next as TripTag[])}
+        <FormItem top="Выберите особенности">
+          <ChipsSelect
+            value={selectedTags.map((tag) => ({ value: tag, label: tag }))}
+            onChange={(options) =>
+              setSelectedTags(options.map((option) => option.value as TripTag))
+            }
+            options={TRIP_TAGS.map((tag) => ({ value: tag, label: tag }))}
+            placeholder="Можно с животными, багаж..."
+            creatable={false}
+            allowClearButton
+            closeAfterSelect={false}
           />
-        </Box>
+        </FormItem>
       </Group>
 
       <Group header={<Header size="s">Комментарий пассажирам</Header>}>

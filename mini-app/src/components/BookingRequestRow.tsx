@@ -43,7 +43,7 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
           <Flex gap={10}>
             <Avatar src={resolveAvatar(booking.passenger.avatar)} size={44} />
 
-            <div className="BookingRequestRow__main">
+            <Flex direction="column" gap={4} className="BookingRequestRow__main">
               <Flex justify="space-between" gap={8}>
                 <Text weight="2">{booking.passenger.name}</Text>
                 <Caption level="1" className="BookingRequestRow__seat">
@@ -101,7 +101,7 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
                   </Subhead>
                 </>
               )}
-            </div>
+            </Flex>
           </Flex>
         </Box>
 
