@@ -45,15 +45,6 @@ const TripDetailsPanelWrapper = lazy(() =>
   }))
 );
 
-/**
- * Обёртка Suspense для одной панели.
- * При первом переходе на ленивую панель suspend-ится только она,
- * а не весь View — сохраняется плавная VKUI-анимация.
- */
-const LazyPanel: FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Suspense fallback={<PanelSpinner />}>{children}</Suspense>
-);
-
 export interface ActionViewProps {
   id: string;
   role: Role;
@@ -72,22 +63,16 @@ export const ActionView: FC<ActionViewProps> = ({
   const activePanel = useGetPanelForView(VIEW_ACTION) || (role === "driver" ? PANEL_TRIPS_MANAGE : PANEL_SEARCH);
 
   return (
-    <ViewErrorBoundary>
-      <View id={id} activePanel={activePanel}>
-        <LazyPanel>
+    <Suspense fallback={<PanelSpinner />}>
+      <ViewErrorBoundary>
+        <View id={id} activePanel={activePanel}>
           <SearchPanel id={PANEL_SEARCH} onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)} />
-        </LazyPanel>
-        <LazyPanel>
           <TripsManagePanel
             id={PANEL_TRIPS_MANAGE}
             onOpenCreateTrip={onOpenCreateTrip}
             onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)}
           />
-        </LazyPanel>
-        <LazyPanel>
           <TripRequestsPanelWrapper id={PANEL_TRIP_REQUESTS} />
-        </LazyPanel>
-        <LazyPanel>
           <PassengerBookingsPanel
             id={PANEL_PASSENGER_BOOKINGS}
             onBack={() => routeNavigator.back()}
@@ -95,8 +80,6 @@ export const ActionView: FC<ActionViewProps> = ({
             onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
             onGoSearch={() => routeNavigator.push("/trips/search")}
           />
-        </LazyPanel>
-        <LazyPanel>
           <PassengerHistoryPanel
             id={PANEL_PASSENGER_HISTORY}
             onBack={() => routeNavigator.back()}
@@ -104,11 +87,9 @@ export const ActionView: FC<ActionViewProps> = ({
             onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
             onGoSearch={() => routeNavigator.push("/trips/search")}
           />
-        </LazyPanel>
-        <LazyPanel>
           <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
-        </LazyPanel>
-      </View>
-    </ViewErrorBoundary>
+        </View>
+      </ViewErrorBoundary>
+    </Suspense>
   );
 };
