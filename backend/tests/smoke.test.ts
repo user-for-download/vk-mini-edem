@@ -193,4 +193,79 @@ describe("bookings smoke", () => {
 
     expect(updatedTrip?.seatsAvailable).toBe(1);
   });
+
+  it("does not double-free a seat on concurrent cancels (Serializable)", async () => {
+    await cleanDb();
+
+    const passenger = await db.user.create({
+      data: {
+        vkUserId: 555555,
+        name: "Passenger",
+        avatar: "https://i.pravatar.cc/200?img=4",
+      },
+    });
+
+    const driver = await db.user.create({
+      data: {
+        vkUserId: 666666,
+        name: "Driver",
+        avatar: "https://i.pravatar.cc/200?img=5",
+      },
+    });
+
+    const trip = await db.trip.create({
+      data: {
+        driverId: driver.id,
+        fromCity: "Москва",
+        fromAddress: "м. Тёплый Стан",
+        toCity: "Тула",
+        toAddress: "пр-т Ленина",
+        departureAt: new Date("2030-01-01T09:00:00Z"),
+        durationMinutes: 120,
+        distanceKm: 180,
+        price: 700,
+        seatsTotal: 3,
+        seatsAvailable: 2,
+        tags: [],
+      },
+    });
+
+    const booking = await db.booking.create({
+      data: {
+        tripId: trip.id,
+        passengerId: passenger.id,
+        seat: 1,
+        status: "confirmed",
+        comment: "",
+      },
+    });
+
+    const cancel = () =>
+      app.request(`/api/v1/bookings/${booking.id}/cancel`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer mock-access-token-${passenger.id}`,
+        },
+      });
+
+    // Два параллельных запроса на отмену одной брони.
+    const [r1, r2] = await Promise.all([cancel(), cancel()]);
+
+    // Один запрос должен пройти, второй — получить 409/400 (уже отменена).
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses[0]).toBe(200);
+    expect(statuses[1]).toBeGreaterThanOrEqual(400);
+    expect(statuses[1]).toBeLessThan(500);
+
+    // Место освободилось ровно один раз: 2 → 3, но не 4.
+    const updatedTrip = await db.trip.findUnique({
+      where: { id: trip.id },
+    });
+    expect(updatedTrip?.seatsAvailable).toBe(3);
+
+    const cancelledCount = await db.booking.count({
+      where: { id: booking.id, status: "cancelled" },
+    });
+    expect(cancelledCount).toBe(1);
+  });
 });

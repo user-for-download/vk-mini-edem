@@ -1,6 +1,7 @@
 // backend/src/trips/index.ts
 import { Hono } from "hono";
-import type { Prisma } from "@prisma/client";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { Prisma } from "@prisma/client";
 import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
 import { env } from "../env.js";
@@ -472,21 +473,44 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   if (dto.tags !== undefined) updateData.tags = dto.tags;
   if (dto.comment !== undefined) updateData.comment = dto.comment;
 
-  if (dto.seatsTotal !== undefined) {
-    // seatsAvailable = seatsTotal - activeCount (свежий activeCount,
-    // вычисленный в блоке проверки выше — дублируем для ясности).
-    const activeBookingsForSeats = await db.booking.count({
-      where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
-    });
-    updateData.seatsTotal = dto.seatsTotal;
-    updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats);
-  }
+  let updated;
+  try {
+    // Пересчёт мест и обновление поездки выполняем в одной Serializable-
+    // транзакции: без неё между проверкой activeCount и update могла
+    // пройти параллельная отмена/подтверждение брони, и seatsAvailable
+    // «протухал» (рассинхронизация мест).
+    updated = await db.$transaction(
+      async (tx) => {
+        if (dto.seatsTotal !== undefined) {
+          const activeBookingsForSeats = await tx.booking.count({
+            where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+          });
+          updateData.seatsTotal = dto.seatsTotal;
+          updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats);
+        }
 
-  const updated = await db.trip.update({
-    where: { id },
-    data: updateData,
-    include: { driver: { include: { car: true } } },
-  });
+        return tx.trip.update({
+          where: { id },
+          data: updateData,
+          include: { driver: { include: { car: true } } },
+        });
+      },
+      { isolationLevel: "Serializable" }
+    );
+  } catch (error) {
+    // Serializable: параллельное изменение поездки/брони — клиент
+    // получает 409 и может повторить запрос с актуальными данными.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
+        409
+      );
+    }
+    throw error;
+  }
 
   /**
    * Если изменились важные для пассажиров поля — уведомляем подтверждённых пассажиров
@@ -692,71 +716,91 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
 
   let passengerIds: string[] = [];
 
-  const updated = await db.$transaction(async (tx) => {
-    // 1. Decline all pending bookings
-    await tx.booking.updateMany({
-      where: {
-        tripId: trip.id,
-        status: "pending",
-      },
-      data: {
-        status: "declined",
-      },
-    });
-
-    // 2. Find confirmed passengers
-    const confirmedBookings = await tx.booking.findMany({
-      where: {
-        tripId: trip.id,
-        status: "confirmed",
-      },
-      select: {
-        passengerId: true,
-      },
-    });
-
-    passengerIds = Array.from(
-      new Set(confirmedBookings.map((booking) => booking.passengerId))
-    );
-
-    // 3. Driver +1 tripsCount
-    await tx.user.update({
-      where: { id: trip.driverId },
-      data: {
-        tripsCount: {
-          increment: 1,
-        },
-      },
-    });
-
-    // 4. Each confirmed passenger +1 tripsCount
-    for (const passengerId of passengerIds) {
-      await tx.user.update({
-        where: { id: passengerId },
-        data: {
-          tripsCount: {
-            increment: 1,
+  let updated;
+  try {
+    updated = await db.$transaction(
+      async (tx) => {
+        // 1. Decline all pending bookings
+        await tx.booking.updateMany({
+          where: {
+            tripId: trip.id,
+            status: "pending",
           },
-        },
-      });
-    }
+          data: {
+            status: "declined",
+          },
+        });
 
-    // 5. Update trip status
-    return tx.trip.update({
-      where: { id: trip.id },
-      data: {
-        status: "completed",
-        seatsAvailable: 0,
-      },
-      include: {
-        driver: {
+        // 2. Find confirmed passengers
+        const confirmedBookings = await tx.booking.findMany({
+          where: {
+            tripId: trip.id,
+            status: "confirmed",
+          },
+          select: {
+            passengerId: true,
+          },
+        });
+
+        passengerIds = Array.from(
+          new Set(confirmedBookings.map((booking) => booking.passengerId))
+        );
+
+        // 3. Driver +1 tripsCount
+        await tx.user.update({
+          where: { id: trip.driverId },
+          data: {
+            tripsCount: {
+              increment: 1,
+            },
+          },
+        });
+
+        // 4. Each confirmed passenger +1 tripsCount
+        for (const passengerId of passengerIds) {
+          await tx.user.update({
+            where: { id: passengerId },
+            data: {
+              tripsCount: {
+                increment: 1,
+              },
+            },
+          });
+        }
+
+        // 5. Update trip status
+        return tx.trip.update({
+          where: { id: trip.id },
+          data: {
+            status: "completed",
+            seatsAvailable: 0,
+          },
           include: {
-            car: true,
+            driver: {
+              include: {
+                car: true,
+              },
+            },
           },
-        },
+        });
       },
-    });
-  });
+      { isolationLevel: "Serializable" }
+    );
+  } catch (error) {
+    // Serializable: параллельное завершение той же поездки — одна из
+    // транзакций не сможет подтвердиться (write conflict). Возвращаем
+    // 409 вместо 500: tripsCount при этом начислен ровно один раз.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
+        409
+      );
+    }
+    throw error;
+  }
 
   logBusinessEvent("trip.completed", {
     tripId: trip.id,
@@ -764,7 +808,15 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
     passengersCount: passengerIds.length,
   });
 
+  // Персистентные уведомления + WS-события пассажирам (ВНЕ транзакции,
+  // паттерн как в автозавершении воркером).
   for (const pid of passengerIds) {
+    await createNotification(
+      pid,
+      "trip_status_changed",
+      "Поездка завершена",
+      `Поездка ${trip.fromCity} → ${trip.toCity} завершена. Вы можете оставить отзыв.`
+    );
     wsManager.sendToUser(pid, {
       type: "trip:status_changed",
       payload: { tripId: trip.id, status: "completed" },

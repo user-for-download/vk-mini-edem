@@ -49,6 +49,20 @@ class WebSocketManager {
   authenticate(connId: string, userId: string): boolean {
     const conn = this.byId.get(connId);
     if (!conn) return false;
+
+    // Повторная аутентификация тем же пользователем (например, после
+    // refresh токена) — НЕ закрываем соединение: просто обновляем
+    // таймер и возвращаем true. Иначе клиент получает 4401, думает,
+    // что токен протух, и уходит в бесконечный цикл refresh → reconnect.
+    if (conn.userId === userId) {
+      if (conn.authTimer) {
+        clearTimeout(conn.authTimer);
+        conn.authTimer = undefined;
+      }
+      logger.debug({ connId, userId }, "ws_reauthenticated_same_user");
+      return true;
+    }
+
     if (conn.userId) return false;
 
     conn.userId = userId;

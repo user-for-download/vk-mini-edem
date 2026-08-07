@@ -83,7 +83,8 @@ export async function processExpiredTrips() {
             ];
 
             return { confirmedPassengerIds, declinedPassengerIds };
-          }
+          },
+          { isolationLevel: "Serializable" }
         );
 
         logger.info(

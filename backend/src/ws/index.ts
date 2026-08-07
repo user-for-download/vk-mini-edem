@@ -39,8 +39,11 @@ export function createWsHandler(upgradeWebSocket: any) {
         try {
           const userId = await verifyAccessToken(msg.token);
           const ok = wsManager.authenticate(connId, userId);
+          // authenticate() возвращает false только если соединение уже
+          // принадлежит ДРУГОМУ пользователю (повторная auth тем же
+          // пользователем идемпотентна и возвращает true).
           if (!ok) {
-            wsManager.close(connId, 4401, "Already authenticated");
+            wsManager.close(connId, 4401, "Already authenticated as another user");
           }
         } catch {
           logger.warn({ connId }, "ws_auth_failed");

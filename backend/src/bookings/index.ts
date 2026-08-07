@@ -702,7 +702,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
       });
 
       return updatedBooking;
-    });
+    }, { isolationLevel: "Serializable" });
 
     logBusinessEvent("booking.status_changed", {
       bookingId: id,
@@ -735,6 +735,18 @@ bookingsRouter.patch("/:id/status", async (c) => {
       return c.json(
         { code: error.code, message: error.message },
         error.statusCode as ContentfulStatusCode
+      );
+    }
+
+    // Serializable: параллельное изменение брони/поездки — клиент
+    // получает 409 и может повторить запрос с актуальными данными.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Бронь только что изменилась, попробуйте ещё раз" },
+        409
       );
     }
 
@@ -814,7 +826,7 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       });
 
       return { tripId: booking.tripId, driverId: booking.trip.driverId };
-    });
+    }, { isolationLevel: "Serializable" });
 
     logBusinessEvent("booking.cancelled", {
       bookingId: id,
@@ -832,6 +844,19 @@ bookingsRouter.patch("/:id/cancel", async (c) => {
       return c.json(
         { code: error.code, message: error.message },
         error.statusCode as ContentfulStatusCode
+      );
+    }
+
+    // Serializable: параллельная отмена той же брони — одна из транзакций
+    // не сможет подтвердиться (write conflict). Возвращаем 409 вместо 500:
+    // место при этом гарантированно освобождено ровно один раз.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Бронь только что изменилась, попробуйте ещё раз" },
+        409
       );
     }
 
