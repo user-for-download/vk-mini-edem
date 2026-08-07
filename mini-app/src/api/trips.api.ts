@@ -60,10 +60,15 @@ export const tripsApi = {
     );
   },
 
-  getMyTrips: (options?: { page?: number; limit?: number }): Promise<PaginatedTripsResponse> => {
+  getMyTrips: (options?: {
+    page?: number;
+    limit?: number;
+    status?: "active" | "archive";
+  }): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
     if (options?.page) query.set("page", options.page.toString());
     if (options?.limit) query.set("limit", options.limit.toString());
+    if (options?.status) query.set("status", options.status);
     const queryString = query.toString() ? `?${query.toString()}` : "";
     return apiClient.request<PaginatedTripsResponse>(
       `/trips/my${queryString}`,

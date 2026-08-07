@@ -369,6 +369,13 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
         throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
       }
 
+      // Запрещаем бронировать уже уехавшие поездки.
+      // Авто-завершение воркером происходит только через 24 часа — без этой
+      // проверки пассажир мог бы забронировать место в уже уехавшей поездке.
+      if (trip.departureAt <= new Date()) {
+        throw new BookingError("Trip has already departed", 400, ERROR_CODES.TRIP_IN_PAST);
+      }
+
       if (trip.driverId === passenger.id) {
         throw new BookingError("Driver cannot book own trip", 400, ERROR_CODES.FORBIDDEN);
       }

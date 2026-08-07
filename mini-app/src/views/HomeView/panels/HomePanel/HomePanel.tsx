@@ -56,6 +56,8 @@ export const HomePanel: FC<HomePanelProps> = ({
     data: myTripsData,
     isLoading: myTripsLoading,
     isFetching: myTripsFetching,
+    isError: myTripsError,
+    error: myTripsFetchError,
     refetch: refetchMyTrips,
   } = useMyTripsQuery({
     enabled: role === "driver",
@@ -182,13 +184,35 @@ export const HomePanel: FC<HomePanelProps> = ({
             </Box>
           )}
 
-          {!myTripsLoading && activeOwnTrip && (
+          {myTripsError && (
+            <EmptyState
+              title="Не удалось загрузить ваши поездки"
+              subtitle={
+                myTripsFetchError instanceof Error
+                  ? myTripsFetchError.message
+                  : "Проверьте соединение и попробуйте позже"
+              }
+              action={
+                <Box padding="system">
+                  <Button
+                    size="m"
+                    mode="primary"
+                    onClick={() => refetchTrips()}
+                  >
+                    Попробовать снова
+                  </Button>
+                </Box>
+              }
+            />
+          )}
+
+          {!myTripsLoading && !myTripsError && activeOwnTrip && (
             <Box padding="system">
               <TripCard trip={activeOwnTrip} onOpen={onOpenTrip} />
             </Box>
           )}
 
-          {!myTripsLoading && !activeOwnTrip && (
+          {!myTripsLoading && !myTripsError && !activeOwnTrip && (
             <EmptyState
               title="Активных поездок нет"
               subtitle="Создайте поездку, чтобы получать заявки пассажиров"

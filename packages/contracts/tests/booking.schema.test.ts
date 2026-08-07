@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createBookingDtoSchema } from "../src/dto/booking.dto";
+import { MAX_SEATS } from "../src/schemas/trip.schema";
 import { bookingStatusSchema, driverBookingActionSchema } from "../src/schemas/booking.schema";
 
 describe("createBookingDtoSchema", () => {
@@ -12,12 +13,20 @@ describe("createBookingDtoSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should reject booking with seat > 8", () => {
+  it(`should reject booking with seat > MAX_SEATS (${MAX_SEATS})`, () => {
     const result = createBookingDtoSchema.safeParse({
       tripId: "t-1",
-      seat: 9,
+      seat: MAX_SEATS + 1,
     });
     expect(result.success).toBe(false);
+  });
+
+  it(`should accept booking with seat = MAX_SEATS (${MAX_SEATS})`, () => {
+    const result = createBookingDtoSchema.safeParse({
+      tripId: "t-1",
+      seat: MAX_SEATS,
+    });
+    expect(result.success).toBe(true);
   });
 
   it("should reject booking with long comment", () => {

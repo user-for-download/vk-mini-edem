@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { userSchema } from "@edem/contracts";
 import type { User } from "@/types";
 
 export interface CarFormDto {
@@ -9,37 +10,37 @@ export interface CarFormDto {
 
 export const usersApi = {
   getCurrentUser: (): Promise<User> => {
-    return apiClient.request<User>("/users/me");
+    return apiClient.request<User>("/users/me", {}, userSchema);
   },
 
   getUserById: (id: string): Promise<User> => {
-    return apiClient.request<User>(`/users/${id}`);
+    return apiClient.request<User>(`/users/${id}`, {}, userSchema);
   },
 
   updateProfile: (data: Partial<Pick<User, "name" | "about">>): Promise<User> => {
     return apiClient.request<User>("/users/me", {
       method: "PATCH",
       body: JSON.stringify(data),
-    });
+    }, userSchema);
   },
 
   updateCar: (data: CarFormDto): Promise<User> => {
     return apiClient.request<User>("/users/me/car", {
       method: "POST",
       body: JSON.stringify(data),
-    });
+    }, userSchema);
   },
 
   requestVerification: (): Promise<User> => {
     return apiClient.request<User>("/users/me/request-verification", {
       method: "POST",
-    });
+    }, userSchema);
   },
 
   updateNotificationSettings: (enabled: boolean): Promise<User> => {
     return apiClient.request<User>("/users/me/notification-settings", {
       method: "PATCH",
       body: JSON.stringify({ notificationsEnabled: enabled }),
-    });
+    }, userSchema);
   },
 };

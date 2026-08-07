@@ -25,6 +25,7 @@ services:
       db:
         condition: service_healthy
     environment:
+      TZ: "Europe/Moscow"
       DATABASE_URL: postgresql://edem:${POSTGRES_PASSWORD}@db:5432/edem?schema=public&connection_limit=10
       NODE_ENV: production
       PORT: 3000

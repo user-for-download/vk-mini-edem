@@ -171,9 +171,17 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     myBooking !== null &&
     (myBooking.status === "pending" || myBooking.status === "confirmed");
 
-  const canBook = !isOwnTrip && isTripActive && !noSeats && !hasActiveBooking;
-
   const departureTime = trip.departureAt ? Date.parse(trip.departureAt) : null;
+
+  // Запрещаем бронировать уже уехавшие поездки (синхронно с бэкендом:
+  // POST /bookings теперь возвращает 400 TRIP_IN_PAST для таких случаев).
+  const canBook =
+    !isOwnTrip &&
+    isTripActive &&
+    !noSeats &&
+    !hasActiveBooking &&
+    departureTime !== null &&
+    departureTime > now;
 
   const canCompleteTrip =
     isOwnTrip &&

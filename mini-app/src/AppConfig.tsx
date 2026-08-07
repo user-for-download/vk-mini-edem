@@ -56,17 +56,21 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
       <AdaptivityProvider {...vkBridgeAdaptivityProps}>
         <RouterProvider router={router}>
           <QueryClientProvider client={queryClient}>
+            {/* ErrorBoundary — самый внешний рубеж: ловит ошибки самого AppRoot.
+                Его fallback — чистый HTML без VKUI (иначе зависит от AppRoot). */}
             <ErrorBoundary>
-              <AuthGate>
-                <WsProvider>
-                  <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
-                    <SnackbarProvider>
-                      <GlobalWsListener />
-                      <ModalProvider>{children}</ModalProvider>
-                    </SnackbarProvider>
-                  </AppRoot>
-                </WsProvider>
-              </AuthGate>
+              <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
+                <SnackbarProvider>
+                  <ModalProvider>
+                    <AuthGate>
+                      <WsProvider>
+                        <GlobalWsListener />
+                        {children}
+                      </WsProvider>
+                    </AuthGate>
+                  </ModalProvider>
+                </SnackbarProvider>
+              </AppRoot>
             </ErrorBoundary>
           </QueryClientProvider>
         </RouterProvider>

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+// ─── Verification Status ────────────────────────────────────────────────────
+export const verificationStatusSchema = z.enum(["none", "pending", "approved", "rejected"]);
+export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
+
 // ─── Car ────────────────────────────────────────────────────────────────────
 export const carSchema = z.object({
   model: z.string().min(1).max(50),
@@ -18,6 +22,9 @@ export const userSchema = z.object({
   reviewsCount: z.number().int().min(0),
   tripsCount: z.number().int().min(0),
   isVerified: z.boolean().optional(),
+  verificationStatus: verificationStatusSchema.optional(),
+  notificationsEnabled: z.boolean().optional(),
+  verifiedAt: z.string().datetime().nullable().optional(),
   car: carSchema.optional(),
   about: z.string().max(500).optional(),
   createdAt: z.string().datetime().optional(),

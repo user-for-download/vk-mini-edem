@@ -66,11 +66,18 @@ export function useMyTripsQuery(options?: { enabled?: boolean }) {
   });
 }
 
-export function useInfiniteMyTripsQuery(options?: { enabled?: boolean }) {
+export function useInfiniteMyTripsQuery(options?: {
+  enabled?: boolean;
+  status?: "active" | "archive";
+}) {
   return useInfiniteQuery({
-    queryKey: [...TRIP_KEYS.my(), "infinite"],
+    queryKey: [...TRIP_KEYS.my(), "infinite", options?.status],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await tripsApi.getMyTrips({ page: pageParam as number, limit: 20 });
+      const res = await tripsApi.getMyTrips({
+        page: pageParam as number,
+        limit: 20,
+        status: options?.status,
+      });
       return res;
     },
     initialPageParam: 1,

@@ -21,7 +21,7 @@ export interface User {
   isVerified?: boolean;
   notificationsEnabled?: boolean;
   verificationStatus?: string;
-  verifiedAt?: string;
+  verifiedAt?: string | null;
   car?: Car;
   about?: string;
   createdAt?: string;
@@ -95,10 +95,10 @@ export interface Booking {
 
   /**
    * Поля, которые backend возвращает для истории поездок.
-   * Делаем их обязательными, т.к. они всегда вычисляются на бэкенде.
+   * Опциональны — схема contracts допускает их отсутствие.
    */
-  canReview: boolean;
-  hasReview: boolean;
+  canReview?: boolean;
+  hasReview?: boolean;
   historyCategory?: "completed" | "cancelled" | "other";
 }
 
@@ -112,9 +112,9 @@ export interface Booking {
 export type PassengerBookingScope = "active" | "history";
 
 export interface PassengerBooking extends Booking {
-  scope: PassengerBookingScope;
-  canReview: boolean;
-  hasReview: boolean;
+  scope?: PassengerBookingScope;
+  canReview?: boolean;
+  hasReview?: boolean;
 
   /**
    * Переопределяем trip, чтобы добавить служебные поля.

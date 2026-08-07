@@ -30,7 +30,9 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
         disabled={isTaken}
         onClick={() => onSelect(isSelected ? null : seat)}
         aria-label={isTaken ? `Место ${seat} занято` : `Выбрать место ${seat}`}
-        aria-pressed={isSelected}
+        role="radio"
+        aria-checked={isSelected}
+        tabIndex={isTaken ? -1 : 0}
       >
         {seat}
       </button>

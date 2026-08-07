@@ -130,7 +130,7 @@ LOG_LEVEL=debug
 
 ## 🔌 API
 
-Все REST-роуты находятся под префиксом **`/api/v1`** (legacy-алиасы `/api/*` временно поддерживаются для совместимости):
+Все REST-роуты находятся под префиксом **`/api/v1`**:
 
 | Метод | Путь | Описание |
 |---|---|---|
@@ -146,6 +146,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/trips/:id/complete` | Завершение поездки |
 | POST | `/api/v1/bookings` | Создание брони (гонка → 409 SEAT_TAKEN) |
 | PATCH | `/api/v1/bookings/:id/status` | Подтвердить/отклонить заявку |
+| PATCH | `/api/v1/bookings/:id/cancel` | Отмена брони пассажиром |
 | GET | `/api/v1/bookings/my` | Мои брони (пассажир) |
 | GET | `/api/v1/bookings/history` | История броней |
 | GET | `/api/v1/bookings/trip/:tripId` | Заявки по поездке (водитель) |
@@ -156,7 +157,7 @@ LOG_LEVEL=debug
 | GET | `/api/v1/users/me` | Текущий пользователь |
 | PATCH | `/api/v1/users/me` | Обновление профиля |
 | PATCH | `/api/v1/users/me/car` | Управление авто |
-| PATCH | `/api/v1/users/me/notifications` | Настройки уведомлений |
+| PATCH | `/api/v1/users/me/notification-settings` | Настройки уведомлений |
 | GET | `/api/v1/users/:id` | Публичный профиль |
 | WS | `/api/v1/ws?token=` | WebSocket-события (booking:new, status_changed, notification:new и др.) |
 | GET | `/health`, `/health/live`, `/health/ready` | Проверки здоровья |

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { Prisma } from "@prisma/client";
 import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
+import { env } from "../env.js";
 import { logger } from "../logger.js";
 import { requireUser, type AuthUser } from "../auth/middleware.js";
 import { optionalAuth } from "../auth/optionalMiddleware.js";
@@ -173,14 +174,25 @@ tripsRouter.get("/my", requireUser, async (c) => {
   const user = c.get("user")!;
   const pageParam = c.req.query("page");
   const limitParam = c.req.query("limit");
+  const statusParam = c.req.query("status"); // "active" | "archive"
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
   const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
   const skip = (page - 1) * limit;
+
+  // Фильтр по статусу для пагинации на клиенте (вкладки "Активные"/"Архив").
+  // "active" — только активные; "archive" — completed + cancelled.
+  const statusFilter: Prisma.TripWhereInput["status"] =
+    statusParam === "active"
+      ? "active"
+      : statusParam === "archive"
+        ? { in: ["completed", "cancelled"] }
+        : undefined;
 
   const [trips, total] = await Promise.all([
     db.trip.findMany({
       where: {
         driverId: user.id,
+        ...(statusFilter ? { status: statusFilter } : {}),
       },
       include: {
         driver: {
@@ -195,7 +207,12 @@ tripsRouter.get("/my", requireUser, async (c) => {
       skip,
       take: limit,
     }),
-    db.trip.count({ where: { driverId: user.id } }),
+    db.trip.count({
+      where: {
+        driverId: user.id,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      },
+    }),
   ]);
 
   const tripIds = trips.map((trip) => trip.id);
@@ -416,11 +433,30 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   }
 
   if (dto.seatsTotal !== undefined) {
-    const activeBookingsCount = await db.booking.count({
+    // Проверяем не только количество активных броней, но и максимальный
+    // номер занятого места. Без этого можно уменьшить seatsTotal так,
+    // что активная бронь окажется на несуществующем месте (например,
+    // seatsTotal=4 → 2, при активной брони на месте №4).
+    const activeBookings = await db.booking.findMany({
       where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+      select: { seat: true },
     });
-    if (dto.seatsTotal < activeBookingsCount) {
-      return c.json({ message: `Cannot reduce seats below ${activeBookingsCount}` }, 400);
+    const activeCount = activeBookings.length;
+    const maxTakenSeat = activeBookings.reduce(
+      (max, b) => (b.seat > max ? b.seat : max),
+      0
+    );
+    if (dto.seatsTotal < activeCount) {
+      return c.json(
+        { message: `Cannot reduce seats below active bookings count (${activeCount})` },
+        400
+      );
+    }
+    if (maxTakenSeat > 0 && dto.seatsTotal < maxTakenSeat) {
+      return c.json(
+        { message: `Seat #${maxTakenSeat} is occupied — cannot set seatsTotal below ${maxTakenSeat}` },
+        400
+      );
     }
   }
 
@@ -437,9 +473,13 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   if (dto.comment !== undefined) updateData.comment = dto.comment;
 
   if (dto.seatsTotal !== undefined) {
-    const seatsDiff = dto.seatsTotal - trip.seatsTotal;
+    // seatsAvailable = seatsTotal - activeCount (свежий activeCount,
+    // вычисленный в блоке проверки выше — дублируем для ясности).
+    const activeBookingsForSeats = await db.booking.count({
+      where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+    });
     updateData.seatsTotal = dto.seatsTotal;
-    updateData.seatsAvailable = Math.max(0, trip.seatsAvailable + seatsDiff);
+    updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats);
   }
 
   const updated = await db.trip.update({
@@ -618,7 +658,10 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
 tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user")!;
-  const force = c.req.query("force") === "1";
+  // force=1 доступен ТОЛЬКО в development/test. В production игнорируем
+  // параметр — иначе любой водитель мог бы накручивать tripsCount,
+  // завершая поездки до времени отправления.
+  const force = !env.isProduction && c.req.query("force") === "1";
 
   const trip = await db.trip.findUnique({
     where: { id },

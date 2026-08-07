@@ -3,6 +3,13 @@ import type { Prisma } from "@prisma/client";
 import type { BookingStatus, TripStatus } from "@edem/contracts";
 import { DEFAULT_AVATAR_URL } from "../constants.js";
 
+/**
+ * Единый часовой пояс для отображения дат и времени.
+ * Без явного timeZone Intl.DateTimeFormat использует TZ контейнера
+ * (в проде обычно UTC), что сдвигает время на экране пользователя.
+ */
+const DISPLAY_TIMEZONE = "Europe/Moscow";
+
 export type UserWithCar = Prisma.UserGetPayload<{
   include: {
     car: boolean;
@@ -48,11 +55,13 @@ const dateFmt = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
   month: "long",
   weekday: "short",
+  timeZone: DISPLAY_TIMEZONE,
 });
 
 const timeFmt = new Intl.DateTimeFormat("ru-RU", {
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: DISPLAY_TIMEZONE,
 });
 
 export function formatDateRu(date: Date): string {
@@ -72,6 +81,9 @@ export function serializeUser(user: UserWithCar) {
     reviewsCount: user.reviewsCount,
     tripsCount: user.tripsCount,
     isVerified: user.isVerified,
+    verificationStatus: user.verificationStatus,
+    notificationsEnabled: user.notificationsEnabled,
+    verifiedAt: user.verifiedAt?.toISOString() ?? null,
     car: user.car
       ? {
           model: user.car.model,
@@ -145,6 +157,7 @@ const reviewDateFmt = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
   month: "long",
   year: "numeric",
+  timeZone: DISPLAY_TIMEZONE,
 });
 
 export function serializeReview(review: ReviewWithAuthor) {

@@ -66,7 +66,15 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data) as WsServerEvent;
-        if (parsed.type === "pong") return; // Internal keep-alive or ignore
+        // Отвечаем на серверный ping для поддержания keep-alive.
+        // Сервер (wsManager.ts) шлёт {type:"ping"} каждые 30 сек и ждёт
+        // {type:"pong"} в течение 60 сек (PONG_TIMEOUT_MS). Без ответа
+        // соединение закрывается с кодом 1001 "Pong timeout".
+        if (parsed.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong" }));
+          return;
+        }
+        if (parsed.type === "pong") return; // Игнорируем ответ сервера на наш pong
         setLastMessage(parsed);
       } catch (err) {
         console.error("Failed to parse WS message", err);

@@ -52,7 +52,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteMyTripsQuery();
+  } = useInfiniteMyTripsQuery({ status: tab });
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,13 +73,11 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  // Фильтрация теперь на бэкенде (параметр status).
+  // Плоский список без повторного фильтра по статусу.
   const myTrips = useMemo(() => {
-    const trips = data?.pages.flatMap((page) => page.items) ?? [];
-    return trips.filter((trip) => {
-      if (tab === "active") return trip.status === "active";
-      return trip.status === "completed" || trip.status === "cancelled";
-    });
-  }, [data, tab]);
+    return data?.pages.flatMap((page) => page.items) ?? [];
+  }, [data]);
 
   const handleRefresh = useCallback(async () => {
     await refetch();
