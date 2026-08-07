@@ -251,7 +251,13 @@ export const HomePanel: FC<HomePanelProps> = ({
               <TripCard
                 trip={nextActiveBooking.trip}
                 onOpen={() => onOpenTrip(nextActiveBooking.trip)}
-                hideSeats // Пассажиру важнее его бронь, а не свободные места
+                seatsLabel={
+                  nextActiveBooking.status === "pending"
+                    ? "Ожидает подтверждение"
+                    : nextActiveBooking.status === "confirmed"
+                      ? "Место подтверждено"
+                      : undefined
+                }
               />
             </Box>
           )}

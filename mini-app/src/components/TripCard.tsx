@@ -23,6 +23,8 @@ export interface TripCardProps {
   onOpen?: (trip: Trip) => void;
   requestsCount?: number;
   hideSeats?: boolean;
+  /** Переопределяет автоматический текст «X из Y мест». */
+  seatsLabel?: string;
   archivedStatus?: "completed" | "cancelled";
   /** Дополнительный контент в нижней части карточки (после блока водителя). */
   children?: ReactNode;
@@ -41,6 +43,7 @@ export const TripCard: FC<TripCardProps> = ({
   onOpen,
   requestsCount = 0,
   hideSeats = false,
+  seatsLabel: seatsLabelProp,
   archivedStatus,
   children,
 }) => {
@@ -55,9 +58,11 @@ export const TripCard: FC<TripCardProps> = ({
   const isArchived = Boolean(archivedStatus);
 
   const seatsLabel =
-    trip.seatsAvailable === 0
-      ? "Мест нет"
-      : `${trip.seatsAvailable} из ${trip.seatsTotal} ${trip.seatsTotal === 1 ? "места" : "мест"}`;
+    seatsLabelProp !== undefined
+      ? seatsLabelProp
+      : trip.seatsAvailable === 0
+        ? "Мест нет"
+        : `${trip.seatsAvailable} из ${trip.seatsTotal} ${trip.seatsTotal === 1 ? "места" : "мест"}`;
 
   return (
     <Card

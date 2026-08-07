@@ -67,9 +67,22 @@
 
 ### Запуск проекта (Фронтенд + Бэкенд)
 ```bash
-npm run dev
+npm run dev          # или: bun run dev
 ```
 Команда параллельно запустит бэкенд на порту 3001 и фронтенд (Vite) на порту 3000. Vite проксирует `/api/v1` и `/ws` на бэкенд.
+
+> **Примечание**: `dev:backend` использует `bun run --cwd backend dev` (bun-совместимый синтаксис). Если bun не установлен — поставьте его (`curl -fsSL https://bun.sh/install | bash`) или замените скрипт на `npm run dev --workspace=backend`.
+
+### Запуск в Docker (бэкенд в контейнере)
+```bash
+docker compose up -d --build   # сборка и запуск db + backend (:3000)
+docker compose up -d db        # только PostgreSQL (для локального dev)
+docker compose stop backend    # остановить контейнер бэкенда (оставить БД)
+```
+Требуется корневой `.env` с переменными `POSTGRES_PASSWORD`, `JWT_SECRET`, `VK_APP_SECRET`, `CORS_ORIGINS` (образец — `.env.example`). Миграции применяются автоматически при старте контейнера. Reseed внутри контейнера:
+```bash
+docker exec -it vk-mini-edem-backend-1 node --import tsx prisma/seed.ts
+```
 
 ### Установка зависимостей
 ```bash
@@ -138,13 +151,13 @@ LOG_LEVEL=debug
 | POST | `/api/v1/auth/refresh` | Ротация refresh-токена (10 req/10 мин) |
 | POST | `/api/v1/auth/logout` | Отзыв refresh-токена |
 | GET | `/api/v1/trips` | Список активных поездок (пагинация `{items, pagination}`) |
-| GET | `/api/v1/trips/my` | Поездки текущего водителя |
+| GET | `/api/v1/trips/my?status=active\|archive` | Поездки текущего водителя (фильтр по статусу) |
 | GET | `/api/v1/trips/:id` | Детали поездки (занятые места, моя бронь) |
-| POST | `/api/v1/trips` | Создание поездки (нужна машина) |
-| PATCH | `/api/v1/trips/:id` | Редактирование поездки |
+| POST | `/api/v1/trips` | Создание поездки (нужна машина, макс. `MAX_SEATS = 4` мест) |
+| PATCH | `/api/v1/trips/:id` | Редактирование поездки (нельзя уменьшить места ниже занятых) |
 | PATCH | `/api/v1/trips/:id/cancel` | Отмена поездки |
-| PATCH | `/api/v1/trips/:id/complete` | Завершение поездки |
-| POST | `/api/v1/bookings` | Создание брони (гонка → 409 SEAT_TAKEN) |
+| PATCH | `/api/v1/trips/:id/complete` | Завершение поездки (`?force=1` — только dev/test) |
+| POST | `/api/v1/bookings` | Создание брони (гонка → 409 SEAT_TAKEN; уехавшая поездка → 400 TRIP_IN_PAST) |
 | PATCH | `/api/v1/bookings/:id/status` | Подтвердить/отклонить заявку |
 | PATCH | `/api/v1/bookings/:id/cancel` | Отмена брони пассажиром |
 | GET | `/api/v1/bookings/my` | Мои брони (пассажир) |
@@ -171,6 +184,8 @@ LOG_LEVEL=debug
 - **Валидация**: Zod-схемы на входе (backend) и на выходе (frontend, `apiClient.request<T>(url, opts, schema)`).
 - **Заголовки**: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
+- **Время**: даты сериализуются в `Europe/Moscow` (в контейнере задано через `TZ`).
+- **Критичные уведомления** (смена статуса брони/поездки) создаются всегда, независимо от настройки `notificationsEnabled` пользователя.
 
 ## 📡 WebSocket
 
@@ -191,3 +206,4 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
 - **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, vite-plugin-pwa, Sentry
 - **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
+- **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
