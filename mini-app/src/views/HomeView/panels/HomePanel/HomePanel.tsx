@@ -143,8 +143,18 @@ export const HomePanel: FC<HomePanelProps> = ({
           </Title>
         </Box>
 
-        <Box padding="system" paddingBlockStart={0} onClick={onGoSearch}>
-          <Search placeholder="Куда едем? Например, Тверь" disabled value="" />
+        <Box padding="system" paddingBlockStart={0}>
+          <Search
+            placeholder="Куда едем? Например, Тверь"
+            readOnly
+            value=""
+            inputMode="none"
+            onFocus={onGoSearch}
+            onClick={onGoSearch}
+            tabIndex={0}
+            aria-label="Поиск поездки"
+            role="button"
+          />
         </Box>
       </Group>
 

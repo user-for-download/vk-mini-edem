@@ -44,6 +44,15 @@ const PrivacyPanel = lazy(() =>
   }))
 );
 
+/**
+ * Обёртка Suspense для одной панели.
+ * При первом переходе на ленивую панель suspend-ится только она,
+ * а не весь View — сохраняется плавная VKUI-анимация.
+ */
+const LazyPanel: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Suspense fallback={<PanelSpinner />}>{children}</Suspense>
+);
+
 export interface ProfileViewProps {
   id: string;
   role: Role;
@@ -69,9 +78,9 @@ export const ProfileView: FC<ProfileViewProps> = ({
   const backToProfile = () => routeNavigator.back();
 
   return (
-    <Suspense fallback={<PanelSpinner />}>
-      <ViewErrorBoundary>
-        <View id={id} activePanel={activePanel}>
+    <ViewErrorBoundary>
+      <View id={id} activePanel={activePanel}>
+        <LazyPanel>
           <ProfilePanel
             id={PANEL_PROFILE}
             role={role}
@@ -86,13 +95,23 @@ export const ProfileView: FC<ProfileViewProps> = ({
             onOpenSupport={() => routeNavigator.push("/profile/support")}
             onOpenAbout={() => routeNavigator.push("/profile/about")}
           />
+        </LazyPanel>
+        <LazyPanel>
           <NotificationsPanel id={PANEL_SETTINGS_NOTIFICATIONS} onBack={backToProfile} />
+        </LazyPanel>
+        <LazyPanel>
           <SupportPanel id={PANEL_SETTINGS_SUPPORT} onBack={backToProfile} />
+        </LazyPanel>
+        <LazyPanel>
           <AboutPanel id={PANEL_SETTINGS_ABOUT} onBack={backToProfile} />
+        </LazyPanel>
+        <LazyPanel>
           <TermsPanel id={PANEL_ABOUT_TERMS} onBack={backToProfile} />
+        </LazyPanel>
+        <LazyPanel>
           <PrivacyPanel id={PANEL_ABOUT_PRIVACY} onBack={backToProfile} />
-        </View>
-      </ViewErrorBoundary>
-    </Suspense>
+        </LazyPanel>
+      </View>
+    </ViewErrorBoundary>
   );
 };

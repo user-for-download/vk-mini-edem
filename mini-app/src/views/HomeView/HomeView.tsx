@@ -17,6 +17,15 @@ const TripDetailsPanelWrapper = lazy(() =>
   }))
 );
 
+/**
+ * Обёртка Suspense для одной панели.
+ * При первом переходе на ленивую панель suspend-ится только она,
+ * а не весь View — сохраняется плавная VKUI-анимация.
+ */
+const LazyPanel: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Suspense fallback={<PanelSpinner />}>{children}</Suspense>
+);
+
 export interface HomeViewProps {
   id: string;
   role: Role;
@@ -34,9 +43,9 @@ export const HomeView: FC<HomeViewProps> = ({ id, role, onGoSearch, onOpenCreate
   };
 
   return (
-    <Suspense fallback={<PanelSpinner />}>
-      <ViewErrorBoundary>
-        <View id={id} activePanel={activePanel}>
+    <ViewErrorBoundary>
+      <View id={id} activePanel={activePanel}>
+        <LazyPanel>
           <HomePanel
             id={PANEL_HOME}
             role={role}
@@ -44,9 +53,11 @@ export const HomeView: FC<HomeViewProps> = ({ id, role, onGoSearch, onOpenCreate
             onGoSearch={onGoSearch}
             onOpenCreateTrip={onOpenCreateTrip}
           />
+        </LazyPanel>
+        <LazyPanel>
           <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
-        </View>
-      </ViewErrorBoundary>
-    </Suspense>
+        </LazyPanel>
+      </View>
+    </ViewErrorBoundary>
   );
 };
