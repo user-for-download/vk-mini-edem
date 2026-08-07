@@ -25,7 +25,10 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+RUN apk add --no-cache openssl
+
 COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./
@@ -35,4 +38,4 @@ COPY --from=builder /app/mini-app/dist ./mini-app/dist
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist/src/index.js"]
