@@ -2,7 +2,6 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
-import { VitePWA } from "vite-plugin-pwa";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf-8")
@@ -12,73 +11,14 @@ const pkg = JSON.parse(
 
 export default defineConfig(() => {
   return {
+    // Относительные пути ассетов: приложение может открываться с подпапкой
+    // или хешем в URL (VK Mini App, reverse proxy). Абсолютные /assets/... сломаются.
+    base: './',
     plugins: [
       react(),
-      VitePWA({
-        registerType: "autoUpdate",
-        includeAssets: ["pwa-192x192.png", "pwa-512x512.png"],
-        manifest: {
-          name: "Едем — попутчики",
-          short_name: "Едем",
-          description: "Поиск попутчиков и совместные поездки",
-          theme_color: "#0077ff",
-          background_color: "#ffffff",
-          display: "standalone",
-          start_url: "/",
-          icons: [
-            {
-              src: "/pwa-192x192.png",
-              sizes: "192x192",
-              type: "image/png",
-            },
-            {
-              src: "/pwa-512x512.png",
-              sizes: "512x512",
-              type: "image/png",
-            },
-            {
-              src: "/pwa-512x512.png",
-              sizes: "512x512",
-              type: "image/png",
-              purpose: "maskable",
-            },
-          ],
-        },
-        workbox: {
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-          navigateFallback: "/index.html",
-          runtimeCaching: [
-            // Публичный список поездок (GET без авторизации) — офлайн-доступ к
-            // ранее загруженным результатам поиска. Авторизованные эндпоинты
-            // намеренно НЕ кэшируются: в общем браузере кэш может отдать
-            // данные другого пользователя.
-            {
-              urlPattern: /\/api\/v1\/trips(\?|$)/,
-              handler: "NetworkFirst",
-              method: "GET",
-              options: {
-                cacheName: "api-get-cache",
-                networkTimeoutSeconds: 5,
-                expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60,
-                },
-              },
-            },
-            {
-              urlPattern: /^https:\/\/i\.pravatar\.cc\/.*/,
-              handler: "CacheFirst",
-              options: {
-                cacheName: "avatars",
-                expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 30,
-                },
-              },
-            },
-          ],
-        },
-      }),
+      // PWA отключён для VK Mini App: Service Worker кэширует старую версию
+      // приложения и конфликтует с деплоем (URL меняется при каждом обновлении).
+      // В WebView VK офлайн-сценарий не критичен, а риски белого экрана — критичны.
     ],
     resolve: {
       dedupe: ["react", "react-dom"],

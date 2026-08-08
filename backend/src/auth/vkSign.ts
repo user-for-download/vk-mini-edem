@@ -57,9 +57,13 @@ export function verifyVkLaunchSignature(rawSearchParams: string): VkAuthResult {
     }
   });
 
-  // Строгое посимвольное сравнение
+  // Строгое посимвольное сравнение.
+  // ВАЖНО: по документации VK значения должны быть URL-кодированы
+  // (запятые → %2C, пробелы → %20 и т.д.), иначе подпись не совпадёт.
   entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  const canonical = entries.map(([k, v]) => `${k}=${v}`).join("&");
+  const canonical = entries
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
 
   const expected = createHmac("sha256", env.VK_APP_SECRET)
     .update(canonical)

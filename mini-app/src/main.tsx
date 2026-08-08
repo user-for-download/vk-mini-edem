@@ -7,8 +7,12 @@ import { AppConfig } from "@/AppConfig";
 import App from "@/App";
 import { bridge } from "@/helpers/bridge";
 
-// Инициализируем VK Mini App
-bridge.send("VKWebAppInit");
+// Инициализируем VK Mini App (fire-and-forget, как в официальном примере VK).
+// VKWebAppInit не должен блокировать рендер: вне VK-окружения bridge не может
+// ответить, и await привёл бы к вечному белому экрану.
+bridge.send("VKWebAppInit").catch((error) => {
+  console.warn("[Bridge] VKWebAppInit failed:", error);
+});
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

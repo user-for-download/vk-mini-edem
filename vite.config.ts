@@ -5,6 +5,10 @@ import { defineConfig } from 'vite';
 export default defineConfig(() => {
   return {
     root: './mini-app',
+    // Относительные пути ассетов: мини-апп может быть развёрнут под любым
+    // путём/доменом (VK hosting, свой сервер) — абсолютный base: '/' сломал бы
+    // загрузку статики при размещении не в корне домена.
+    base: './',
     plugins: [react()],
     resolve: {
       dedupe: ['react', 'react-dom'],
@@ -16,7 +20,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      allowedHosts: ['vk.binetc.fun'],
+      // allowedHosts: ['<your-tunnel-domain>'], // для dev-туннеля (не коммитить реальный домен)
       proxy: {
         '/api': {
           target: 'http://127.0.0.1:3001',

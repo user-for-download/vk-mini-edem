@@ -54,7 +54,35 @@ async function getVkAuthPayload(): Promise<{ searchParams: string }> {
     return { searchParams: devParams.toString() };
   }
 
-  return { searchParams: search.replace(/^\?/, "") };
+  // Способ 1: параметры в URL (window.location.search) — стандартный случай
+  if (urlParams.has("vk_user_id") && urlParams.has("sign")) {
+    return { searchParams: search.replace(/^\?/, "") };
+  }
+
+  // Способ 2: параметры через VK Bridge (VKWebAppGetLaunchParams) —
+  // VK может не передавать их в URL, а отдавать через событие bridge.
+  // ВАЖНО: вне VK-окружения bridge.send() не отвечает — нужен таймаут,
+  // иначе bootstrap() зависнет навсегда и AuthGate покажет вечный спиннер.
+  try {
+    const launchParams = (await Promise.race([
+      bridge.send("VKWebAppGetLaunchParams"),
+      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 3000)),
+    ])) as Record<string, unknown> | undefined;
+
+    if (launchParams && launchParams.vk_user_id && launchParams.sign) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(launchParams)) {
+        if (value !== undefined && value !== null) {
+          params.set(key, String(value));
+        }
+      }
+      return { searchParams: params.toString() };
+    }
+  } catch {
+    // ignore — вернём пустой searchParams ниже
+  }
+
+  return { searchParams: "" };
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({

@@ -182,7 +182,7 @@ LOG_LEVEL=debug
 - **Rate limiting**: раздельные лимитеры для `/auth/vk`, `/auth/refresh`, чтения и мутаций.
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
 - **Валидация**: Zod-схемы на входе (backend) и на выходе (frontend, `apiClient.request<T>(url, opts, schema)`).
-- **Заголовки**: `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
+- **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
 - **Время**: даты сериализуются в `Europe/Moscow` (в контейнере задано через `TZ`).
 - **Критичные уведомления** (смена статуса брони/поездки) создаются всегда, независимо от настройки `notificationsEnabled` пользователя.
@@ -201,9 +201,67 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
   - `CacheFirst` для аватаров (`i.pravatar.cc`, 30 дней);
 - авторизованные API-эндпоинты намеренно не кэшируются (защита данных пользователей).
 
+> **Примечание (деплой в VK Mini App):** PWA отключён в `mini-app/vite.config.ts` — Service Worker кэширует старую версию приложения и конфликтует с деплоем (URL меняется при каждом обновлении). В WebView VK офлайн-сценарий не критичен, а риски белого экрана — критичны.
+
 ## 🛠 Технологии
 
 - **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, vite-plugin-pwa, Sentry
 - **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
+
+## 🚀 Деплой (Production)
+
+Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) проксирует на порт 3000.
+
+```
+Пользователь → VK (WebView/iframe) → https://<your-domain> → Traefik (443) → 0.0.0.0:3000 (backend)
+```
+
+### Требования VK Mini Apps
+
+- **HTTPS обязателен** в production (кроме localhost).
+- Сервер должен **разрешать iframe** — бэкенд отдаёт CSP `frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru` (не `X-Frame-Options: DENY`).
+- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин).
+
+### Шаги деплоя
+
+1. **Собрать**:
+   ```bash
+   npm ci
+   npm run build        # contracts → backend (dist) → mini-app (dist, base: './')
+   ```
+2. **Применить миграции**:
+   ```bash
+   npm run db:migrate:deploy
+   ```
+3. **Запустить** (production):
+   ```bash
+   NODE_ENV=production PORT=3000 npm start
+   ```
+   Или через Docker: `docker compose up -d --build` (backend на :3000, миграции применяются при старте).
+
+### Переменные окружения (production)
+
+| Переменная | Обязательна | Описание |
+|---|---|---|
+| `DATABASE_URL` | ✅ | PostgreSQL (в Docker — `postgresql://edem:...@db:5432/edem`) |
+| `JWT_SECRET` | ✅ | ≥ 32 символов (проверяется в production) |
+| `VK_APP_SECRET` | ✅ | Защищённый ключ приложения из консоли VK (dev.vk.com → Настройки) |
+| `CORS_ORIGINS` | ✅ | Разрешённые origin (для iframe VK: `https://vk.com,https://m.vk.com,https://vk.ru,https://m.vk.ru`) |
+| `NODE_ENV` | ✅ | `production` |
+| `PORT` | — | По умолчанию 3000 |
+| `SENTRY_DSN` | — | Мониторинг ошибок |
+| `ALLOW_DEV_AUTH` | — | В production принудительно `false` |
+
+### Консоль VK (dev.vk.com)
+
+1. Создать мини-апп → получить числовой **app_id**.
+2. В настройках указать **URL мини-аппа** (например, `https://<your-domain>`) для платформ mobile/web/mvk.
+3. Скопировать **защищённый ключ** → в `VK_APP_SECRET`.
+4. Тестировать: `https://vk.com/app<app_id>`.
+5. Для публикации в каталоге — отправить на модерацию (каждое обновление — повторная модерация).
+
+### WebSocket за Traefik/nginx
+
+Прокси должен поддерживать upgrade (Traefik — из коробки). Клиент подключается к `wss://<host>/api/v1/ws`.

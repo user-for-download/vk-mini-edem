@@ -37,6 +37,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       ALLOW_DEV_AUTH: "false"
       APP_VERSION: ${APP_VERSION:-0.1.0}
+      # Туннель/прокси стоит перед Node.js → доверяем X-Forwarded-For,
+      # иначе rate limiter считает всех одним IP (адресом туннеля).
+      TRUST_PROXY: "true"
     ports:
       - "3000:3000"
     healthcheck:

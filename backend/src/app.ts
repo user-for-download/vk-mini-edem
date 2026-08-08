@@ -68,11 +68,19 @@ app.use("*", async (c, next) => {
 
 /**
  * Security headers.
+ *
+ * ВАЖНО для VK Mini Apps: VK загружает мини-апп в iframe на vk.com / m.vk.com,
+ * а на десктопе — через прокси akashi.vk-portal.net.
+ * Поэтому вместо X-Frame-Options: DENY (который заблокировал бы загрузку)
+ * используем CSP frame-ancestors, разрешающий только VK-домены, прокси и self.
  */
 app.use("*", async (c, next) => {
   await next();
   c.header("X-Content-Type-Options", "nosniff");
-  c.header("X-Frame-Options", "DENY");
+  c.header(
+    "Content-Security-Policy",
+    "frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru https://akashi.vk-portal.net"
+  );
   c.header("X-XSS-Protection", "0");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
