@@ -43,9 +43,9 @@ describe("auth bootstrap", () => {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify({
-        vkUserId: 111111,
-        sign: "dev-sign",
-        ts: Date.now(),
+        // Полный searchParams из launch-параметров VK (единственный поддерживаемый формат).
+        // В dev-режиме (ALLOW_DEV_AUTH) подпись sign=dev-sign принимается без проверки HMAC.
+        searchParams: "vk_user_id=111111&sign=dev-sign",
       }),
     });
 
