@@ -33,7 +33,14 @@ function getStatusLabel(booking: PassengerBooking): string {
   if (booking.trip.status === "cancelled") return "Поездка отменена";
   if (booking.status === "cancelled") return "Отменена вами";
   if (booking.status === "pending") return "Ждёт подтверждения";
-  if (booking.status === "confirmed") return booking.scope === "active" ? "Подтверждена" : "Завершена";
+  if (booking.status === "confirmed") {
+    // «Завершена» только когда поездка реально завершена: воркер
+    // автозавершения может ещё не отработать, хотя бронь уже в истории.
+    if (booking.scope === "history" && booking.trip.status === "completed") {
+      return "Завершена";
+    }
+    return "Подтверждена";
+  }
   return "Отклонена";
 }
 

@@ -43,7 +43,14 @@ export async function processExpiredTrips() {
               data: { status: "completed", seatsAvailable: 0 },
             });
 
-            const pendingBookingIds = trip.bookings
+            // Перечитываем брони ВНУТРИ транзакции: trip.bookings был получен
+            // до неё, и бронь, созданная в промежутке, иначе осталась бы
+            // в статусе pending на завершённой поездке навсегда.
+            const txBookings = await tx.booking.findMany({
+              where: { tripId: trip.id },
+            });
+
+            const pendingBookingIds = txBookings
               .filter((b) => b.status === "pending")
               .map((b) => b.id);
 
@@ -61,7 +68,7 @@ export async function processExpiredTrips() {
 
             const confirmedPassengerIds = [
               ...new Set(
-                trip.bookings
+                txBookings
                   .filter((b) => b.status === "confirmed")
                   .map((b) => b.passengerId)
               ),
@@ -76,7 +83,7 @@ export async function processExpiredTrips() {
 
             const declinedPassengerIds = [
               ...new Set(
-                trip.bookings
+                txBookings
                   .filter((b) => b.status === "pending")
                   .map((b) => b.passengerId)
               ),

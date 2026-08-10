@@ -119,6 +119,15 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
     return trips.filter((trip) => trip.driver.id !== currentUser?.id);
   }, [data, currentUser?.id]);
 
+  // Свои поездки отфильтровываются на клиенте ПОСЛЕ пагинации: если первая
+  // страница целиком состоит из поездок текущего пользователя, догружаем
+  // следующие страницы, пока не найдём чужие поездки или не закончатся.
+  useEffect(() => {
+    if (results.length === 0 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [results.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   const handleRefresh = useCallback(async () => {
     await refetch();
   }, [refetch]);
@@ -235,7 +244,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
           </Box>
         )}
 
-        {!isLoading && !isError && results.length === 0 && (
+        {!isLoading && !isError && results.length === 0 && !hasNextPage && (
           <EmptyState
             title="Ничего не нашлось"
             subtitle="Попробуйте изменить маршрут или поискать другой город"

@@ -38,6 +38,15 @@ function formatDuration(minutes: number): string {
   return `${m} мин`;
 }
 
+/** Русская плюрализация: 1 место, 2 места, 5 мест. */
+function pluralSeats(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "место";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "места";
+  return "мест";
+}
+
 export const TripCard: FC<TripCardProps> = ({
   trip,
   onOpen,
@@ -62,7 +71,7 @@ export const TripCard: FC<TripCardProps> = ({
       ? seatsLabelProp
       : trip.seatsAvailable === 0
         ? "Мест нет"
-        : `${trip.seatsAvailable} из ${trip.seatsTotal} ${trip.seatsTotal === 1 ? "места" : "мест"}`;
+        : `${trip.seatsAvailable} из ${trip.seatsTotal} ${pluralSeats(trip.seatsTotal)}`;
 
   return (
     <Card

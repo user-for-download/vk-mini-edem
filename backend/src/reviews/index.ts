@@ -155,8 +155,8 @@ reviewsRouter.get("/my", requireUser, async (c) => {
  * Поездки, доступные текущему пользователю для отзыва.
  *
  * Логика:
- * - пользователь был пассажиром;
- * - бронь подтверждена;
+ * - пользователь был пассажиром (бронь подтверждена) ИЛИ водителем
+ *   (в поездке есть подтверждённые пассажиры);
  * - поездка не отменена;
  * - поездка уже прошла;
  * - пользователь еще не оставлял отзыв по этой поездке.
@@ -165,7 +165,7 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
   const user = c.get("user");
   const now = new Date();
 
-  const bookings = await db.booking.findMany({
+  const passengerBookings = await db.booking.findMany({
     where: {
       passengerId: user.id,
       status: "confirmed",
@@ -196,7 +196,41 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
     },
   });
 
-  const tripIds = Array.from(new Set(bookings.map((b) => b.tripId)));
+  // Поездки, где пользователь был водителем (с подтверждёнными пассажирами),
+  // — чтобы водитель мог оставить отзыв о пассажирах.
+  const driverTrips = await db.trip.findMany({
+    where: {
+      driverId: user.id,
+      status: {
+        not: "cancelled",
+      },
+      departureAt: {
+        lt: now,
+      },
+      bookings: {
+        some: {
+          status: "confirmed",
+        },
+      },
+    },
+    include: {
+      driver: {
+        include: {
+          car: true,
+        },
+      },
+    },
+    orderBy: {
+      departureAt: "desc",
+    },
+  });
+
+  const tripIds = Array.from(
+    new Set([
+      ...passengerBookings.map((b) => b.tripId),
+      ...driverTrips.map((t) => t.id),
+    ])
+  );
 
   if (tripIds.length === 0) {
     return c.json([]);
@@ -222,9 +256,15 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
 
   const availableTripsMap = new Map<string, TripWithDriver>();
 
-  for (const booking of bookings) {
+  for (const booking of passengerBookings) {
     if (!reviewedTripIds.has(booking.tripId)) {
       availableTripsMap.set(booking.tripId, booking.trip);
+    }
+  }
+
+  for (const trip of driverTrips) {
+    if (!reviewedTripIds.has(trip.id)) {
+      availableTripsMap.set(trip.id, trip);
     }
   }
 
@@ -422,10 +462,21 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === "P2002" || error.code === "P2034")
+      error.code === "P2034"
     ) {
-      // Уникальный индекс сработал (P2002) или SSI-конфликт повторился
-      // после ретрая (P2034): параллельный запрос уже создал отзыв.
+      // SSI-конфликт повторился после ретрая — это НЕ дубль отзыва,
+      // а временная ошибка конкурентной записи: просим повторить запрос.
+      return c.json(
+        { code: ERROR_CODES.INTERNAL_ERROR, message: "Concurrent update conflict, please retry" },
+        503
+      );
+    }
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Уникальный индекс сработал: параллельный запрос уже создал отзыв.
       return c.json(
         { code: ERROR_CODES.ALREADY_REVIEWED, message: "You already reviewed this user for this trip" },
         409

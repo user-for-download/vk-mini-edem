@@ -97,7 +97,7 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
       {!isLoading && !isError && visibleTrips.length === 0 && (
         <EmptyState
           title="Пока нет поездок для отзыва"
-          subtitle="Когда вы совершите поездку как пассажир, она появится здесь"
+          subtitle="Когда вы совершите поездку, она появится здесь"
         />
       )}
 

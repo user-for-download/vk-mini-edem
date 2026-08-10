@@ -1,12 +1,14 @@
 // mini-app/src/modals/CreateReviewModal/CreateReviewModal.tsx
-import { type FC, useState, useCallback } from "react";
+import { type FC, useState, useCallback, useMemo } from "react";
 import {
+  Avatar,
   Button,
   Box,
   Caption,
   Flex,
   FormItem,
   ModalCard,
+  Radio,
   Spacing,
   Text,
   Textarea,
@@ -16,6 +18,9 @@ import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import type { Trip, User } from "@/types";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCreateReviewMutation, REVIEW_KEYS } from "@/queries/useReviewsQuery";
+import { useTripBookingsQuery } from "@/queries/useBookingsQuery";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { resolveAvatar } from "@/helpers/avatar";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -116,8 +121,44 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const createReview = useCreateReviewMutation();
   const queryClient = useQueryClient();
+  const currentUser = useCurrentUser();
 
-  const targetUser = target ?? trip?.driver ?? null;
+  // Водитель поездки отзывается о пассажирах: подгружаем подтверждённые
+  // брони и даём выбрать, кому оставить отзыв.
+  const isDriver = Boolean(
+    trip && currentUser && trip.driver.id === currentUser.id
+  );
+
+  const { data: tripBookings } = useTripBookingsQuery(trip?.id ?? "", {
+    enabled: isDriver,
+  });
+
+  const passengers = useMemo(() => {
+    if (!isDriver) {
+      return [];
+    }
+    return (tripBookings ?? [])
+      .filter((b) => b.status === "confirmed")
+      .map((b) => b.passenger);
+  }, [isDriver, tripBookings]);
+
+  const [selectedPassengerId, setSelectedPassengerId] = useState<string | null>(
+    null
+  );
+
+  const targetUser = useMemo(() => {
+    if (target) {
+      return target;
+    }
+    if (isDriver) {
+      return (
+        passengers.find((p) => p.id === selectedPassengerId) ??
+        passengers[0] ??
+        null
+      );
+    }
+    return trip?.driver ?? null;
+  }, [target, isDriver, passengers, selectedPassengerId, trip]);
 
   const handleSubmit = () => {
     if (!trip) {
@@ -229,6 +270,36 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
         <Title level="3" weight="2" className="CreateReviewModal__title">
           Как прошла поездка?
         </Title>
+
+        {isDriver && passengers.length > 0 && (
+          <>
+            <Spacing size={12} />
+            <FormItem top="Кому оставить отзыв">
+              <Flex direction="column" gap={4}>
+                {passengers.map((passenger) => (
+                  <Radio
+                    key={passenger.id}
+                    name="review-target"
+                    checked={
+                      selectedPassengerId === passenger.id ||
+                      (selectedPassengerId === null &&
+                        passengers[0]?.id === passenger.id)
+                    }
+                    onChange={() => setSelectedPassengerId(passenger.id)}
+                  >
+                    <Flex align="center" gap={8}>
+                      <Avatar
+                        src={resolveAvatar(passenger.avatar)}
+                        size={32}
+                      />
+                      {passenger.name}
+                    </Flex>
+                  </Radio>
+                ))}
+              </Flex>
+            </FormItem>
+          </>
+        )}
 
         <Spacing size={16} />
 
