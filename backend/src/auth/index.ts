@@ -44,13 +44,13 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     );
   }
 
-  const { searchParams, vkUserId: reqVkUserId, sign: reqSign, ts: reqTs } = parseResult.data;
+  const { searchParams } = parseResult.data;
 
-  let queryToVerify = searchParams;
-  if (!queryToVerify && reqVkUserId && reqSign) {
-    const tsSec = Math.floor((reqTs || Date.now()) / 1000);
-    queryToVerify = `vk_user_id=${reqVkUserId}&vk_app_id=0&vk_platform=desktop_web&vk_ts=${tsSec}&sign=${encodeURIComponent(reqSign)}`;
-  }
+  // Единственный поддерживаемый формат — полный searchParams из launch-параметров VK.
+  // Реконструкция query по отдельным полям (vkUserId/sign/ts) невозможна корректно:
+  // подпись VK считается по всем launch-параметрам (vk_app_id, vk_platform и др.),
+  // которых в payload нет — такой fallback всегда давал бы 401.
+  const queryToVerify = searchParams;
 
   if (!queryToVerify) {
     return c.json({ message: "Invalid auth payload" }, 400);
@@ -105,6 +105,29 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
     const { userId, jti } = await verifyRefreshToken(
       parseResult.data.refreshToken
     );
+
+    // DEV mock refresh: записи в БД нет (jti "dev-jti"), ротация невозможна.
+    // Возвращаем свежий mock-токен, чтобы dev-сессия не умирала по истечении access-токена.
+    if (env.ALLOW_DEV_AUTH && parseResult.data.refreshToken.startsWith("mock-refresh-token-")) {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        include: { car: true },
+      });
+
+      if (!user) {
+        return c.json({ message: "User not found" }, 401);
+      }
+
+      const accessToken = await signAccessToken(user.id);
+
+      return c.json({
+        accessToken,
+        refreshToken: `mock-refresh-token-${userId}`,
+        expiresIn: env.JWT_ACCESS_TTL_SECONDS,
+        user: serializeUser(user),
+      });
+    }
+
     const newJti = await rotateRefreshToken(jti, userId); // Атомарно: отзыв старого + создание нового
 
     const user = await db.user.findUnique({

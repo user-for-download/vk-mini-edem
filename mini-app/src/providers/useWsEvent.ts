@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useWs } from "./WsProvider";
 import type { WsServerEvent } from "@edem/contracts";
 
@@ -11,15 +11,20 @@ export function useWsEvent<T extends WsServerEvent["type"]>(
 ) {
   const { lastMessage } = useWs();
 
+  // Храним handler в ref: колбэки создаются инлайн при каждом рендере,
+  // и зависимость от них в useEffect приводила бы к повторному срабатыванию
+  // обработчика с тем же lastMessage на каждый рендер.
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
   useEffect(() => {
     if (lastMessage?.type === type) {
       const event = lastMessage as Extract<WsServerEvent, { type: T }>;
       if ("payload" in event) {
-        handler(event.payload as PayloadOf<T>);
+        handlerRef.current(event.payload as PayloadOf<T>);
       } else {
-        handler(undefined as PayloadOf<T>);
+        handlerRef.current(undefined as PayloadOf<T>);
       }
     }
-  }, [lastMessage, type, handler]);
+  }, [lastMessage, type]);
 }
-

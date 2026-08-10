@@ -207,7 +207,7 @@ export const HomePanel: FC<HomePanelProps> = ({
                   <Button
                     size="m"
                     mode="primary"
-                    onClick={() => refetchTrips()}
+                    onClick={() => refetchMyTrips()}
                   >
                     Попробовать снова
                   </Button>
