@@ -42,6 +42,20 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     });
   }, []);
 
+  /**
+   * Refresh-токен отозван/истёк (401 от /auth/refresh): сбрасываем сессию,
+   * чтобы приложение не застревало с мёртвыми токенами. Пользователь увидит
+   * экран ошибки авторизации и сможет авторизоваться заново.
+   */
+  useEffect(() => {
+    return apiClient.onSessionExpired(() => {
+      const state = useAuthStore.getState();
+      if (state.status === "authenticated" || state.status === "background") {
+        void state.clearSession("Session expired");
+      }
+    });
+  }, []);
+
   if (status === "idle" || status === "initializing") {
     return <ScreenSpinner />;
   }

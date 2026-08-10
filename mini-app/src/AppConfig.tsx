@@ -46,6 +46,11 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
 
   const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
 
+  // В dev launch-параметры приходят из mock-bridge, а не из URL:
+  // платформа мока — desktop_web, поэтому рендерим vkcom-интерфейс.
+  const platform =
+    vk_platform === "desktop_web" || import.meta.env.DEV ? "vkcom" : undefined;
+
   return (
     <ConfigProvider
       colorScheme={vkBridgeColorScheme}

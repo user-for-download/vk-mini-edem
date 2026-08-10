@@ -9,8 +9,9 @@ export const GlobalWsListener: React.FC = () => {
   const { enqueue: enqueueSnackbar } = useSnackbar();
 
   useWsEvent("notification:new", () => {
-    queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    queryClient.invalidateQueries({ queryKey: ["users", "me"] });
+    // Списка уведомлений в UI пока нет (notificationsApi не используется),
+    // поэтому инвалидировать нечего. Обработчик оставлен как точка
+    // подключения будущего экрана уведомлений.
   });
 
   useWsEvent("booking:new", ({ bookingId, tripId }) => {

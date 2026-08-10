@@ -103,17 +103,16 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
   }, [showSaved]);
 
   const updateSettings = (patch: Partial<NotificationSettings>) => {
-    setSettings((prev) => {
-      const next: NotificationSettings = {
-        ...prev,
-        ...patch,
-      };
+    // Побочные эффекты (saveSettings/setShowSaved) — вне setState-апдейтера:
+    // StrictMode вызывает апдейтеры дважды, а localStorage-запись не идемпотентна.
+    const next: NotificationSettings = {
+      ...settings,
+      ...patch,
+    };
 
-      saveSettings(next);
-      setShowSaved(true);
-
-      return next;
-    });
+    setSettings(next);
+    saveSettings(next);
+    setShowSaved(true);
   };
 
   const toggleNotifications = async (enabled: boolean) => {

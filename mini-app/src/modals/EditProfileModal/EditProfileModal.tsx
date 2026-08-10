@@ -107,6 +107,7 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
                 setError(null);
               }
             }}
+            maxLength={100}
           />
         </FormItem>
 

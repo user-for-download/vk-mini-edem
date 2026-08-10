@@ -74,7 +74,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
       isLoading={isLoading}
       isError={isError}
       isRefreshing={isRefreshing}
-      onBack={() => routeNavigator.push("/trips/my")}
+      onBack={() => routeNavigator.back()}
       onRefresh={handleRefresh}
       onSetStatus={handleSetStatus}
       onRetry={() => refetchBookings()}

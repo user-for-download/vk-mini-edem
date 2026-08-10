@@ -21,7 +21,11 @@ export function parseDeepLink(): DeepLinkParams {
 
   // 1. Проверяем hash (основной механизм)
   const hash = window.location.hash;
-  if (hash.includes("/trips/") && !hash.includes("/trips/my")) {
+  if (
+    hash.includes("/trips/") &&
+    !hash.includes("/trips/my") &&
+    !hash.includes("/trips/search")
+  ) {
     const match = hash.match(/\/trips\/([^/?#]+)/);
     if (match) {
       params.tripId = match[1];

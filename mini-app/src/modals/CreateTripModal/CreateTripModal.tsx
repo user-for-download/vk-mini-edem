@@ -65,17 +65,16 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
 
   const handleChange = useCallback(
     (field: keyof TripFormValues, value: string | number) => {
-      setValues((prev) => {
-        const next = { ...prev, [field]: value };
+      // Вычисляем next вне setState-апдейтера: вызов setErrors внутри
+      // апдейтера — антипаттерн (StrictMode вызывает апдейтеры дважды).
+      const next = { ...values, [field]: value };
+      setValues(next);
 
-        if (touched[field]) {
-          setErrors(validateTripForm(next));
-        }
-
-        return next;
-      });
+      if (touched[field]) {
+        setErrors(validateTripForm(next));
+      }
     },
-    [touched]
+    [touched, values]
   );
 
   const handleDateTimeChange = useCallback((date: Date | null) => {

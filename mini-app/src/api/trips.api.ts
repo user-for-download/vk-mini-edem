@@ -33,7 +33,7 @@ export const tripsApi = {
     if (filters?.toCity) query.set("toCity", filters.toCity);
     if (filters?.dateFrom) query.set("dateFrom", filters.dateFrom);
     if (filters?.dateTo) query.set("dateTo", filters.dateTo);
-    if (filters?.maxPrice) query.set("maxPrice", filters.maxPrice.toString());
+    if (filters?.maxPrice !== undefined) query.set("maxPrice", filters.maxPrice.toString());
     if (filters?.tags && filters.tags.length > 0) {
       query.set("tags", filters.tags.join(","));
     }

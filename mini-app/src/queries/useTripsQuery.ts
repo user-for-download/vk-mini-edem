@@ -58,7 +58,9 @@ export function useMyTripsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: TRIP_KEYS.my(),
     queryFn: async () => {
-      const res = await tripsApi.getMyTrips();
+      // Лимит 50 (максимум бэкенда): список нужен целиком для бейджа
+      // заявок в таббаре и выбора активной поездки на главной.
+      const res = await tripsApi.getMyTrips({ limit: 50 });
       return res.items;
     },
     enabled: options?.enabled ?? true,

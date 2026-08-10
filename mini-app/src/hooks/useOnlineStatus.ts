@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Отслеживает статус соединения с сетью.
@@ -14,11 +14,15 @@ export function useOnlineStatus(): {
 } {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [wasOffline, setWasOffline] = useState(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOnline = useCallback(() => {
     setIsOnline(true);
     setWasOffline(true);
-    setTimeout(() => setWasOffline(false), 3000);
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+    reconnectTimerRef.current = setTimeout(() => setWasOffline(false), 3000);
   }, []);
 
   const handleOffline = useCallback(() => {
@@ -31,6 +35,9 @@ export function useOnlineStatus(): {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
     };
   }, [handleOnline, handleOffline]);
 

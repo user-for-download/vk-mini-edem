@@ -20,9 +20,11 @@ export interface SupportPanelProps {
 
 /**
  * Ссылки сервиса поддержки.
+ * Настраиваются через VITE_SUPPORT_CHAT_URL / VITE_SUPPORT_REPORT_URL.
+ * Пока не настроены — кнопки не показываем (мёртвые ссылки хуже отсутствия).
  */
-const SUPPORT_CHAT_URL = "https://vk.com/im?sel=-100000000";
-const REPORT_PROBLEM_URL = "https://vk.com/im?sel=-100000000";
+const SUPPORT_CHAT_URL = import.meta.env.VITE_SUPPORT_CHAT_URL ?? "";
+const REPORT_PROBLEM_URL = import.meta.env.VITE_SUPPORT_REPORT_URL ?? "";
 
 const FAQ_ITEMS = [
   {
@@ -124,27 +126,41 @@ export const SupportPanel: FC<SupportPanelProps> = ({ id, onBack }) => {
       <Spacing size={12} />
 
       <Group header={<Header size="s">Связаться с нами</Header>}>
-        <Box padding="system">
-          <Button
-            size="m"
-            mode="primary"
-            stretched
-            onClick={() => openExternalUrl(SUPPORT_CHAT_URL)}
-          >
-            Написать в чат поддержки
-          </Button>
+        {SUPPORT_CHAT_URL || REPORT_PROBLEM_URL ? (
+          <Box padding="system">
+            {SUPPORT_CHAT_URL && (
+              <>
+                <Button
+                  size="m"
+                  mode="primary"
+                  stretched
+                  onClick={() => openExternalUrl(SUPPORT_CHAT_URL)}
+                >
+                  Написать в чат поддержки
+                </Button>
 
-          <Spacing size={12} />
+                <Spacing size={12} />
+              </>
+            )}
 
-          <Button
-            size="m"
-            mode="secondary"
-            stretched
-            onClick={() => openExternalUrl(REPORT_PROBLEM_URL)}
-          >
-            Сообщить о проблеме с поездкой
-          </Button>
-        </Box>
+            {REPORT_PROBLEM_URL && (
+              <Button
+                size="m"
+                mode="secondary"
+                stretched
+                onClick={() => openExternalUrl(REPORT_PROBLEM_URL)}
+              >
+                Сообщить о проблеме с поездкой
+              </Button>
+            )}
+          </Box>
+        ) : (
+          <Box padding="system">
+            <Text className="SupportPanel__answer">
+              Чат поддержки появится в одном из следующих обновлений.
+            </Text>
+          </Box>
+        )}
       </Group>
     </Panel>
   );

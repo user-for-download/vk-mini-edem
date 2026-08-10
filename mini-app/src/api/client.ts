@@ -27,6 +27,7 @@ class ApiClient {
   private refreshPromise: Promise<boolean> | null = null;
   private refreshGeneration = 0;
   private tokenListeners: Set<TokenUpdateListener> = new Set();
+  private sessionExpiredListeners: Set<() => void> = new Set();
 
   setToken(token: string | null) {
     this.token = token;
@@ -51,6 +52,20 @@ class ApiClient {
 
   private emitTokenUpdate(tokens: TokenUpdate) {
     this.tokenListeners.forEach((listener) => listener(tokens));
+  }
+
+  /**
+   * Подписка на необратимый отказ refresh (401 от /auth/refresh):
+   * токен отозван/истёк, сессию нужно сбросить, иначе приложение
+   * навсегда застревает с мёртвыми токенами.
+   */
+  onSessionExpired(listener: () => void): () => void {
+    this.sessionExpiredListeners.add(listener);
+    return () => this.sessionExpiredListeners.delete(listener);
+  }
+
+  private emitSessionExpired() {
+    this.sessionExpiredListeners.forEach((listener) => listener());
   }
 
   /**
@@ -177,6 +192,11 @@ class ApiClient {
         });
 
         if (!response.ok) {
+          // 401 — refresh-токен отозван или истёк безвозвратно:
+          // уведомляем подписчиков, чтобы сбросить сессию.
+          if (response.status === 401) {
+            this.emitSessionExpired();
+          }
           return false;
         }
 

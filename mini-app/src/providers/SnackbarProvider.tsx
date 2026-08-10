@@ -29,15 +29,21 @@ export const useSnackbar = (): SnackbarApi => {
 
 export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
   const [api, contextHolder] = useSnackbarManager();
-  const lastDedupeKey = useRef<string | null>(null);
+  // dedupeKey → время последнего показа: одинаковый снекбар не спамится
+  // в течение окна, но может появиться снова позже (в отличие от
+  // бессрочного запоминания одного ключа).
+  const lastDedupeAt = useRef<Map<string, number>>(new Map());
+  const DEDUPE_WINDOW_MS = 5000;
 
   const enqueue = useCallback(
     (item: SnackbarItem) => {
-      if (item.dedupeKey && item.dedupeKey === lastDedupeKey.current) {
-        return;
-      }
       if (item.dedupeKey) {
-        lastDedupeKey.current = item.dedupeKey;
+        const now = Date.now();
+        const last = lastDedupeAt.current.get(item.dedupeKey);
+        if (last !== undefined && now - last < DEDUPE_WINDOW_MS) {
+          return;
+        }
+        lastDedupeAt.current.set(item.dedupeKey, now);
       }
 
       const icon =
