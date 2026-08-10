@@ -54,7 +54,7 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
   return (
     <ConfigProvider
       colorScheme={vkBridgeColorScheme}
-      platform={vk_platform === "desktop_web" ? "vkcom" : undefined}
+      platform={platform}
       isWebView={bridge.isWebView()}
       hasCustomPanelHeaderAfter={bridge.isWebView()}
     >

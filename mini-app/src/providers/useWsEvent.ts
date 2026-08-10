@@ -14,8 +14,12 @@ export function useWsEvent<T extends WsServerEvent["type"]>(
   // Храним handler в ref: колбэки создаются инлайн при каждом рендере,
   // и зависимость от них в useEffect приводила бы к повторному срабатыванию
   // обработчика с тем же lastMessage на каждый рендер.
+  // Обновляем ref в эффекте (не во время рендера — react-hooks/refs).
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
     if (lastMessage?.type === type) {
