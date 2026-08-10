@@ -9,6 +9,11 @@ const pkg = JSON.parse(
   version?: string;
 };
 
+// Таргет прокси для /api и /ws. Прод-бэкенд слушает 3000, dev — свой порт
+// (например 3011). Задаётся через ENV, чтобы не хардкодить окружение.
+const apiTarget = process.env.VITE_API_TARGET ?? "http://127.0.0.1:3000";
+const wsTarget = apiTarget.replace(/^http/, "ws");
+
 export default defineConfig(() => {
   return {
     // Относительные пути ассетов: приложение может открываться с подпапкой
@@ -69,13 +74,19 @@ export default defineConfig(() => {
       },
     },
     server: {
+      // Доступ через туннель/домен — иначе Vite блокирует запросы
+      // с незнакомых Host-заголовков. Хосты задаются через ENV
+      // (VITE_ALLOWED_HOSTS="a.fun,b.fun"), чтобы не попадать в паблик.
+      allowedHosts: process.env.VITE_ALLOWED_HOSTS
+        ? process.env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim())
+        : undefined,
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:3001",
+          target: apiTarget,
           changeOrigin: true,
         },
         "/ws": {
-          target: "ws://127.0.0.1:3001",
+          target: wsTarget,
           ws: true,
           changeOrigin: true,
         },
