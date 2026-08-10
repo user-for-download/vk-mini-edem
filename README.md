@@ -4,11 +4,11 @@
 
 ## 🌟 Основные возможности
 
-- **Поиск поездок**: поиск с фильтрацией по городам, дате, цене и тегам, offset-пагинация (`page`/`limit`).
+- **Поиск поездок**: поиск с фильтрацией по городам, дате, цене и тегам, offset-пагинация (`page`/`limit`); собственные поездки исключаются из выдачи (при пустой странице клиент догружает следующие).
 - **Создание поездок**: для водителей с указанием цены, количества мест, тегов и комментария.
 - **Бронирование мест**: пассажиры бронируют места в активных поездках; защита от гонки броней на уровне БД (partial unique index + Serializable-транзакции).
 - **Заявки пассажиров**: водитель подтверждает или отклоняет заявки, место удерживается в статусе `pending`.
-- **Отзывы и рейтинги**: система рейтингов водителей и пассажиров, отзывы после завершённых поездок.
+- **Отзывы и рейтинги**: система рейтингов водителей и пассажиров, отзывы после завершённых поездок в обе стороны (пассажир → водитель и водитель → пассажир).
 - **Уведомления**: встроенные уведомления + WebSocket-пуши (новая заявка, статус брони, отмена поездки).
 - **Управление автомобилями**: добавление и редактирование информации об авто для водителей.
 - **Интеграция с VK**: авторизация через VK ID (имитация в Dev-режиме), компоненты VKUI, PWA.
@@ -41,11 +41,11 @@
 │   │   ├── middleware/          # Rate limiting, sanitize (DOMPurify), requireUser
 │   │   ├── trips/               # Поездки (+ пагинация, статусы, авто-завершение)
 │   │   ├── bookings/            # Бронирования (Serializable, P2002/P2034 → 409)
-│   │   ├── reviews/             # Отзывы
+│   │   ├── reviews/             # Отзывы (Serializable, P2034 → retry → 503)
 │   │   ├── notifications/       # Уведомления (курсорная пагинация, unreadCount)
 │   │   ├── users/               # Профили, авто, настройки уведомлений
 │   │   ├── ws/                  # WebSocket (auth, рассылка событий)
-│   │   ├── workers/             # Фон: авто-завершение и очистка поездок
+│   │   ├── workers/             # Фон: авто-завершение просроченных поездок
 │   │   ├── serializers/         # Сериализация ответов
 │   │   ├── services/            # Бизнес-сервисы (уведомления)
 │   │   ├── app.ts               # Hono-приложение (роуты /api/v1, security-заголовки)
@@ -127,7 +127,7 @@ bash run_workflow.sh     # Полный CI-прогон: build contracts → pri
 ```env
 DATABASE_URL="postgresql://user:password@host:port/db?schema=public"
 NODE_ENV=development
-ALLOW_DEV_AUTH=true            # Dev-имитация VK-подписи (только не в production)
+ALLOW_DEV_AUTH=true            # Dev-имитация VK-подписи (только не в production); mock refresh-токены работают end-to-end
 JWT_SECRET=your-jwt-secret-key-32-chars-long
 VK_APP_SECRET=your-vk-app-secret
 CORS_ORIGINS=http://localhost:3000
@@ -166,7 +166,11 @@ LOG_LEVEL=debug
 | GET | `/api/v1/notifications/my?cursor=&limit=` | Уведомления (курсорная пагинация, `unreadCount`) |
 | PATCH | `/api/v1/notifications/:id/read` | Отметить прочитанным |
 | PATCH | `/api/v1/notifications/read-all` | Отметить все прочитанными |
-| GET/POST | `/api/v1/reviews` | Отзывы |
+| GET | `/api/v1/reviews` | Отзывы |
+| POST | `/api/v1/reviews` | Создание отзыва (участник поездки, не себе, не повторно) |
+| GET | `/api/v1/reviews/my` | Отзывы, оставленные текущим пользователем |
+| GET | `/api/v1/reviews/available-trips` | Поездки для отзыва (пассажир или водитель с подтверждёнными пассажирами) |
+| GET | `/api/v1/reviews/user/:userId` | Публичный список отзывов о пользователе |
 | GET | `/api/v1/users/me` | Текущий пользователь |
 | PATCH | `/api/v1/users/me` | Обновление профиля |
 | PATCH | `/api/v1/users/me/car` | Управление авто |
@@ -181,6 +185,7 @@ LOG_LEVEL=debug
 - **Refresh-токены**: хранятся в БД хэшированными (SHA-256), одноразовые — при каждом `/refresh` старый отзывается, выдаётся новый (`rotateRefreshToken`, атомарная транзакция).
 - **Rate limiting**: раздельные лимитеры для `/auth/vk`, `/auth/refresh`, чтения и мутаций.
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
+- **Отзывы**: Serializable-транзакция с одним ретраем при P2034; повторный конфликт → 503 (не маскируется под «отзыв уже оставлен» 409 — дубль ловится отдельно по уникальному индексу).
 - **Валидация**: Zod-схемы на входе (backend) и на выходе (frontend, `apiClient.request<T>(url, opts, schema)`).
 - **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
@@ -222,7 +227,7 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
 
 - **HTTPS обязателен** в production (кроме localhost).
 - Сервер должен **разрешать iframe** — бэкенд отдаёт CSP `frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru` (не `X-Frame-Options: DENY`).
-- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин).
+- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин). Принимается только полный `searchParams` из launch-параметров — реконструкция подписи по отдельным полям не поддерживается.
 
 ### Шаги деплоя
 
