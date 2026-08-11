@@ -1,8 +1,19 @@
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  // Env из .env-файлов mini-app (mini-app/.env и т.п.) + реальные переменные
+  // окружения (последние имеют приоритет). process.env напрямую env-файлы НЕ содержит.
+  const env = loadEnv(mode, path.resolve(__dirname, './mini-app'), '');
+
+  // Хосты (через запятую) сверх дефолтных (localhost/127.0.0.1), которым
+  // разрешён доступ к dev-серверу — например, домен туннеля:
+  // VITE_ALLOWED_HOSTS="my-tunnel.example.com" (см. .env.example).
+  const extraAllowedHosts = env.VITE_ALLOWED_HOSTS
+    ? env.VITE_ALLOWED_HOSTS.split(',').map((host) => host.trim()).filter(Boolean)
+    : [];
+
   return {
     root: './mini-app',
     // Относительные пути ассетов: мини-апп может быть развёрнут под любым
@@ -20,17 +31,22 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // allowedHosts: ['<your-tunnel-domain>'], // для dev-туннеля (не коммитить реальный домен)
+      // allowedHosts заменяет дефолтный список Vite, поэтому при задании
+      // туннельных доменов локальные хосты добавляем явно.
+      allowedHosts:
+        extraAllowedHosts.length > 0
+          ? ['localhost', '.localhost', '127.0.0.1', '::1', ...extraAllowedHosts]
+          : undefined,
       proxy: {
         '/api': {
-          // Адрес dev-бэкенда: VITE_API_TARGET или дефолт 3011 (npm run dev).
-          target: process.env.VITE_API_TARGET || 'http://127.0.0.1:3011',
+          // Адрес dev-бэкенда: VITE_API_TARGET (env или .env) или дефолт 3011.
+          target: env.VITE_API_TARGET || 'http://127.0.0.1:3011',
           changeOrigin: true,
           ws: true,
         },
       },
-      hmr: process.env.DISABLE_HMR !== 'true',
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      hmr: env.DISABLE_HMR !== 'true',
+      watch: env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });
