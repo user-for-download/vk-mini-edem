@@ -1,10 +1,14 @@
+// backend/src/services/wsManager.ts
 import type { WSContext } from "hono/ws";
 import type { WsServerEvent } from "@edem/contracts";
 import { logger } from "../logger.js";
+import { wsConnectionLimitHits, wsConnections, wsAuthenticatedUsers } from "../metrics.js";
 
 const AUTH_TIMEOUT_MS = 5_000;
 const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 60_000;
+const REAPER_INTERVAL_MS = 30_000;
+const MAX_CONNECTIONS_PER_USER = 5;
 
 interface Connection {
   ws: WSContext<WebSocket>;
@@ -27,6 +31,7 @@ class WebSocketManager {
       lastPongAt: Date.now(),
     };
     this.byId.set(connId, conn);
+    wsConnections.inc();
 
     conn.authTimer = setTimeout(() => {
       if (!conn.userId) {
@@ -65,18 +70,30 @@ class WebSocketManager {
 
     if (conn.userId) return false;
 
+    // Лимит соединений на пользователя: 6-я вкладка/клиент отклоняется.
+    // Проверяем ДО присвоения userId, чтобы лимит нельзя было обойти
+    // переподключениями одного и того же соединения.
+    const userConns = this.connections.get(userId);
+    if (userConns && userConns.size >= MAX_CONNECTIONS_PER_USER) {
+      wsConnectionLimitHits.inc();
+      logger.warn({ connId, userId, limit: MAX_CONNECTIONS_PER_USER }, "ws_connection_limit_reached");
+      this.close(connId, 1013, "Too many connections for user");
+      return false;
+    }
+
     conn.userId = userId;
     if (conn.authTimer) {
       clearTimeout(conn.authTimer);
       conn.authTimer = undefined;
     }
 
-    let userConns = this.connections.get(userId);
-    if (!userConns) {
-      userConns = new Set();
-      this.connections.set(userId, userConns);
+    let connSet = this.connections.get(userId);
+    if (!connSet) {
+      connSet = new Set();
+      this.connections.set(userId, connSet);
     }
-    userConns.add(connId);
+    connSet.add(connId);
+    wsAuthenticatedUsers.set(this.connections.size);
 
     logger.info({ connId, userId }, "ws_authenticated");
     return true;
@@ -145,6 +162,7 @@ class WebSocketManager {
           this.connections.delete(conn.userId);
         }
       }
+      wsAuthenticatedUsers.set(this.connections.size);
     }
 
     try {
@@ -154,6 +172,7 @@ class WebSocketManager {
     }
 
     this.byId.delete(connId);
+    wsConnections.dec();
     logger.info({ connId, code, reason }, "ws_closed");
   }
 
@@ -173,9 +192,26 @@ class WebSocketManager {
 
 export const wsManager = new WebSocketManager();
 
-setInterval(() => {
-  const reaped = wsManager.reapStale();
-  if (reaped.length > 0) {
-    logger.warn({ count: reaped.length }, "ws_reaped_stale");
+let reaperInterval: NodeJS.Timeout | null = null;
+
+/** Запускает периодическую очистку «мёртвых» соединений (pong timeout). */
+export function startWsReaper(): void {
+  if (reaperInterval) return;
+  reaperInterval = setInterval(() => {
+    const reaped = wsManager.reapStale();
+    if (reaped.length > 0) {
+      logger.warn({ count: reaped.length }, "ws_reaped_stale");
+    }
+  }, REAPER_INTERVAL_MS);
+  reaperInterval.unref?.();
+  logger.debug({ intervalMs: REAPER_INTERVAL_MS }, "ws_reaper_started");
+}
+
+/** Останавливает reaper (вызывается при graceful shutdown). */
+export function stopWsReaper(): void {
+  if (reaperInterval) {
+    clearInterval(reaperInterval);
+    reaperInterval = null;
+    logger.debug("ws_reaper_stopped");
   }
-}, 30_000).unref?.();
+}

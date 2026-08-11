@@ -19,6 +19,7 @@ import { db } from "./db.js";
 import { logger } from "./logger.js";
 import { Sentry } from "./sentry.js";
 import { ERROR_CODES } from "./errors.js";
+import { httpRequestsTotal, metricsSnapshot } from "./metrics.js";
 
 export const app = new Hono();
 
@@ -54,6 +55,8 @@ app.use("*", async (c, next) => {
   const startedAt = Date.now();
 
   await next();
+
+  httpRequestsTotal.inc();
 
   logger.info(
     {
@@ -139,6 +142,13 @@ app.get("/health/live", (c) => {
 app.get("/health/ready", async (c) => {
   const dbOk = await checkDatabase();
   return c.json({ ready: dbOk }, dbOk ? 200 : 503);
+});
+
+/**
+ * Метрики сервиса в Prometheus text-формате.
+ */
+app.get("/metrics", (c) => {
+  return c.text(metricsSnapshot(), 200, { "Content-Type": "text/plain; charset=utf-8" });
 });
 
 app.route("/api/v1/auth", authRouter);

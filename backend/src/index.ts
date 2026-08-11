@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { app, injectWebSocket } from "./app.js";
 import { env } from "./env.js";
 import { logger } from "./logger.js";
-import { wsManager } from "./services/wsManager.js";
+import { wsManager, startWsReaper, stopWsReaper } from "./services/wsManager.js";
 
 import { db } from "./db.js";
 import { startTripWorker, stopTripWorker } from "./workers/tripWorker.js";
@@ -33,11 +33,13 @@ injectWebSocket(server);
 logger.info({ port: env.PORT }, "WebSocket support injected");
 
 startTripWorker();
+startWsReaper();
 
 const SHUTDOWN_TIMEOUT_MS = 20_000;
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutdown signal received");
   stopTripWorker();
+  stopWsReaper();
   wsManager.closeAll(1001, "Server shutting down");
   server.close(async () => {
     logger.info("HTTP server closed");

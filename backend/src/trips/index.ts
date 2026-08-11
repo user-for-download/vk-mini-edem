@@ -15,6 +15,11 @@ import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
+import { TripError, TripErrors } from "./errors.js";
+
+type TripWithDriver = Prisma.TripGetPayload<{
+  include: { driver: { include: { car: true } } };
+}>;
 
 async function getActiveBookingSeatsByTripIds(
   tripIds: string[]
@@ -563,76 +568,106 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
  * Логика:
  * - отменить может только водитель поездки;
  * - отменить можно только active поездку;
- * - все pending/confirmed брони становятся declined;
+ * - все pending/confirmed брони становятся cancelled;
  * - seatsAvailable обнуляется, так как поездка больше не доступна для бронирования.
+ *
+ * TOCTOU: загрузка поездки и все проверки выполняются ВНУТРИ Serializable-
+ * транзакции. Между чтением статуса и записью не может пройти параллельная
+ * отмена/завершение (воркером или вторым запросом): конфликтная транзакция
+ * получит P2034 и ответит 409, а не перезапишет статус.
  */
 tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user")!;
 
-  const trip = await db.trip.findUnique({
-    where: { id },
-    include: {
-      driver: {
-        include: {
-          car: true,
-        },
-      },
-    },
-  });
-
-  if (!trip) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
-  }
-
-  if (trip.driverId !== user.id) {
-    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
-  }
-
-  if (trip.status !== "active") {
-    return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
-  }
-
-  const { updated, uniquePassengers } = await db.$transaction(async (tx) => {
-    // Пассажиров собираем ДО updateMany: после перевода броней в cancelled
-    // выборка по pending/confirmed вернёт пустой массив.
-    const activeBookings = await tx.booking.findMany({
-      where: { tripId: trip.id, status: { in: ["pending", "confirmed"] } },
-      select: { passengerId: true },
-    });
-
-    await tx.booking.updateMany({
-      where: {
-        tripId: trip.id,
-        status: {
-          in: ["pending", "confirmed"],
-        },
-      },
-      data: {
-        status: "cancelled",
-      },
-    });
-
-    const updated = await tx.trip.update({
-      where: { id: trip.id },
-      data: {
-        status: "cancelled",
-        seatsAvailable: 0,
-      },
-      include: {
-        driver: {
+  let result: { updated: TripWithDriver; uniquePassengers: string[] };
+  try {
+    result = await db.$transaction(
+      async (tx) => {
+        const trip = await tx.trip.findUnique({
+          where: { id },
           include: {
-            car: true,
+            driver: {
+              include: {
+                car: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
-    return {
-      updated,
-      uniquePassengers: Array.from(new Set(activeBookings.map((b) => b.passengerId))),
-    };
-  });
+        if (!trip) {
+          throw new TripError(TripErrors.notFound(), "Trip not found");
+        }
+        if (trip.driverId !== user.id) {
+          throw new TripError(TripErrors.forbidden(), "Forbidden");
+        }
+        if (trip.status !== "active") {
+          throw new TripError(TripErrors.notActive(), "Trip is not active");
+        }
+
+        // Пассажиров собираем ДО updateMany: после перевода броней в cancelled
+        // выборка по pending/confirmed вернёт пустой массив.
+        const activeBookings = await tx.booking.findMany({
+          where: { tripId: trip.id, status: { in: ["pending", "confirmed"] } },
+          select: { passengerId: true },
+        });
+
+        await tx.booking.updateMany({
+          where: {
+            tripId: trip.id,
+            status: {
+              in: ["pending", "confirmed"],
+            },
+          },
+          data: {
+            status: "cancelled",
+          },
+        });
+
+        const updated = await tx.trip.update({
+          where: { id: trip.id },
+          data: {
+            status: "cancelled",
+            seatsAvailable: 0,
+          },
+          include: {
+            driver: {
+              include: {
+                car: true,
+              },
+            },
+          },
+        });
+
+        return {
+          updated,
+          uniquePassengers: Array.from(new Set(activeBookings.map((b) => b.passengerId))),
+        };
+      },
+      { isolationLevel: "Serializable" }
+    );
+  } catch (error) {
+    if (error instanceof TripError) {
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status as ContentfulStatusCode
+      );
+    }
+    // Serializable: параллельное изменение поездки/брони — клиент
+    // получает 409 и может повторить запрос с актуальными данными.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
+        409
+      );
+    }
+    throw error;
+  }
+
+  const { updated, uniquePassengers } = result;
 
   // createNotification глотает ошибки внутри, поэтому параллелим безопасно.
   await Promise.all(
@@ -641,12 +676,12 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
         pid,
         "trip_cancelled",
         "Поездка отменена",
-        `Водитель отменил поездку ${trip.fromCity} → ${trip.toCity}`
+        `Водитель отменил поездку ${updated.fromCity} → ${updated.toCity}`
       );
 
       wsManager.sendToUser(pid, {
         type: "trip:status_changed",
-        payload: { tripId: trip.id, status: "cancelled" },
+        payload: { tripId: updated.id, status: "cancelled" },
       });
       wsManager.sendToUser(pid, {
         type: "notification:new",
@@ -656,7 +691,7 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
   );
 
   logBusinessEvent("trip.cancelled", {
-    tripId: trip.id,
+    tripId: updated.id,
     driverId: user.id,
   });
 
@@ -678,6 +713,11 @@ tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
  * - force=1 позволяет завершить поездку раньше (полезно для dev/тестирования);
  * - pending-заявки отклоняются;
  * - confirmed-заявки остаются как история.
+ *
+ * TOCTOU: загрузка поездки и все проверки выполняются ВНУТРИ Serializable-
+ * транзакции — параллельные cancel/complete/автозавершение воркером не могут
+ * перезаписать статус «из-под» нас (P2034 → 409, tripsCount начисляется ровно
+ * один раз).
  */
 tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   const id = c.req.param("id");
@@ -687,39 +727,34 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
   // завершая поездки до времени отправления.
   const force = !env.isProduction && c.req.query("force") === "1";
 
-  const trip = await db.trip.findUnique({
-    where: { id },
-    include: {
-      driver: {
-        include: {
-          car: true,
-        },
-      },
-    },
-  });
-
-  if (!trip) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
-  }
-
-  if (trip.driverId !== user.id) {
-    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
-  }
-
-  if (trip.status !== "active") {
-    return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
-  }
-
-  if (!force && trip.departureAt > new Date()) {
-    return c.json({ code: ERROR_CODES.TRIP_IN_PAST, message: "Trip has not started yet" }, 400);
-  }
-
-  let passengerIds: string[] = [];
-
-  let updated;
+  let result: { updated: TripWithDriver; passengerIds: string[] };
   try {
-    updated = await db.$transaction(
+    result = await db.$transaction(
       async (tx) => {
+        const trip = await tx.trip.findUnique({
+          where: { id },
+          include: {
+            driver: {
+              include: {
+                car: true,
+              },
+            },
+          },
+        });
+
+        if (!trip) {
+          throw new TripError(TripErrors.notFound(), "Trip not found");
+        }
+        if (trip.driverId !== user.id) {
+          throw new TripError(TripErrors.forbidden(), "Forbidden");
+        }
+        if (trip.status !== "active") {
+          throw new TripError(TripErrors.notActive(), "Trip is not active");
+        }
+        if (!force && trip.departureAt > new Date()) {
+          throw new TripError(TripErrors.notStarted(), "Trip has not started yet");
+        }
+
         // 1. Decline all pending bookings
         await tx.booking.updateMany({
           where: {
@@ -742,7 +777,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
           },
         });
 
-        passengerIds = Array.from(
+        const passengerIds = Array.from(
           new Set(confirmedBookings.map((booking) => booking.passengerId))
         );
 
@@ -769,7 +804,7 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
         }
 
         // 5. Update trip status
-        return tx.trip.update({
+        const updated = await tx.trip.update({
           where: { id: trip.id },
           data: {
             status: "completed",
@@ -783,10 +818,18 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
             },
           },
         });
+
+        return { updated, passengerIds };
       },
       { isolationLevel: "Serializable" }
     );
   } catch (error) {
+    if (error instanceof TripError) {
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status as ContentfulStatusCode
+      );
+    }
     // Serializable: параллельное завершение той же поездки — одна из
     // транзакций не сможет подтвердиться (write conflict). Возвращаем
     // 409 вместо 500: tripsCount при этом начислен ровно один раз.
@@ -802,8 +845,10 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
     throw error;
   }
 
+  const { updated, passengerIds } = result;
+
   logBusinessEvent("trip.completed", {
-    tripId: trip.id,
+    tripId: updated.id,
     driverId: user.id,
     passengersCount: passengerIds.length,
   });
@@ -815,11 +860,11 @@ tripsRouter.patch("/:id/complete", requireUser, async (c) => {
       pid,
       "trip_status_changed",
       "Поездка завершена",
-      `Поездка ${trip.fromCity} → ${trip.toCity} завершена. Вы можете оставить отзыв.`
+      `Поездка ${updated.fromCity} → ${updated.toCity} завершена. Вы можете оставить отзыв.`
     );
     wsManager.sendToUser(pid, {
       type: "trip:status_changed",
-      payload: { tripId: trip.id, status: "completed" },
+      payload: { tripId: updated.id, status: "completed" },
     });
     wsManager.sendToUser(pid, {
       type: "notification:new",
