@@ -1,6 +1,7 @@
 // backend/src/auth/index.ts
 import { Hono } from "hono";
 import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
+import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { DEFAULT_AVATAR_URL } from "../constants.js";
@@ -38,7 +39,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     return c.json(
       {
         message: "Invalid request payload",
-        errors: parseResult.error.format(),
+        errors: z.formatError(parseResult.error),
       },
       400
     );

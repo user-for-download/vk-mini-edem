@@ -1,6 +1,7 @@
 // backend/src/trips/index.ts
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
 import { db } from "../db.js";
@@ -348,7 +349,7 @@ tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
   if (!parseResult.success) {
     return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
       400
     );
   }
@@ -421,7 +422,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   
   const parseResult = updateTripDtoSchema.safeParse(body);
   if (!parseResult.success) {
-    return c.json({ message: "Invalid payload", errors: parseResult.error.format() }, 400);
+    return c.json({ message: "Invalid payload", errors: z.formatError(parseResult.error) }, 400);
   }
 
   const dto = parseResult.data;

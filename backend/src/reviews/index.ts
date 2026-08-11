@@ -1,6 +1,7 @@
 // backend/src/reviews/index.ts
 import { Hono } from "hono";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createReviewDtoSchema, paginatedReviewsResponseSchema } from "@edem/contracts";
 import { db } from "../db.js";
@@ -376,7 +377,7 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
 
   if (!parseResult.success) {
     return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
       400
     );
   }

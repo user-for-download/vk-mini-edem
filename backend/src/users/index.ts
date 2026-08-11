@@ -82,7 +82,7 @@ usersRouter.patch("/me", requireUser, async (c) => {
 
   if (!parseResult.success) {
     return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
       400
     );
   }
@@ -112,7 +112,7 @@ async function upsertCar(c: Context<AuthEnv>) {
 
   if (!parseResult.success) {
     return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
       400
     );
   }

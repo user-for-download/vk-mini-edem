@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { Prisma } from "@prisma/client";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import {
   createBookingDtoSchema,
   updateBookingStatusDtoSchema,
@@ -394,7 +395,7 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
 
   if (!parseResult.success) {
     return c.json(
-      { message: "Invalid payload", errors: parseResult.error.format() },
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
       400
     );
   }
