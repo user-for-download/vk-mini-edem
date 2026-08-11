@@ -101,6 +101,8 @@ export const PassengerTripCard: FC<{
   onOpenReview?: (trip: Trip) => void;
 }> = ({ booking, onOpen, onOpenReview }) => {
   const status = getStatusData(booking);
+  const canReview = Boolean(booking.canReview && onOpenReview);
+  const hasDetails = Boolean(booking.comment || canReview || booking.hasReview);
 
   return (
     <TripCard
@@ -109,32 +111,36 @@ export const PassengerTripCard: FC<{
       seatsLabel={`Место ${booking.seat} ${status.label}`}
       seatsColor={status.color}
     >
-      {booking.comment && (
-        <Text className="PassengerTripCard__comment">
-          «{booking.comment}»
-        </Text>
-      )}
+      {hasDetails && (
+        <>
+          {booking.comment && (
+            <Text className="PassengerTripCard__comment">
+              «{booking.comment}»
+            </Text>
+          )}
 
-      {booking.canReview && onOpenReview && (
+          {canReview && (
         <>
           <Spacing size={12} />
           <Button
             size="s"
             mode="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenReview(booking.trip);
-            }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenReview?.(booking.trip);
+                }}
           >
             Оставить отзыв
           </Button>
         </>
       )}
 
-      {booking.hasReview && (
-        <Caption level="1" className="PassengerTripCard__comment">
-          Отзыв оставлен
-        </Caption>
+          {booking.hasReview && (
+            <Caption level="1" className="PassengerTripCard__comment">
+              Отзыв оставлен
+            </Caption>
+          )}
+        </>
       )}
     </TripCard>
   );
