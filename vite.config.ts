@@ -23,7 +23,8 @@ export default defineConfig(() => {
       // allowedHosts: ['<your-tunnel-domain>'], // для dev-туннеля (не коммитить реальный домен)
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:3001',
+          // Адрес dev-бэкенда: VITE_API_TARGET или дефолт 3011 (npm run dev).
+          target: process.env.VITE_API_TARGET || 'http://127.0.0.1:3011',
           changeOrigin: true,
           ws: true,
         },
