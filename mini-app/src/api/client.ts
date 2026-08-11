@@ -21,13 +21,15 @@ export interface TokenUpdate {
 
 type TokenUpdateListener = (tokens: TokenUpdate) => void;
 
-class ApiClient {
+export class ApiClient {
   private token: string | null = null;
   private refreshTokenValue: string | null = null;
   private refreshPromise: Promise<boolean> | null = null;
   private refreshGeneration = 0;
   private tokenListeners: Set<TokenUpdateListener> = new Set();
   private sessionExpiredListeners: Set<() => void> = new Set();
+  private refreshStartListeners: Set<() => void> = new Set();
+  private refreshEndListeners: Set<(success: boolean) => void> = new Set();
 
   setToken(token: string | null) {
     this.token = token;
@@ -66,6 +68,55 @@ class ApiClient {
 
   private emitSessionExpired() {
     this.sessionExpiredListeners.forEach((listener) => listener());
+  }
+
+  /**
+   * Единый источник refresh-состояния: идёт ли сейчас refresh-запрос.
+   * Используется WsProvider, чтобы не дублировать refresh при 4401/1008.
+   */
+  isRefreshing(): boolean {
+    return this.refreshPromise !== null;
+  }
+
+  /**
+   * Подписка на начало refresh. Возвращает функцию отписки.
+   */
+  onRefreshStart(listener: () => void): () => void {
+    this.refreshStartListeners.add(listener);
+    return () => {
+      this.refreshStartListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Подписка на завершение refresh (успешного или нет).
+   * Вызывается ОДИН раз на refresh — только у инициатора.
+   */
+  onRefreshEnd(listener: (success: boolean) => void): () => void {
+    this.refreshEndListeners.add(listener);
+    return () => {
+      this.refreshEndListeners.delete(listener);
+    };
+  }
+
+  private emitRefreshStart(): void {
+    this.refreshStartListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (err) {
+        console.error("[ApiClient] refreshStart listener error:", err);
+      }
+    });
+  }
+
+  private emitRefreshEnd(success: boolean): void {
+    this.refreshEndListeners.forEach((listener) => {
+      try {
+        listener(success);
+      } catch (err) {
+        console.error("[ApiClient] refreshEnd listener error:", err);
+      }
+    });
   }
 
   /**
@@ -162,14 +213,26 @@ class ApiClient {
    * Публичный — вызывается из WsProvider при закрытии соединения с кодом 1008/4401.
    */
   async tryRefresh(): Promise<boolean> {
-    if (!this.refreshPromise) {
+    // Паттерн «одного промиса»: при нескольких параллельных 401 refresh
+    // произойдёт только один раз. Start/End уведомляем только у инициатора.
+    const isNewRefresh = !this.refreshPromise;
+    if (isNewRefresh) {
       this.refreshPromise = this.performRefresh();
+      this.emitRefreshStart();
     }
+    // Сразу после присваивания промис гарантированно не null.
+    const promise = this.refreshPromise!;
 
     try {
-      return await this.refreshPromise;
+      const success = await promise;
+      if (isNewRefresh) {
+        this.emitRefreshEnd(success);
+      }
+      return success;
     } finally {
-      this.refreshPromise = null;
+      if (isNewRefresh) {
+        this.refreshPromise = null;
+      }
     }
   }
 

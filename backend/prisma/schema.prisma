@@ -113,9 +113,16 @@ model Booking {
 
   @@index([tripId, status])
   @@index([passengerId, status])
-  @@index([tripId, seat, status])
+  @@index([tripId, seat])
+  @@index([tripId, passengerId])
   @@index([tripId, createdAt(sort: Desc)])
 }
+
+// Partial unique constraints создаются SQL-миграцией (Prisma не поддерживает
+// `where` в @@unique):
+// - active_seat_booking (tripId, seat) WHERE status IN ('pending', 'confirmed')
+// - active_passenger_booking (tripId, passengerId) WHERE status IN ('pending', 'confirmed')
+// См. prisma/migrations/*_booking_unique_indexes/migration.sql
 
 model Review {
   id           String   @id @default(uuid())

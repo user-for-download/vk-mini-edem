@@ -36,7 +36,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
         durationMinutes: 120,
         distanceKm: 700,
         price: 1500,
-        seatsTotal: 4,
+        seatsTotal: 15,
         seatsAvailable: 0,
         tags: [],
       },
@@ -44,6 +44,8 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
     tripId = trip.id;
 
     // 15 заявок с убывающими createdAt.
+    // Места уникальны: partial unique индекс active_seat_booking не
+    // позволяет двум активным броням занимать одно место.
     for (let i = 0; i < 15; i++) {
       const passenger = await db.user.create({
         data: {
@@ -58,7 +60,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
         data: {
           tripId,
           passengerId: passenger.id,
-          seat: (i % 4) + 1,
+          seat: i + 1,
           status: "pending",
           createdAt: new Date(Date.now() - i * 1000),
         },

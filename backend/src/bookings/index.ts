@@ -35,6 +35,17 @@ import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
 
+type BookingFull = Prisma.BookingGetPayload<{
+  include: {
+    trip: { include: { driver: { include: { car: true } } } };
+    passenger: { include: { car: true } };
+  };
+}>;
+
+type CreateResult =
+  | { kind: "created"; booking: BookingFull }
+  | { kind: "idempotent"; booking: BookingFull };
+
 /**
  * Пагинация заявок на поездку (GET /bookings/trip/:tripId).
  * nextCursor — id последней заявки страницы; null означает конец списка.
@@ -392,7 +403,7 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
   const passenger = c.get("user");
 
   try {
-    const booking = await db.$transaction(
+    const result: CreateResult = await db.$transaction(
       async (tx) => {
         const trip = await tx.trip.findUnique({
           where: { id: tripId },
@@ -433,9 +444,38 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
             in: ["pending", "confirmed"],
           },
         },
+        select: { id: true, passengerId: true },
       });
 
       if (seatConflict) {
+        // Псевдо-идемпотентность: конфликт на НАШЕМ же месте — клиент
+        // повторил запрос после таймаута, а бронь уже создалась.
+        // Возвращаем существующую бронь с 200 вместо 409.
+        if (seatConflict.passengerId === passenger.id) {
+          const existing = await tx.booking.findUnique({
+            where: { id: seatConflict.id },
+            include: {
+              trip: {
+                include: {
+                  driver: {
+                    include: {
+                      car: true,
+                    },
+                  },
+                },
+              },
+              passenger: {
+                include: {
+                  car: true,
+                },
+              },
+            },
+          });
+          if (existing) {
+            return { kind: "idempotent", booking: existing };
+          }
+        }
+
         throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
       }
 
@@ -490,10 +530,20 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
         },
       });
 
-      return created;
+      return { kind: "created", booking: created };
       },
       { isolationLevel: "Serializable" }
     );
+
+    if (result.kind === "idempotent") {
+      logger.info(
+        { bookingId: result.booking.id, tripId, seat, passengerId: passenger.id },
+        "booking_idempotent_return"
+      );
+      return c.json(serializeBooking(result.booking), 200);
+    }
+
+    const booking = result.booking;
 
     logBusinessEvent("booking.created", {
       bookingId: booking.id,
@@ -521,13 +571,72 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
 
     return c.json(serializeBooking(booking), 201);
   } catch (error) {
-    // Ловим ошибку уникального индекса (гонка броней на уровне БД)
+    // Ловим ошибку уникального индекса (гонка броней на уровне БД).
+    // Prisma 5.22 для Postgres не отдаёт meta.constraint (имя индекса),
+    // только meta.target — массив полей нарушенного индекса. Partial
+    // unique индексы (см. prisma/migrations/*_booking_unique_indexes)
+    // не пересекаются по полям, поэтому классификация однозначна.
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
+      const target = (error.meta?.target as string[] | undefined) ?? [];
+
+      logger.info(
+        { target, tripId, seat, passengerId: passenger.id },
+        "booking_p2002_conflict"
+      );
+
+      // Случай 1: конфликт на active_seat_booking (tripId, seat).
+      // Либо наш retry (гонка двух одинаковых запросов — оба прошли
+      // pre-check, один вставил), либо место занял другой пассажир.
+      if (target.includes("seat")) {
+        const existingBooking = await db.booking.findFirst({
+          where: {
+            tripId,
+            seat,
+            passengerId: passenger.id,
+            status: { in: ["pending", "confirmed"] },
+          },
+          include: {
+            trip: { include: { driver: { include: { car: true } } } },
+            passenger: { include: { car: true } },
+          },
+        });
+
+        if (existingBooking) {
+          logger.info(
+            { bookingId: existingBooking.id, tripId, seat },
+            "booking_idempotent_return"
+          );
+          return c.json(serializeBooking(existingBooking), 200);
+        }
+
+        return c.json(
+          { code: ERROR_CODES.SEAT_TAKEN, message: "Seat just taken" },
+          409
+        );
+      }
+
+      // Случай 2: конфликт на active_passenger_booking (tripId, passengerId) —
+      // у пассажира уже есть активная бронь на ДРУГОЕ место этой поездки.
+      if (target.includes("passengerId")) {
+        return c.json(
+          {
+            code: ERROR_CODES.ALREADY_BOOKED,
+            message: "You already have an active booking for this trip",
+          },
+          409
+        );
+      }
+
+      // Случай 3: неизвестный индекс — общий конфликт (логируем как ошибку).
+      logger.error(
+        { target, tripId, seat, passengerId: passenger.id },
+        "booking_p2002_unknown_target"
+      );
       return c.json(
-        { code: ERROR_CODES.SEAT_TAKEN, message: "Место только что заняли" },
+        { code: ERROR_CODES.BOOKING_CONFLICT, message: "Booking conflict" },
         409
       );
     }

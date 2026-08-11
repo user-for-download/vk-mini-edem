@@ -28,13 +28,16 @@ function getWsUrl(): string {
   return `${protocol}//${window.location.host}${apiUrl}/ws`;
 }
 
+// Константы вместо magic numbers.
+const WS_RECONNECT_DELAY_MS = 3_000;
+const WS_REFRESH_WAIT_DELAY_MS = 1_000;
+
 export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WsServerEvent | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
-  const isRefreshingRef = useRef(false);
 
   // connect вызывается сам из себя (reconnect в onclose), а самоссылка
   // в инициализаторе useCallback запрещена (react-hooks/immutability).
@@ -44,7 +47,9 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    if (isRefreshingRef.current) return;
+    // Если идёт refresh (из HTTP-клиента или WsProvider) — не пытаемся
+    // переподключиться: после завершения нас разбудит onTokenUpdate.
+    if (apiClient.isRefreshing()) return;
 
     const token = apiClient.getToken();
     if (!token) return; // Wait until token is available
@@ -89,15 +94,20 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       // токен протух/невалиден: пробуем обновить и переподключиться.
       if (e.code === 1008 || e.code === 4401) {
         console.warn("[WS] Auth failed, trying to refresh token...");
-        isRefreshingRef.current = true;
-        let refreshed = false;
-        try {
-          refreshed = await apiClient.tryRefresh();
-        } finally {
-          // Флаг снимаем ДО connect(), иначе он отсечёт переподключение
-          // (guard в начале connect()).
-          isRefreshingRef.current = false;
+
+        // Refresh уже идёт (например, из-за 401 в HTTP-клиенте) — просто
+        // ждём его завершения. После успеха onTokenUpdate переподключит нас.
+        if (apiClient.isRefreshing()) {
+          console.log("[WS] Refresh already in progress, waiting...");
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            connectRef.current();
+          }, WS_REFRESH_WAIT_DELAY_MS);
+          return;
         }
+
+        // apiClient.tryRefresh() сам обеспечивает single-flight.
+        const refreshed = await apiClient.tryRefresh();
+
         if (refreshed) {
           connectRef.current();
         } else {
@@ -108,7 +118,10 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
 
       // Обычный реконнект при обрыве сети
-      reconnectTimeoutRef.current = window.setTimeout(() => connectRef.current(), 3000);
+      reconnectTimeoutRef.current = window.setTimeout(
+        () => connectRef.current(),
+        WS_RECONNECT_DELAY_MS
+      );
     };
 
     ws.onerror = () => {
@@ -121,6 +134,21 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   useEffect(() => {
     connectRef.current = connect;
   }, [connect]);
+
+  // Токен обновился (успешный refresh где-то в приложении) — если соединение
+  // закрыто и reconnect не запланирован, пробуем переподключиться сразу.
+  useEffect(() => {
+    const unsubscribeTokenUpdate = apiClient.onTokenUpdate(() => {
+      if (!wsRef.current && !reconnectTimeoutRef.current) {
+        console.log("[WS] Token updated, reconnecting...");
+        connectRef.current();
+      }
+    });
+
+    return () => {
+      unsubscribeTokenUpdate();
+    };
+  }, []);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
