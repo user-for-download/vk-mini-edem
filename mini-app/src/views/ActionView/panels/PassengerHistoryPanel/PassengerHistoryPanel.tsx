@@ -3,7 +3,6 @@ import { type FC, useCallback, useMemo, useState } from "react";
 import {
   Box,
   Button,
-  Caption,
   Flex,
   Group,
   Panel,
@@ -11,8 +10,6 @@ import {
   PullToRefresh,
   SegmentedControl,
   Spacing,
-  Subhead,
-  Text,
 } from "@vkontakte/vkui";
 import type { Booking, Trip } from "@/types";
 import { TripCard } from "@/components/TripCard";
@@ -20,6 +17,7 @@ import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { usePassengerHistoryQuery } from "@/queries/useBookingsQuery";
+import { BookingCardFooter } from "@/components/BookingCardFooter";
 
 export interface PassengerHistoryPanelProps {
   id: string;
@@ -30,115 +28,6 @@ export interface PassengerHistoryPanelProps {
 }
 
 type HistoryFilter = "all" | "completed" | "cancelled";
-
-function isPast(date?: string): boolean {
-  if (!date) {
-    return false;
-  }
-
-  const time = Date.parse(date);
-
-  if (Number.isNaN(time)) {
-    return false;
-  }
-
-  return time <= Date.now();
-}
-
-function getStatusData(booking: Booking): {
-  label: string;
-  color: string;
-} {
-  const trip = booking.trip as Trip & {
-    status?: "active" | "cancelled" | "completed";
-    departureAt?: string;
-  };
-
-  if (trip.status === "cancelled") {
-    return {
-      label: "Поездка отменена",
-      color: "var(--vkui--color_text_negative)",
-    };
-  }
-
-  if (booking.status === "declined") {
-    return {
-      label: "Заявка отклонена",
-      color: "var(--vkui--color_text_secondary)",
-    };
-  }
-
-  if (
-    booking.status === "confirmed" &&
-    (trip.status === "completed" || isPast(trip.departureAt))
-  ) {
-    return {
-      label: "Завершена",
-      color: "var(--carpool_accent)",
-    };
-  }
-
-  if (booking.status === "pending" && isPast(trip.departureAt)) {
-    return {
-      label: "Не состоялась",
-      color: "var(--vkui--color_text_secondary)",
-    };
-  }
-
-  return {
-    label: "История",
-    color: "var(--vkui--color_text_secondary)",
-  };
-}
-
-const HistoryCardFooter: FC<{
-  booking: Booking;
-  status: { label: string; color: string };
-  onOpenReview?: (trip: Trip) => void;
-}> = ({ booking, status, onOpenReview }) => {
-  return (
-    <>
-      <Flex justify="space-between" align="center">
-        <Caption level="1" weight="2">
-          Место {booking.seat}
-        </Caption>
-        <Subhead weight="2" style={{ color: status.color }}>
-          {status.label}
-        </Subhead>
-      </Flex>
-
-      {booking.comment && (
-        <Text className="PassengerHistoryPanel__comment">
-          «{booking.comment}»
-        </Text>
-      )}
-
-      {booking.canReview && onOpenReview && (
-        <>
-          <Spacing size={12} />
-          <Button
-            size="s"
-            mode="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenReview(booking.trip);
-            }}
-          >
-            Оставить отзыв
-          </Button>
-        </>
-      )}
-
-      {booking.hasReview && (
-        <Caption level="1" className="PassengerHistoryPanel__comment">
-          Отзыв оставлен
-        </Caption>
-      )}
-    </>
-  );
-};
-
-HistoryCardFooter.displayName = "HistoryCardFooter";
 
 /**
  * Экран истории поездок пассажира.
@@ -256,9 +145,8 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
                   onOpen={() => onOpenTrip(booking.trip)}
                   hideSeats
                 >
-                  <HistoryCardFooter
+                  <BookingCardFooter
                     booking={booking}
-                    status={getStatusData(booking)}
                     onOpenReview={onOpenReview}
                   />
                 </TripCard>

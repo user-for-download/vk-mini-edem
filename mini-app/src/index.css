@@ -603,8 +603,7 @@ body {
   text-align: left;
 }
 
-/* ---------- PassengerHistoryPanel / BookingCardFooter ---------- */
-.PassengerHistoryPanel__comment,
+/* ---------- BookingCardFooter (единый футер брони пассажира) ---------- */
 .BookingCardFooter__comment {
   margin-top: 10px;
   color: var(--vkui--color_text_secondary);
