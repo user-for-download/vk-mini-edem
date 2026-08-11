@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/TripsManagePanel/TripsManagePanel.tsx
-import { useCallback, useMemo, useEffect, useRef, useState, type FC } from "react";
+import { useMemo, useEffect, useRef, useState, type FC } from "react";
 import {
   Box,
   Button,
@@ -18,6 +18,7 @@ import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useInfiniteMyTripsQuery } from "@/queries/useTripsQuery";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export interface TripsManagePanelProps {
   id: string;
@@ -45,7 +46,6 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
   const {
     data,
     isLoading,
-    isFetching,
     isError,
     error,
     refetch,
@@ -53,6 +53,8 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
     hasNextPage,
     fetchNextPage,
   } = useInfiniteMyTripsQuery({ status: tab });
+
+  const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -78,12 +80,6 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
   const myTrips = useMemo(() => {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
-
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
-  const isRefreshing = isFetching && !isLoading;
 
   return (
     <Panel id={id}>

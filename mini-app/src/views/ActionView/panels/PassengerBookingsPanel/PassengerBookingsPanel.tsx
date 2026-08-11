@@ -1,9 +1,8 @@
 // mini-app/src/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel.tsx
-import { type FC, useCallback, useMemo, useState } from "react";
+import { useMemo, useState, type FC } from "react";
 import {
   Box,
   Button,
-  Caption,
   Flex,
   Group,
   Panel,
@@ -11,15 +10,16 @@ import {
   PullToRefresh,
   SegmentedControl,
   Spacing,
-  Subhead,
-  Text,
 } from "@vkontakte/vkui";
-import type { PassengerBooking, PassengerBookingScope, Trip } from "@/types";
+import type { Trip } from "@/types";
 import { TripCard } from "@/components/TripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { BookingCardFooter } from "@/components/BookingCardFooter";
+import type { PassengerBooking, PassengerBookingScope } from "@/types";
 
 export interface PassengerBookingsPanelProps {
   id: string;
@@ -29,91 +29,6 @@ export interface PassengerBookingsPanelProps {
   onGoSearch: () => void;
 }
 
-function getStatusLabel(booking: PassengerBooking): string {
-  if (booking.trip.status === "cancelled") return "Поездка отменена";
-  if (booking.status === "cancelled") return "Отменена вами";
-  if (booking.status === "pending") return "Ждёт подтверждения";
-  if (booking.status === "confirmed") {
-    // «Завершена» только когда поездка реально завершена: воркер
-    // автозавершения может ещё не отработать, хотя бронь уже в истории.
-    if (booking.scope === "history" && booking.trip.status === "completed") {
-      return "Завершена";
-    }
-    return "Подтверждена";
-  }
-  return "Отклонена";
-}
-
-function getStatusColor(booking: PassengerBooking): string {
-  if (booking.trip.status === "cancelled" || booking.status === "cancelled") {
-    return "var(--vkui--color_text_negative)";
-  }
-  // ... остальное без изменений
-  if (booking.status === "pending") {
-    return "var(--vkui--color_text_accent, #3f8ae0)";
-  }
-
-  if (booking.status === "confirmed") {
-    return "var(--carpool_accent)";
-  }
-
-  return "var(--vkui--color_text_secondary)";
-}
-
-const BookingCardFooter: FC<{
-  booking: PassengerBooking;
-  onOpenReview: (trip: Trip) => void;
-}> = ({ booking, onOpenReview }) => {
-  return (
-    <>
-      <Flex justify="space-between" align="center">
-        <Caption level="1" weight="2">
-          Место {booking.seat}
-        </Caption>
-        <Subhead weight="2" style={{ color: getStatusColor(booking) }}>
-          {getStatusLabel(booking)}
-        </Subhead>
-      </Flex>
-
-      {booking.comment && (
-        <Text className="PassengerBookingsPanel__comment">
-          «{booking.comment}»
-        </Text>
-      )}
-
-      {booking.scope === "history" && booking.canReview && (
-        <>
-          <Spacing size={12} />
-          <Button
-            size="s"
-            mode="primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenReview(booking.trip);
-            }}
-          >
-            Оставить отзыв
-          </Button>
-        </>
-      )}
-
-      {booking.scope === "history" && booking.hasReview && (
-        <Caption level="1" className="PassengerBookingsPanel__comment">
-          Отзыв оставлен
-        </Caption>
-      )}
-    </>
-  );
-};
-
-BookingCardFooter.displayName = "BookingCardFooter";
-
-/**
- * Экран пассажира:
- * - активные брони;
- * - история поездок;
- * - возможность оставить отзыв после завершенной поездки.
- */
 export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
   id,
   onBack,
@@ -126,11 +41,12 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
   const {
     data,
     isLoading,
-    isFetching,
     isError,
     error,
     refetch,
   } = useMyBookingsQuery();
+
+  const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
 
   const visibleBookings = useMemo(() => {
     const bookings = ((data as unknown as PassengerBooking[]) ?? []).filter(
@@ -148,12 +64,6 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
       return bTime - aTime;
     });
   }, [data, tab]);
-
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
-  const isRefreshing = isFetching && !isLoading;
 
   return (
     <Panel id={id}>
@@ -232,7 +142,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
 
         {!isLoading && !isError && visibleBookings.length === 0 && tab === "active" && (
           <EmptyState
-            title="Нет активных бронирований"
+            title="Нет активных броней"
             subtitle="Найдите поездку и отправьте заявку водителю"
             action={
               <Box padding="system">
@@ -246,8 +156,8 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
 
         {!isLoading && !isError && visibleBookings.length === 0 && tab === "history" && (
           <EmptyState
-            title="История пока пуста"
-            subtitle="Здесь появятся завершенные поездки"
+            title="История пуста"
+            subtitle="Здесь будут ваши прошлые поездки"
           />
         )}
       </Group>

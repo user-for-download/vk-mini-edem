@@ -1,5 +1,5 @@
 // mini-app/src/views/HomeView/panels/HomePanel/HomePanel.tsx
-import { useCallback, type FC } from "react";
+import { useMemo, type FC } from "react";
 import {
   Banner,
   Button,
@@ -21,6 +21,7 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTripsQuery, useMyTripsQuery } from "@/queries/useTripsQuery";
 import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
+import { usePullToRefreshMany } from "@/hooks/usePullToRefresh";
 
 export interface HomePanelProps {
   id: string;
@@ -47,7 +48,6 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: tripsData,
     isLoading: tripsLoading,
-    isFetching: tripsFetching,
     isError: tripsError,
     refetch: refetchTrips,
   } = useTripsQuery();
@@ -55,7 +55,6 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: myTripsData,
     isLoading: myTripsLoading,
-    isFetching: myTripsFetching,
     isError: myTripsError,
     error: myTripsFetchError,
     refetch: refetchMyTrips,
@@ -68,25 +67,21 @@ export const HomePanel: FC<HomePanelProps> = ({
   const {
     data: myBookings,
     isLoading: myBookingsLoading,
-    isFetching: myBookingsFetching,
     isError: myBookingsError,
     refetch: refetchMyBookings,
   } = useMyBookingsQuery({
     enabled: role === "passenger",
   });
 
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      refetchTrips(),
-      role === "driver" ? refetchMyTrips() : Promise.resolve(),
-      role === "passenger" ? refetchMyBookings() : Promise.resolve(),
-    ]);
+  // Array of refetchers depends on role
+  const refetchers = useMemo(() => {
+    const list: Array<() => Promise<unknown>> = [refetchTrips];
+    if (role === "driver") list.push(refetchMyTrips);
+    if (role === "passenger") list.push(refetchMyBookings);
+    return list;
   }, [refetchTrips, refetchMyTrips, refetchMyBookings, role]);
 
-  const isRefreshing =
-    (tripsFetching && !tripsLoading) ||
-    (role === "driver" && myTripsFetching && !myTripsLoading) ||
-    (role === "passenger" && myBookingsFetching && !myBookingsLoading);
+  const { isRefreshing, handleRefresh } = usePullToRefreshMany(refetchers);
 
   if (!currentUser) {
     return (
@@ -136,7 +131,7 @@ export const HomePanel: FC<HomePanelProps> = ({
       <AppPanelHeader>Едем</AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <Group padding="s">
+      <Group>
         <Box padding="system">
           <Title level="1" weight="2">
             Привет, {currentUser.name.split(" ")[0]}!

@@ -599,9 +599,9 @@ body {
   text-align: left;
 }
 
-/* ---------- PassengerBookingsPanel / PassengerHistoryPanel ---------- */
-.PassengerBookingsPanel__comment,
-.PassengerHistoryPanel__comment {
+/* ---------- PassengerHistoryPanel / BookingCardFooter ---------- */
+.PassengerHistoryPanel__comment,
+.BookingCardFooter__comment {
   margin-top: 10px;
   color: var(--vkui--color_text_secondary);
 }

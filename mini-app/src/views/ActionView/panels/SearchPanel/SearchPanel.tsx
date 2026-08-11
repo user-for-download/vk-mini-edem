@@ -1,3 +1,4 @@
+// mini-app/src/views/ActionView/panels/SearchPanel/SearchPanel.tsx
 import { useCallback, useEffect, useMemo, useState, useRef, type FC } from "react";
 import { Box, Button, Caption, DateInput, Flex, Group, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
@@ -11,6 +12,7 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useInfiniteTripsQuery } from "@/queries/useTripsQuery";
 import type { SearchTripsFilters } from "@/api/trips.api";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export interface SearchPanelProps {
   id: string;
@@ -95,8 +97,10 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
   }, [debouncedSearchValue, selectedTags, dateFrom, dateTo, toDateString]);
 
   const {
-    data, isLoading, isError, error, refetch, isFetching, isFetchingNextPage, hasNextPage, fetchNextPage,
+    data, isLoading, isError, error, refetch, isFetchingNextPage, hasNextPage, fetchNextPage,
   } = useInfiniteTripsQuery(filters);
+
+  const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -127,12 +131,6 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
       fetchNextPage();
     }
   }, [results.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
-  const isRefreshing = isFetching && !isLoading;
 
   return (
     <Panel id={id}>
@@ -234,7 +232,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
 
         {results.length > 0 && (
           <Box padding="system">
-            <Flex direction="column" gap={12} aria-busy={isFetching}>
+            <Flex direction="column" gap={12} aria-busy={isFetchingNextPage}>
               {results.map((trip) => (
                 <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
               ))}
@@ -257,4 +255,3 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
     </Panel>
   );
 };
-
