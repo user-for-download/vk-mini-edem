@@ -193,25 +193,62 @@ class WebSocketManager {
 export const wsManager = new WebSocketManager();
 
 let reaperInterval: NodeJS.Timeout | null = null;
+// Флаг остановки: защита от «зомби»-тиков interval, уже попавших в очередь
+// event loop после stopWsReaper() — они НЕ должны чистить соединения.
+let reaperStopped = false;
+
+/** Тело тика reaper: «зомби»-тик после остановки ничего не чистит. */
+function reaperTick(): void {
+  // «Зомби»-тик после остановки: логируем отдельным событием и выходим,
+  // НЕ трогая соединения (reapStale ниже не вызывается).
+  if (reaperStopped) {
+    logger.debug("ws_reaper_zombie_tick_ignored");
+    return;
+  }
+  const reaped = wsManager.reapStale();
+  if (reaped.length > 0) {
+    logger.warn({ count: reaped.length }, "ws_reaped_stale");
+  }
+}
 
 /** Запускает периодическую очистку «мёртвых» соединений (pong timeout). */
 export function startWsReaper(): void {
   if (reaperInterval) return;
-  reaperInterval = setInterval(() => {
-    const reaped = wsManager.reapStale();
-    if (reaped.length > 0) {
-      logger.warn({ count: reaped.length }, "ws_reaped_stale");
-    }
-  }, REAPER_INTERVAL_MS);
+  // Повторный запуск после stopWsReaper() обязан «перевзвести» флаг,
+  // иначе свежесозданный interval будет игнорировать все тики.
+  reaperStopped = false;
+  reaperInterval = setInterval(reaperTick, REAPER_INTERVAL_MS);
   reaperInterval.unref?.();
   logger.debug({ intervalMs: REAPER_INTERVAL_MS }, "ws_reaper_started");
 }
 
 /** Останавливает reaper (вызывается при graceful shutdown). */
 export function stopWsReaper(): void {
+  // Идемпотентность: повторный stop не меняет состояние, логируем отдельное событие.
+  if (reaperStopped) {
+    logger.debug("ws_reaper_already_stopped");
+    return;
+  }
+  // Флаг ставим ДО clearInterval: тик, уже находящийся в очереди,
+  // увидит reaperStopped = true и не будет чистить соединения.
+  reaperStopped = true;
   if (reaperInterval) {
     clearInterval(reaperInterval);
     reaperInterval = null;
     logger.debug("ws_reaper_stopped");
   }
+}
+
+/**
+ * Сброс состояния reaper в исходное: reaperInterval = null, reaperStopped = false.
+ * ТОЛЬКО ДЛЯ ТЕСТОВ — не вызывает clearInterval для активного таймера.
+ */
+export function __resetWsReaperState(): void {
+  reaperInterval = null;
+  reaperStopped = false;
+}
+
+/** Вызов тела тика reaper напрямую. ТОЛЬКО ДЛЯ ТЕСТОВ (zombie-guard). */
+export function __reaperTickForTests(): void {
+  reaperTick();
 }

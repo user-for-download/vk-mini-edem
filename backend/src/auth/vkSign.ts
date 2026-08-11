@@ -1,8 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../env.js";
 import { logger } from "../logger.js";
+import { captureWarning } from "../utils/sentry.js";
 
 const MAX_SIGN_AGE_MS = 5 * 60 * 1000;
+// Порог, после которого расхождение часов клиента/сервера логируется
+// (до молчаливого отклонения по MAX_SIGN_AGE_MS).
+const DRIFT_WARN_THRESHOLD_MS = 60 * 1000;
 
 export interface VkAuthResult {
   isValid: boolean;
@@ -45,8 +49,21 @@ export function verifyVkLaunchSignature(rawSearchParams: string): VkAuthResult {
 
   // Проверка свежести vk_ts (в секундах)
   const vkTsMs = Number(vkTsStr) * 1000;
-  if (Number.isNaN(vkTsMs) || Math.abs(Date.now() - vkTsMs) > MAX_SIGN_AGE_MS) {
+  const driftMs = Number.isNaN(vkTsMs) ? Number.NaN : Math.abs(Date.now() - vkTsMs);
+  if (Number.isNaN(driftMs) || driftMs > MAX_SIGN_AGE_MS) {
     return { isValid: false };
+  }
+  // Расхождение часов больше 1 минуты — сигнал для диагностики
+  // (подпись ещё валидна, но у клиента, вероятно, сбиты часы).
+  if (driftMs > DRIFT_WARN_THRESHOLD_MS) {
+    logger.warn(
+      { vkUserId, driftMs, maxAgeMs: MAX_SIGN_AGE_MS },
+      "vk_sign_clock_drift"
+    );
+    captureWarning("vk_sign_clock_drift", {
+      extra: { vkUserId, driftMs, maxAgeMs: MAX_SIGN_AGE_MS },
+      tags: { auth: "vk_sign" },
+    });
   }
 
   // Сбор только vk_* параметров (исключая подпись и любые сторонние параметры вроде driverId/tripId)

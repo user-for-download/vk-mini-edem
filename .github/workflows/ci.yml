@@ -38,6 +38,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: dist must not be tracked
+        run: |
+          TRACKED_DIST=$(git ls-files | grep -E '(^|/)dist/' || true)
+          if [ -n "$TRACKED_DIST" ]; then echo "dist/ files are tracked: $TRACKED_DIST"; exit 1; fi
+
       - name: Setup Node
         uses: actions/setup-node@v5
         with:

@@ -1,4 +1,4 @@
-import "./sentry.js";
+import { initSentry } from "./utils/sentry.js";
 import { serve } from "@hono/node-server";
 import { app, injectWebSocket } from "./app.js";
 import { env } from "./env.js";
@@ -7,6 +7,8 @@ import { wsManager, startWsReaper, stopWsReaper } from "./services/wsManager.js"
 
 import { db } from "./db.js";
 import { startTripWorker, stopTripWorker } from "./workers/tripWorker.js";
+
+initSentry();
 
 if (env.isProduction && env.ALLOW_DEV_AUTH) {
   throw new Error(

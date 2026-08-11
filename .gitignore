@@ -5,9 +5,10 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
+.env
 !.env.example
 backend/.env
+!backend/.env.test
 *.db
 *.db-journal
 .opencode/

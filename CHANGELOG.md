@@ -94,3 +94,29 @@
   (`backend/tests/integration/bookings-pagination.test.ts`).
 - Покрытие: дефолтный/custom limit, clamp 1-50, невалидный cursor → 400,
   expired cursor → пустая страница 200, обход страниц без пересечений, 404/403.
+
+### 🚀 Features
+
+#### Observability (Phase 4)
+
+- **Sentry-хелперы** (`backend/src/utils/sentry.ts`):
+  - `initSentry()` — единственная точка инициализации Sentry (других `Sentry.init` в проекте нет): `beforeSend`-фильтр вырезает PII до отправки события (`event.user`, `event.request` — headers/cookies/query_string, чувствительные `extra`-ключи);
+  - `captureWarning()` / `captureException()` — обёртки для структурированных предупреждений и ошибок;
+  - `backend/src/sentry.ts` переведён на re-export, `index.ts` вызывает `initSentry()` вместо side-effect импорта.
+- **Диагностика дрейфа подписи VK Launch** (`backend/src/auth/vkSign.ts`): при `vk_ts`-дрейфе более 1 минуты пишется структурированный warn + `captureWarning` — раньше такой запрос молча отклонялся (порог 5 минут), и расследовать проблемы с рассинхроном часов клиента было нечем.
+- **Безопасность WebSocket reaper** (`backend/src/services/wsManager.ts`):
+  - идемпотентный `stopWsReaper` — флаг `reaperStopped`, повторный stop логируется отдельным сообщением `ws_reaper_already_stopped`;
+  - защита от zombie-колбэков при остановленном reaper;
+  - `startWsReaper` сбрасывает флаг; для тестов экспортирован `__resetWsReaperState`.
+
+### 🧪 Testing
+
+- Юнит-тесты `backend/tests/unit/`:
+  - `sentry.test.ts` — PII-stripping в `beforeSend`, единый init-путь, `captureWarning`/`captureException`;
+  - `vkSign.test.ts` — диагностика дрейфа `vk_ts` (структурированный warn + `captureWarning`);
+  - `wsManager.test.ts` — идемпотентный stop reaper, zombie-гард.
+
+### 🔧 Tooling & CI
+
+- `.gitignore` — агрессивный паттерн `.env*` заменён на явные перечисления (существующие защиты сохранены: `.opencode/`, `.tmp/`, `dump/`, `fix/`, `prc.json`, `assets/` и т.д.); добавлено исключение `!backend/.env.test`.
+- CI (`.github/workflows/ci.yml`) — добавлен шаг-проверка «dist не должен отслеживаться в git» (regression-гард от случайного коммита сборочных артефактов).
