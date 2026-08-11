@@ -102,21 +102,21 @@ function resolveClientIp(c: Context): string {
 
 /**
  * Лимитер для публичных GET-эндпоинтов (поиск, профили, отзывы).
- * 100 запросов в минуту с одного IP.
+ * 100 запросов в минуту с одного IP (настраивается через ENV).
  */
 export const publicReadLimiter = createRateLimiter({
-  windowMs: 60 * 1000,
-  max: 100,
+  windowMs: env.PUBLIC_READ_RATE_WINDOW_MS,
+  max: env.PUBLIC_READ_RATE_MAX,
   keyPrefix: "public-read",
 });
 
 /**
  * Лимитер для мутаций (создание поездок, броней, отзывов).
- * 30 запросов в минуту с одного IP.
+ * 30 запросов в минуту с одного IP (настраивается через ENV).
  */
 export const mutationLimiter = createRateLimiter({
-  windowMs: 60 * 1000,
-  max: 30,
+  windowMs: env.MUTATION_RATE_WINDOW_MS,
+  max: env.MUTATION_RATE_MAX,
   keyPrefix: "mutation",
 });
 
@@ -217,30 +217,30 @@ export function createUserRateLimiter(options: RateLimiterOptions) {
 
 // ─── Пресеты user-based лимитеров ─────────────────────────────────────────
 
-/** Водитель: создание поездок, 10 в сутки. */
+/** Водитель: создание поездок, 10 в сутки (настраивается через ENV). */
 export const createTripLimiter = createUserRateLimiter({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 10,
+  windowMs: env.CREATE_TRIP_RATE_WINDOW_MS,
+  max: env.CREATE_TRIP_RATE_MAX,
   keyPrefix: "driver-create-trip",
 });
 
-/** Водитель: отмена поездок, 20 в сутки. */
+/** Водитель: отмена поездок, 20 в сутки (настраивается через ENV). */
 export const cancelTripLimiter = createUserRateLimiter({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 20,
+  windowMs: env.CANCEL_TRIP_RATE_WINDOW_MS,
+  max: env.CANCEL_TRIP_RATE_MAX,
   keyPrefix: "driver-cancel-trip",
 });
 
-/** Пассажир: создание броней, 20 в сутки. */
+/** Пассажир: создание броней, 20 в сутки (настраивается через ENV). */
 export const createBookingLimiter = createUserRateLimiter({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 20,
+  windowMs: env.CREATE_BOOKING_RATE_WINDOW_MS,
+  max: env.CREATE_BOOKING_RATE_MAX,
   keyPrefix: "passenger-create-booking",
 });
 
-/** Пассажир: отмена броней, 20 в сутки. */
+/** Пассажир: отмена броней, 20 в сутки (настраивается через ENV). */
 export const cancelBookingLimiter = createUserRateLimiter({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 20,
+  windowMs: env.CANCEL_BOOKING_RATE_WINDOW_MS,
+  max: env.CANCEL_BOOKING_RATE_MAX,
   keyPrefix: "passenger-cancel-booking",
 });
