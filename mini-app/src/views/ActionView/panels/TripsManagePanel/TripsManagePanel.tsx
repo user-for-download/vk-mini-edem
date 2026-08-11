@@ -97,6 +97,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
 
       <Group>
         <Box padding="system">
@@ -190,6 +191,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </div>
       </PullToRefresh>
     </Panel>
   );

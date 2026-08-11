@@ -197,6 +197,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
 
       <Group>
         <Box padding="system">
@@ -302,6 +303,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </div>
       </PullToRefresh>
     </Panel>
   );

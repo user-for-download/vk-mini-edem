@@ -146,6 +146,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
 
       {trip && (
         <Group>
@@ -271,6 +272,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
           />
         )}
       </Group>
+      </div>
       </PullToRefresh>
     </Panel>
   );

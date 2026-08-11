@@ -5,9 +5,10 @@
   --carpool_accent_soft: #e3f6ec;
 }
 
+/* Скролл живёт внутри VKUI (Panel__in): внешний overflow на html ломал бы
+   PullToRefresh (document.scrollingElement вместо внутреннего контейнера). */
 html {
   height: 100%;
-  overflow-y: auto;
 }
 
 body, #root {
@@ -18,6 +19,9 @@ body {
   margin: 0;
   width: 100vw;
   overflow-x: hidden;
+  /* Блокируем системный rubber-band/overscroll на уровне документа,
+     не мешая внутреннему скроллу Panel__in. */
+  overscroll-behavior-y: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

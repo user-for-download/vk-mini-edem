@@ -131,6 +131,7 @@ export const HomePanel: FC<HomePanelProps> = ({
       <AppPanelHeader>Едем</AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
       <Group>
         <Box padding="system">
           <Title level="1" weight="2">
@@ -314,6 +315,7 @@ export const HomePanel: FC<HomePanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </div>
       </PullToRefresh>
     </Panel>
   );

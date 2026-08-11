@@ -74,6 +74,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
       <Group>
         <Box padding="system">
           <SegmentedControl<PassengerBookingScope>
@@ -163,6 +164,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
       </Group>
 
       <Spacing size={24} />
+      </div>
       </PullToRefresh>
     </Panel>
   );

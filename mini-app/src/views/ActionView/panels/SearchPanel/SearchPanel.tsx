@@ -137,6 +137,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
       <AppPanelHeader>Поиск поездок</AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
+      <div>
       <Group>
         <Box padding="system">
           <Search
@@ -251,6 +252,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
       </Group>
 
       <Spacing size={24} />
+      </div>
       </PullToRefresh>
     </Panel>
   );
