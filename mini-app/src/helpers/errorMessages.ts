@@ -18,6 +18,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   ALREADY_REVIEWED: "Вы уже оставляли отзыв об этой поездке",
   NOT_PARTICIPANT: "Вы не участвовали в этой поездке",
   SELF_REVIEW: "Нельзя оставить отзыв самому себе",
+  DRIVER_TRIP_OVERLAP: "У вас уже есть активная поездка на это время. Выберите другое время.",
+  PASSENGER_BOOKING_OVERLAP: "У вас уже есть бронь на поездку в это время. Проверьте «Мои поездки».",
   INTERNAL_ERROR: "Внутренняя ошибка сервера",
 };
 

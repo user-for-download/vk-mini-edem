@@ -15,6 +15,7 @@ export const TripErrors = {
   notActive: (): TripErrorKind => ({ code: ERROR_CODES.TRIP_NOT_ACTIVE, status: 400 }),
   notStarted: (): TripErrorKind => ({ code: ERROR_CODES.TRIP_IN_PAST, status: 400 }),
   conflict: (): TripErrorKind => ({ code: ERROR_CODES.CONFLICT, status: 409 }),
+  overlap: (): TripErrorKind => ({ code: ERROR_CODES.DRIVER_TRIP_OVERLAP, status: 409 }),
 } as const;
 
 export class TripError extends Error {

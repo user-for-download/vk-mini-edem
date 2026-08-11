@@ -17,6 +17,7 @@ import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
 import { TripError, TripErrors } from "./errors.js";
+import { getTripRange, rangesOverlap } from "../utils/overlap.js";
 
 type TripWithDriver = Prisma.TripGetPayload<{
   include: { driver: { include: { car: true } } };
@@ -374,30 +375,85 @@ tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
     );
   }
 
-  const created = await db.trip.create({
-    data: {
-      driverId: driver.id,
-      fromCity: dto.fromCity,
-      fromAddress: dto.fromAddress,
-      toCity: dto.toCity,
-      toAddress: dto.toAddress,
-      departureAt: new Date(dto.departureAt),
-      durationMinutes: dto.durationMinutes,
-      distanceKm: dto.distanceKm,
-      price: dto.price,
-      seatsTotal: dto.seatsTotal,
-      seatsAvailable: dto.seatsTotal,
-      tags: dto.tags,
-      comment: dto.comment,
-    },
-    include: {
-      driver: {
-        include: {
-          car: true,
-        },
+  let created: TripWithDriver;
+  try {
+    // Проверка пересечения с другими active-поездками водителя и создание —
+    // в одной Serializable-транзакции: между проверкой и insert не может
+    // пройти параллельная поездка на пересекающееся время (иначе две
+    // вкладки создали бы два пересекающихся рейса).
+    created = await db.$transaction(
+      async (tx) => {
+        const newRange = getTripRange(departureDate, dto.durationMinutes);
+
+        const driverActiveTrips = await tx.trip.findMany({
+          where: {
+            driverId: driver.id,
+            status: "active",
+            // Потенциально пересекаются только поездки, стартующие до конца
+            // новой: остальные гарантированно не пересекаются.
+            departureAt: { lt: newRange.end },
+          },
+          select: { departureAt: true, durationMinutes: true },
+        });
+
+        const hasOverlap = driverActiveTrips.some((t) =>
+          rangesOverlap(newRange, getTripRange(t.departureAt, t.durationMinutes))
+        );
+
+        if (hasOverlap) {
+          throw new TripError(
+            TripErrors.overlap(),
+            "У вас уже есть поездка на это время"
+          );
+        }
+
+        return tx.trip.create({
+          data: {
+            driverId: driver.id,
+            fromCity: dto.fromCity,
+            fromAddress: dto.fromAddress,
+            toCity: dto.toCity,
+            toAddress: dto.toAddress,
+            departureAt: new Date(dto.departureAt),
+            durationMinutes: dto.durationMinutes,
+            distanceKm: dto.distanceKm,
+            price: dto.price,
+            seatsTotal: dto.seatsTotal,
+            seatsAvailable: dto.seatsTotal,
+            tags: dto.tags,
+            comment: dto.comment,
+          },
+          include: {
+            driver: {
+              include: {
+                car: true,
+              },
+            },
+          },
+        });
       },
-    },
-  });
+      { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 }
+    );
+  } catch (error) {
+    if (error instanceof TripError) {
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status as ContentfulStatusCode
+      );
+    }
+    // Serializable: параллельное создание поездки на пересекающееся время —
+    // клиент получает 409 и может повторить запрос.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
+        409
+      );
+    }
+    throw error;
+  }
 
   logBusinessEvent("trip.created", {
     tripId: created.id,
@@ -487,6 +543,41 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
     // «протухал» (рассинхронизация мест).
     updated = await db.$transaction(
       async (tx) => {
+        if (dto.departureAt !== undefined || dto.durationMinutes !== undefined) {
+          const newDeparture =
+            dto.departureAt !== undefined
+              ? new Date(dto.departureAt)
+              : trip.departureAt;
+          const newDuration =
+            dto.durationMinutes !== undefined
+              ? dto.durationMinutes
+              : trip.durationMinutes;
+          const newRange = getTripRange(newDeparture, newDuration);
+
+          // Проверяем пересечение с другими active-поездками водителя,
+          // исключая текущую (свою же поездку можно «пересекать»).
+          const otherActiveTrips = await tx.trip.findMany({
+            where: {
+              driverId: user.id,
+              status: "active",
+              id: { not: trip.id },
+              departureAt: { lt: newRange.end },
+            },
+            select: { departureAt: true, durationMinutes: true },
+          });
+
+          const hasOverlap = otherActiveTrips.some((t) =>
+            rangesOverlap(newRange, getTripRange(t.departureAt, t.durationMinutes))
+          );
+
+          if (hasOverlap) {
+            throw new TripError(
+              TripErrors.overlap(),
+              "Новое время пересекается с другой вашей поездкой"
+            );
+          }
+        }
+
         if (dto.seatsTotal !== undefined) {
           const activeBookingsForSeats = await tx.booking.count({
             where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
@@ -504,6 +595,12 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
       { isolationLevel: "Serializable" }
     );
   } catch (error) {
+    if (error instanceof TripError) {
+      return c.json(
+        { code: error.code, message: error.message },
+        error.status as ContentfulStatusCode
+      );
+    }
     // Serializable: параллельное изменение поездки/брони — клиент
     // получает 409 и может повторить запрос с актуальными данными.
     if (

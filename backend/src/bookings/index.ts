@@ -18,6 +18,7 @@ import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../
 import { mutationLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
+import { getTripRange, rangesOverlap } from "../utils/overlap.js";
 
 type HttpStatus = 400 | 403 | 404 | 409;
 
@@ -427,6 +428,39 @@ bookingsRouter.post("/", mutationLimiter, async (c) => {
 
       if (trip.driverId === passenger.id) {
         throw new BookingError("Driver cannot book own trip", 400, ERROR_CODES.FORBIDDEN);
+      }
+
+      // Запрещаем бронировать поездку, пересекающуюся по времени с другой
+      // активной броней пассажира (pending/confirmed на active-поездку).
+      const newRange = getTripRange(trip.departureAt, trip.durationMinutes);
+
+      const passengerActiveBookings = await tx.booking.findMany({
+        where: {
+          passengerId: passenger.id,
+          // Исключаем брони на ЭТУ поездку: они обрабатываются ниже
+          // (идемпотентный retry / ALREADY_BOOKED).
+          tripId: { not: tripId },
+          status: { in: [...ACTIVE_BOOKING_STATUSES] },
+          trip: {
+            status: "active",
+            departureAt: { lt: newRange.end },
+          },
+        },
+        include: {
+          trip: { select: { departureAt: true, durationMinutes: true } },
+        },
+      });
+
+      const hasOverlap = passengerActiveBookings.some((b) =>
+        rangesOverlap(newRange, getTripRange(b.trip.departureAt, b.trip.durationMinutes))
+      );
+
+      if (hasOverlap) {
+        throw new BookingError(
+          "У вас уже есть бронь на поездку в это время",
+          409,
+          ERROR_CODES.PASSENGER_BOOKING_OVERLAP
+        );
       }
 
       if (seat < 1 || seat > trip.seatsTotal) {

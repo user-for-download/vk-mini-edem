@@ -234,6 +234,13 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             });
             // Force refetch to update seat scheme
             queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(trip.id) });
+          } else if (error instanceof ApiError && error.code === 'PASSENGER_BOOKING_OVERLAP') {
+            enqueueSnackbar({
+              type: "error",
+              title: "Время пересекается с другой броней",
+              subtitle: "У вас уже есть бронь на поездку в это время. Проверьте «Мои поездки».",
+              dedupeKey: `book_overlap_error_${trip.id}`,
+            });
           } else {
             enqueueSnackbar({
               type: "error",

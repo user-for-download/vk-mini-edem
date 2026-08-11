@@ -96,6 +96,7 @@ model Trip {
 
   @@index([status, departureAt(sort: Asc)])
   @@index([driverId, status])
+  @@index([driverId, status, departureAt(sort: Asc)])
   @@index([fromCity, toCity, status])
 }
 
