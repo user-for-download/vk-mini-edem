@@ -247,12 +247,17 @@ export const HomePanel: FC<HomePanelProps> = ({
               <TripCard
                 trip={nextActiveBooking.trip}
                 onOpen={() => onOpenTrip(nextActiveBooking.trip)}
-                seatsLabel={
+                seatsLabel={`Место ${nextActiveBooking.seat}${
+                  nextActiveBooking.status === "confirmed"
+                    ? " подтверждено"
+                    : nextActiveBooking.status === "pending"
+                      ? " ожидает"
+                      : ""
+                }`}
+                seatsColor={
                   nextActiveBooking.status === "pending"
-                    ? "Ожидает подтверждение"
-                    : nextActiveBooking.status === "confirmed"
-                      ? "Место подтверждено"
-                      : undefined
+                    ? "var(--vkui--color_text_accent, #3f8ae0)"
+                    : undefined
                 }
               />
             </Box>

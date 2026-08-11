@@ -603,8 +603,8 @@ body {
   text-align: left;
 }
 
-/* ---------- BookingCardFooter (единый футер брони пассажира) ---------- */
-.BookingCardFooter__comment {
+/* ---------- PassengerTripCard (статус/место/отзыв в теле карточки) ---------- */
+.PassengerTripCard__comment {
   margin-top: 10px;
   color: var(--vkui--color_text_secondary);
 }

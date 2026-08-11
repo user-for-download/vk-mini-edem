@@ -1,13 +1,7 @@
-// mini-app/src/components/BookingCardFooter.tsx
+// mini-app/src/components/PassengerTripCard.tsx
 import { type FC } from "react";
-import {
-  Button,
-  Caption,
-  Flex,
-  Spacing,
-  Subhead,
-  Text,
-} from "@vkontakte/vkui";
+import { Button, Caption, Spacing, Text } from "@vkontakte/vkui";
+import { TripCard } from "@/components/TripCard";
 import type { Booking, Trip } from "@/types";
 
 function isPast(date?: string): boolean {
@@ -34,7 +28,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 1. Поездка отменена (глобальный статус поездки)
   if (trip.status === "cancelled") {
     return {
-      label: "Поездка отменена",
+      label: "отменено",
       color: "var(--vkui--color_text_negative)",
     };
   }
@@ -42,7 +36,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 2. Бронь отменена пассажиром
   if (booking.status === "cancelled") {
     return {
-      label: "Отменена вами",
+      label: "отменено вами",
       color: "var(--vkui--color_text_negative)",
     };
   }
@@ -50,7 +44,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 3. Заявка отклонена водителем
   if (booking.status === "declined") {
     return {
-      label: "Заявка отклонена",
+      label: "отклонено",
       color: "var(--vkui--color_text_secondary)",
     };
   }
@@ -58,7 +52,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 4. Не состоялась: заявка так и не подтверждена, а время поездки прошло
   if (booking.status === "pending" && isPast(trip.departureAt)) {
     return {
-      label: "Не состоялась",
+      label: "не состоялось",
       color: "var(--vkui--color_text_secondary)",
     };
   }
@@ -66,7 +60,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 5. Ждёт подтверждения
   if (booking.status === "pending") {
     return {
-      label: "Ждёт подтверждения",
+      label: "ожидает",
       color: "var(--vkui--color_text_accent, #3f8ae0)",
     };
   }
@@ -77,7 +71,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
     (trip.status === "completed" || isPast(trip.departureAt))
   ) {
     return {
-      label: "Завершена",
+      label: "завершено",
       color: "var(--carpool_accent)",
     };
   }
@@ -85,38 +79,38 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   // 7. Подтверждена
   if (booking.status === "confirmed") {
     return {
-      label: "Подтверждена",
+      label: "подтверждено",
       color: "var(--carpool_accent)",
     };
   }
 
   return {
-    label: "Неизвестно",
+    label: "неизвестно",
     color: "var(--vkui--color_text_secondary)",
   };
 }
 
-export const BookingCardFooter: FC<{
+/**
+ * Карточка поездки для пассажирской брони: статус брони встроен в строку
+ * места в правой колонке («Место 1 подтверждено», цвет по статусу),
+ * комментарий и кнопка отзыва — в теле карточки, без отдельного футера.
+ */
+export const PassengerTripCard: FC<{
   booking: Booking;
+  onOpen?: (trip: Trip) => void;
   onOpenReview?: (trip: Trip) => void;
-}> = ({ booking, onOpenReview }) => {
-  const { label, color } = getStatusData(booking);
-
-  const showReviewDone = Boolean(booking.hasReview);
+}> = ({ booking, onOpen, onOpenReview }) => {
+  const status = getStatusData(booking);
 
   return (
-    <>
-      <Flex justify="space-between" align="center">
-        <Caption level="1" weight="2">
-          Место {booking.seat}
-        </Caption>
-        <Subhead weight="2" style={{ color }}>
-          {label}
-        </Subhead>
-      </Flex>
-
+    <TripCard
+      trip={booking.trip}
+      onOpen={onOpen}
+      seatsLabel={`Место ${booking.seat} ${status.label}`}
+      seatsColor={status.color}
+    >
       {booking.comment && (
-        <Text className="BookingCardFooter__comment">
+        <Text className="PassengerTripCard__comment">
           «{booking.comment}»
         </Text>
       )}
@@ -137,13 +131,13 @@ export const BookingCardFooter: FC<{
         </>
       )}
 
-      {showReviewDone && (
-        <Caption level="1" className="BookingCardFooter__comment">
+      {booking.hasReview && (
+        <Caption level="1" className="PassengerTripCard__comment">
           Отзыв оставлен
         </Caption>
       )}
-    </>
+    </TripCard>
   );
 };
 
-BookingCardFooter.displayName = "BookingCardFooter";
+PassengerTripCard.displayName = "PassengerTripCard";

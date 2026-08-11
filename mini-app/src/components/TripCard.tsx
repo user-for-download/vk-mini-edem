@@ -25,8 +25,10 @@ export interface TripCardProps {
   hideSeats?: boolean;
   /** Переопределяет автоматический текст «X из Y мест». */
   seatsLabel?: string;
+  /** Цвет текста мест (перекрывает цвет по умолчанию). */
+  seatsColor?: string;
   archivedStatus?: "completed" | "cancelled";
-  /** Дополнительный контент в нижней части карточки (после блока водителя). */
+  /** Дополнительный контент в теле карточки (после блока водителя, без Separator). */
   children?: ReactNode;
 }
 
@@ -53,6 +55,7 @@ export const TripCard: FC<TripCardProps> = ({
   requestsCount = 0,
   hideSeats = false,
   seatsLabel: seatsLabelProp,
+  seatsColor,
   archivedStatus,
   children,
 }) => {
@@ -157,6 +160,7 @@ export const TripCard: FC<TripCardProps> = ({
               <Caption
                 level="1"
                 weight="2"
+                style={seatsColor ? { color: seatsColor } : undefined}
                 className={
                   trip.seatsAvailable === 0
                     ? "TripCard__seats TripCard__seats--none"
@@ -176,8 +180,6 @@ export const TripCard: FC<TripCardProps> = ({
 
         {children && (
           <>
-            <Spacing size={12} />
-            <Separator />
             <Spacing size={12} />
             {children}
           </>

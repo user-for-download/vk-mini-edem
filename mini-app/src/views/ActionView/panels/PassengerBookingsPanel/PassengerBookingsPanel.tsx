@@ -12,13 +12,12 @@ import {
   Spacing,
 } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
-import { TripCard } from "@/components/TripCard";
+import { PassengerTripCard } from "@/components/PassengerTripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import { BookingCardFooter } from "@/components/BookingCardFooter";
 import type { PassengerBooking, PassengerBookingScope } from "@/types";
 
 export interface PassengerBookingsPanelProps {
@@ -125,17 +124,12 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
               aria-label={`Список поездок, всего ${visibleBookings.length}`}
             >
               {visibleBookings.map((booking) => (
-              <TripCard
+              <PassengerTripCard
                 key={booking.id}
-                trip={booking.trip}
+                booking={booking}
                 onOpen={() => onOpenTrip(booking.trip)}
-                hideSeats
-              >
-                <BookingCardFooter
-                  booking={booking}
-                  onOpenReview={onOpenReview}
-                />
-              </TripCard>
+                onOpenReview={onOpenReview}
+              />
             ))}
             </Flex>
           </Box>

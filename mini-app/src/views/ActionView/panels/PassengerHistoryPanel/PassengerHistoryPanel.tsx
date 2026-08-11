@@ -11,14 +11,12 @@ import {
   SegmentedControl,
   Spacing,
 } from "@vkontakte/vkui";
-import type { Booking, Trip } from "@/types";
-import { TripCard } from "@/components/TripCard";
+import type { Trip } from "@/types";
+import { PassengerTripCard } from "@/components/PassengerTripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { usePassengerHistoryQuery } from "@/queries/useBookingsQuery";
-import { BookingCardFooter } from "@/components/BookingCardFooter";
-
 export interface PassengerHistoryPanelProps {
   id: string;
   onBack: () => void;
@@ -139,17 +137,12 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
           <Box padding="system">
             <Flex direction="column" gap={12}>
               {visibleItems.map((booking) => (
-                <TripCard
+                <PassengerTripCard
                   key={booking.id}
-                  trip={booking.trip}
+                  booking={booking}
                   onOpen={() => onOpenTrip(booking.trip)}
-                  hideSeats
-                >
-                  <BookingCardFooter
-                    booking={booking}
-                    onOpenReview={onOpenReview}
-                  />
-                </TripCard>
+                  onOpenReview={onOpenReview}
+                />
               ))}
             </Flex>
           </Box>
