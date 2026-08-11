@@ -8,7 +8,7 @@ COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
 COPY mini-app/package.json ./mini-app/
 
-RUN npm ci || npm install
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 COPY tsconfig.json ./
 COPY packages/contracts ./packages/contracts
@@ -28,8 +28,18 @@ ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 
 COPY --from=builder /app/backend/dist ./dist
+# В npm workspaces ВСЕ пакеты поднимаются в корневой node_modules;
+# backend/node_modules содержит только symlink'и — копировать его поверх нельзя.
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/node_modules ./node_modules
+
+# Версии backend-зависимостей, которые npm НЕ поднял в корень из-за конфликтов
+# с другими воркспейсами (zod 3 vs 4, @hono/node-server 1.x vs 2.x,
+# dotenv 16 vs 17) — они лежат реальными папками в backend/node_modules,
+# а рантайм резолвит из /app/node_modules. Копируем их точечно.
+COPY --from=builder /app/backend/node_modules/zod ./node_modules/zod
+COPY --from=builder /app/backend/node_modules/dotenv ./node_modules/dotenv
+COPY --from=builder /app/backend/node_modules/@hono/node-server ./node_modules/@hono/node-server
+COPY --from=builder /app/backend/node_modules/@hono/node-ws ./node_modules/@hono/node-ws
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/packages/contracts/dist ./node_modules/@edem/contracts/dist
@@ -38,4 +48,4 @@ COPY --from=builder /app/mini-app/dist ./mini-app/dist
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist/src/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/index.js"]
