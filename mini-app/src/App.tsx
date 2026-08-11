@@ -137,7 +137,7 @@ export default function App() {
   return (
     <>
       <OfflineBanner isOnline={isOnline} wasOffline={wasOffline} />
-      <SplitLayout header={<PanelHeader delimiter="none" fixed={false} />}>
+      <SplitLayout center header={<PanelHeader delimiter="none" fixed={false} />}>
         <SplitCol autoSpaced maxWidth={720}>
           <Epic
             activeStory={activeView as ViewId}

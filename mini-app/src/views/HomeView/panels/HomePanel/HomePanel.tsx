@@ -136,7 +136,7 @@ export const HomePanel: FC<HomePanelProps> = ({
       <AppPanelHeader>Едем</AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <Group>
+      <Group padding="s">
         <Box padding="system">
           <Title level="1" weight="2">
             Привет, {currentUser.name.split(" ")[0]}!
