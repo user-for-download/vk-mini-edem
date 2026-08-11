@@ -37,7 +37,7 @@
 │   │   ├── migrations/          # Prisma-миграции (единый snapshot)
 │   │   └── seed.ts              # Наполнение тестовыми данными (22 юзера, 28 поездок и т.д.)
 │   ├── src/
-│   │   ├── auth/                # VK-авторизация, JWT + refresh-токены (ротация, хэш в БД)
+│   │   ├── auth/                # VK-авторизация (подпись launch params + диагностика дрейфа часов), JWT + refresh-токены (ротация, хэш в БД)
 │   │   ├── middleware/          # Rate limiting, sanitize (DOMPurify), requireUser
 │   │   ├── trips/               # Поездки (+ пагинация, статусы, авто-завершение)
 │   │   ├── bookings/            # Бронирования (Serializable, P2002/P2034 → 409)
@@ -47,9 +47,10 @@
 │   │   ├── ws/                  # WebSocket (auth, рассылка событий)
 │   │   ├── workers/             # Фон: авто-завершение просроченных поездок
 │   │   ├── serializers/         # Сериализация ответов
-│   │   ├── services/            # Бизнес-сервисы (уведомления)
+│   │   ├── services/            # Бизнес-сервисы (уведомления, wsManager с reaper-очисткой)
+│   │   ├── utils/               # Sentry-хелперы (initSentry с PII-стриппингом, captureWarning/Exception)
 │   │   ├── app.ts               # Hono-приложение (роуты /api/v1, security-заголовки)
-│   │   └── index.ts             # Серверный entry point
+│   │   └── index.ts             # Серверный entry point (initSentry, graceful shutdown)
 │   ├── .env                     # Переменные окружения (dev)
 │   └── .env.test                # Переменные окружения для тестов (отдельная БД edem_test)
 │
@@ -130,6 +131,7 @@ NODE_ENV=development
 ALLOW_DEV_AUTH=true            # Dev-имитация VK-подписи (только не в production); mock refresh-токены работают end-to-end
 JWT_SECRET=your-jwt-secret-key-32-chars-long
 VK_APP_SECRET=your-vk-app-secret
+SENTRY_DSN=                    # Sentry DSN (пусто — Sentry выключен)
 CORS_ORIGINS=http://localhost:3000
 BACKEND_PORT=3001
 JWT_ACCESS_TTL_SECONDS=900
@@ -139,7 +141,7 @@ AUTH_RATE_MAX=20
 LOG_LEVEL=debug
 ```
 
-Для тестов — `backend/.env.test` (аналогично, но `DATABASE_URL` указывает на `edem_test`). Оба файла в `.gitignore`.
+Для тестов — `backend/.env.test` (аналогично, но `DATABASE_URL` указывает на `edem_test`). Шаблон `.env.example` отслеживается в git; `backend/.env.test` — локальный файл, в git не коммитится (в `.gitignore` для него есть исключение `!backend/.env.test`).
 
 ## 🔌 API
 
@@ -191,11 +193,14 @@ LOG_LEVEL=debug
 - **Ограничение тела запроса**: 100 KB.
 - **Время**: даты сериализуются в `Europe/Moscow` (в контейнере задано через `TZ`).
 - **Критичные уведомления** (смена статуса брони/поездки) создаются всегда, независимо от настройки `notificationsEnabled` пользователя.
+- **Sentry (опционально, `SENTRY_DSN`)**: перед отправкой события очищаются от PII — `user` обнуляется, в `request` остаются только url/method, из `extra` вырезаются чувствительные ключи (token/password/secret/cookie и т.д.); без DSN хелперы деградируют в обычные логи.
 
 ## 📡 WebSocket
 
 После авторизации клиент подключается к `/api/v1/ws?token=...` и отправляет `{ type: "auth", token }`. Сервер рассылает события:
 `booking:new`, `booking:status_changed`, `trip:status_changed`, `notification:new`, `pong`/`ping`. Клиент автоматически реконнектится (3с), инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
+
+Reaper (`startWsReaper`/`stopWsReaper`): каждые 30 с сервер закрывает соединения без pong дольше 60 с; остановка идемпотентна, «зомби»-тики после остановки не чистят соединения (graceful shutdown).
 
 ## 🌐 PWA
 
@@ -211,7 +216,7 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
 ## 🛠 Технологии
 
 - **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, vite-plugin-pwa, Sentry
-- **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, isomorphic-dompurify
+- **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
 
@@ -227,7 +232,7 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
 
 - **HTTPS обязателен** в production (кроме localhost).
 - Сервер должен **разрешать iframe** — бэкенд отдаёт CSP `frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru` (не `X-Frame-Options: DENY`).
-- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин). Принимается только полный `searchParams` из launch-параметров — реконструкция подписи по отдельным полям не поддерживается.
+- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин; дрейф часов > 1 мин логируется и отправляется в Sentry для диагностики). Принимается только полный `searchParams` из launch-параметров — реконструкция подписи по отдельным полям не поддерживается.
 
 ### Шаги деплоя
 
