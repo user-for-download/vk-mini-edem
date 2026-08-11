@@ -26,7 +26,7 @@ import type { CreateTripDto, TripTag } from "@edem/contracts";
 import { ApiError } from "@/api/client";
 import { TRIP_TAGS } from "@/consts/tags";
 import { useSnackbar } from "@/providers/SnackbarProvider";
-import { getErrorMessage } from "@/helpers/errorMessages";
+import { getErrorMessage, getRateLimitMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
 import {
   type TripFormValues,
@@ -182,9 +182,11 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       },
       onError: (error) => {
         const message =
-          error instanceof ApiError
-            ? getErrorMessage(error.code, error.message)
-            : "Не удалось создать поездку";
+          error instanceof ApiError && error.code === "RATE_LIMITED"
+            ? getRateLimitMessage(error.retryAfterMs)
+            : error instanceof ApiError
+              ? getErrorMessage(error.code, error.message)
+              : "Не удалось создать поездку";
 
         enqueueSnackbar({
           type: "error",

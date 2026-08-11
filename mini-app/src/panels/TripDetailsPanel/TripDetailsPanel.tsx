@@ -30,6 +30,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { SeatScheme } from "@/components/SeatScheme";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
+import { getRateLimitMessage } from "@/helpers/errorMessages";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -240,6 +241,12 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               title: "Время пересекается с другой броней",
               subtitle: "У вас уже есть бронь на поездку в это время. Проверьте «Мои поездки».",
               dedupeKey: `book_overlap_error_${trip.id}`,
+            });
+          } else if (error instanceof ApiError && error.code === 'RATE_LIMITED') {
+            enqueueSnackbar({
+              type: "error",
+              title: getRateLimitMessage(error.retryAfterMs),
+              dedupeKey: `book_rate_limit_error_${trip.id}`,
             });
           } else {
             enqueueSnackbar({

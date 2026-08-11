@@ -15,7 +15,11 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
-import { mutationLimiter } from "../middleware/rateLimit.js";
+import {
+  mutationLimiter,
+  createBookingLimiter,
+  cancelBookingLimiter,
+} from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { getTripRange, rangesOverlap } from "../utils/overlap.js";
@@ -390,7 +394,7 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
  * Статус всегда pending.
  * Pending сразу удерживает место.
  */
-bookingsRouter.post("/", mutationLimiter, async (c) => {
+bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
   const body = await getSanitizedBody(c);
   const parseResult = createBookingDtoSchema.safeParse(body);
 
@@ -952,7 +956,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
  * - поездка должна быть active;
  * - активная бронь освобождает место.
  */
-bookingsRouter.patch("/:id/cancel", async (c) => {
+bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
 

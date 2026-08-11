@@ -1,8 +1,10 @@
 // backend/src/middleware/rateLimit.ts
-import type { Context, Next } from "hono";
+import type { Context, Env, Next } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { ERROR_CODES } from "../errors.js";
 import { env } from "../env.js";
+import { logger } from "../logger.js";
+import type { AuthUser } from "../auth/middleware.js";
 
 interface RateLimiterOptions {
   windowMs: number;
@@ -116,4 +118,129 @@ export const mutationLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   max: 30,
   keyPrefix: "mutation",
+});
+
+/**
+ * User-based rate limiter: ключ — userId, а не IP.
+ *
+ * Лимитирует «дорогие» действия по аккаунту (создание поездок, броней,
+ * отмены), чтобы нельзя было обойти IP-лимит сменой IP/NAT.
+ *
+ * Обязательно ставить ПОСЛЕ requireUser: без user в контексте лимитер
+ * не работает и выбрасывает ошибку (fail-fast), а не молча пропускает.
+ *
+ * Память: bucket'ы чистятся лениво при обращении (пустой — удаляется)
+ * и периодическим cleanup-таймером (unref — не держит процесс).
+ */
+export function createUserRateLimiter(options: RateLimiterOptions) {
+  const buckets = new Map<string, RateBucket>();
+
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+
+    for (const [key, bucket] of buckets.entries()) {
+      bucket.timestamps = bucket.timestamps.filter(
+        (timestamp) => now - timestamp < options.windowMs
+      );
+
+      if (bucket.timestamps.length === 0) {
+        buckets.delete(key);
+      }
+    }
+  }, options.windowMs);
+
+  if (typeof cleanupTimer.unref === "function") {
+    cleanupTimer.unref();
+  }
+
+  // Generic middleware: Hono выводит Env (включая Path) из роутера,
+  // поэтому у handler'ов после лимитера сохраняется типизация param().
+  return async function userRateLimiter<
+    E extends Env & { Variables: { user?: AuthUser } },
+    P extends string = any,
+  >(c: Context<E, P>, next: Next): Promise<Response | void> {
+    const user = c.get("user");
+    if (!user) {
+      throw new Error("userRateLimiter must run after requireUser");
+    }
+
+    const key = `${options.keyPrefix}:${user.id}`;
+    const now = Date.now();
+
+    let bucket = buckets.get(key);
+    if (bucket) {
+      // Lazy cleanup: выкидываем протухшие метки сразу, пустой bucket удаляем.
+      bucket.timestamps = bucket.timestamps.filter(
+        (timestamp) => now - timestamp < options.windowMs
+      );
+      if (bucket.timestamps.length === 0) {
+        buckets.delete(key);
+        bucket = undefined;
+      }
+    }
+
+    if (!bucket) {
+      bucket = { timestamps: [] };
+      buckets.set(key, bucket);
+    }
+
+    if (bucket.timestamps.length >= options.max) {
+      const oldestTimestamp = bucket.timestamps[0];
+      const retryAfterMs = Math.max(
+        1,
+        options.windowMs - (now - oldestTimestamp)
+      );
+
+      logger.warn(
+        `[Rate Limit] user ${user.id} exceeded ${options.keyPrefix} (${options.max}/${options.windowMs}ms)`
+      );
+
+      c.header("Retry-After", String(Math.ceil(retryAfterMs / 1000)));
+
+      return c.json(
+        {
+          code: ERROR_CODES.RATE_LIMITED,
+          message: `Лимит действий исчерпан. Попробуйте через ${Math.ceil(retryAfterMs / 1000 / 60)} мин.`,
+          retryAfterMs,
+        },
+        429
+      );
+    }
+
+    // В single-threaded Node.js между filter() и push() нет await —
+    // другой запрос для этого же ключа не может вклиниться (нет гонки).
+    bucket.timestamps.push(now);
+
+    return next();
+  };
+}
+
+// ─── Пресеты user-based лимитеров ─────────────────────────────────────────
+
+/** Водитель: создание поездок, 10 в сутки. */
+export const createTripLimiter = createUserRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 10,
+  keyPrefix: "driver-create-trip",
+});
+
+/** Водитель: отмена поездок, 20 в сутки. */
+export const cancelTripLimiter = createUserRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 20,
+  keyPrefix: "driver-cancel-trip",
+});
+
+/** Пассажир: создание броней, 20 в сутки. */
+export const createBookingLimiter = createUserRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 20,
+  keyPrefix: "passenger-create-booking",
+});
+
+/** Пассажир: отмена броней, 20 в сутки. */
+export const cancelBookingLimiter = createUserRateLimiter({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 20,
+  keyPrefix: "passenger-cancel-booking",
 });

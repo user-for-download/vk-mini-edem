@@ -10,7 +10,12 @@ import { logger } from "../logger.js";
 import { requireUser, type AuthUser } from "../auth/middleware.js";
 import { optionalAuth } from "../auth/optionalMiddleware.js";
 import { serializeTrip } from "../serializers/index.js";
-import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import {
+  publicReadLimiter,
+  mutationLimiter,
+  createTripLimiter,
+  cancelTripLimiter,
+} from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
@@ -344,7 +349,7 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
 /**
  * Создание поездки текущим пользователем.
  */
-tripsRouter.post("/", requireUser, mutationLimiter, async (c) => {
+tripsRouter.post("/", requireUser, mutationLimiter, createTripLimiter, async (c) => {
   const body = await getSanitizedBody(c);
   const parseResult = createTripDtoSchema.safeParse(body);
 
@@ -674,7 +679,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
  * отмена/завершение (воркером или вторым запросом): конфликтная транзакция
  * получит P2034 и ответит 409, а не перезапишет статус.
  */
-tripsRouter.patch("/:id/cancel", requireUser, async (c) => {
+tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user")!;
 

@@ -29,3 +29,15 @@ export function getErrorMessage(code?: string, fallback?: string): string {
   }
   return fallback || "Произошла неизвестная ошибка";
 }
+
+/**
+ * Сообщение для 429 RATE_LIMITED с учётом времени до сброса лимита.
+ * Сервер отдаёт retryAfterMs в теле ответа (и Retry-After заголовке).
+ */
+export function getRateLimitMessage(retryAfterMs?: number): string {
+  if (retryAfterMs && retryAfterMs > 0) {
+    const minutes = Math.max(1, Math.ceil(retryAfterMs / 1000 / 60));
+    return `Лимит действий исчерпан. Попробуйте через ${minutes} мин.`;
+  }
+  return ERROR_MESSAGES.RATE_LIMITED;
+}
