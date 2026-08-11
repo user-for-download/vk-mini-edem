@@ -52,7 +52,7 @@ export function useTripBookingsQuery(tripId: string, options?: { enabled?: boole
     queryKey: BOOKING_KEYS.trip(tripId),
     queryFn: async () => {
       const res = await bookingsApi.getTripBookings(tripId);
-      return res as unknown as Booking[];
+      return res.items;
     },
     enabled: Boolean(tripId) && (options?.enabled ?? true),
     placeholderData: keepPreviousData,

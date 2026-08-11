@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { Prisma } from "@prisma/client";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createReviewDtoSchema } from "@edem/contracts";
+import { createReviewDtoSchema, paginatedReviewsResponseSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
@@ -13,6 +13,10 @@ import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 
 export const reviewsRouter = new Hono<AuthEnv>();
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DEFAULT_PAGE_LIMIT = 20;
+const MAX_PAGE_LIMIT = 50;
 
 class ReviewError extends Error {
   statusCode: number;
@@ -274,7 +278,13 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
 });
 
 /**
- * Публичный список отзывов о пользователе.
+ * Публичный список отзывов о пользователе (cursor-based пагинация).
+ *
+ * Query params:
+ * - `limit` (optional): количество отзывов на страницу (1-50, default 20)
+ * - `cursor` (optional): ID последнего элемента предыдущей страницы
+ *
+ * Response: { items: Review[], pagination: { nextCursor, hasMore, limit } }
  */
 reviewsRouter.get("/user/:userId", publicReadLimiter, async (c) => {
   const userId = c.req.param("userId");
@@ -287,19 +297,64 @@ reviewsRouter.get("/user/:userId", publicReadLimiter, async (c) => {
     return c.json({ message: "User not found" }, 404);
   }
 
+  // === Пагинация ===
+  const limitParam = Number.parseInt(
+    c.req.query("limit") ?? String(DEFAULT_PAGE_LIMIT),
+    10
+  );
+  const limit = Number.isFinite(limitParam)
+    ? Math.min(Math.max(limitParam, 1), MAX_PAGE_LIMIT)
+    : DEFAULT_PAGE_LIMIT;
+
+  const cursorStr = c.req.query("cursor");
+  let cursor: string | undefined;
+
+  if (cursorStr) {
+    // Строгая валидация UUID — защита от инъекций и ошибок Prisma.
+    if (!UUID_REGEX.test(cursorStr)) {
+      return c.json(
+        { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid cursor format" },
+        400
+      );
+    }
+    cursor = cursorStr;
+  }
+
+  // Берём limit + 1, чтобы понять, есть ли следующая страница.
+  // Валидный cursor на конце списка — пустая страница (200), не 400.
   const reviews = await db.review.findMany({
     where: {
       targetUserId: userId,
     },
+    take: limit + 1,
+    skip: cursor ? 1 : 0, // Пропускаем сам cursor-элемент (уже отдан на прошлой странице)
+    cursor: cursor ? { id: cursor } : undefined,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }], // id-tiebreaker: стабильный порядок
     include: {
       author: true,
     },
-    orderBy: {
-      createdAt: "desc",
-    },
   });
 
-  return c.json(reviews.map(serializeReview));
+  const hasMore = reviews.length > limit;
+  const items = hasMore ? reviews.slice(0, limit) : reviews;
+  const nextCursor =
+    hasMore && items.length > 0 ? items[items.length - 1].id : null;
+
+  const response = {
+    items: items.map(serializeReview),
+    pagination: { nextCursor, hasMore, limit },
+  };
+
+  // Runtime-валидация ответа: ловим contract drift всегда, не только в dev.
+  const validation = paginatedReviewsResponseSchema.safeParse(response);
+  if (!validation.success) {
+    logger.warn(
+      { issues: validation.error.issues, userId },
+      "reviews_pagination_response_validation_failed"
+    );
+  }
+
+  return c.json(response);
 });
 
 /**

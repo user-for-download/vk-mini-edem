@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { userSchema, roleSchema } from "./user.schema.js";
+import { cursorPaginationSchema } from "./common.schema.js";
 
 export const reviewSchema = z.object({
   id: z.string(),
@@ -12,3 +13,10 @@ export const reviewSchema = z.object({
 });
 
 export type Review = z.infer<typeof reviewSchema>;
+
+export const paginatedReviewsResponseSchema = z.object({
+  items: z.array(reviewSchema),
+  pagination: cursorPaginationSchema,
+});
+
+export type PaginatedReviewsResponse = z.infer<typeof paginatedReviewsResponseSchema>;

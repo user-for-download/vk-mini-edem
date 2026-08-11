@@ -1,13 +1,15 @@
 // mini-app/src/queries/useReviewsQuery.ts
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reviewsApi } from "../api/reviews.api";
 import { USER_KEYS } from "./useUsersQuery";
 import type { CreateReviewDto } from "@edem/contracts";
-import type { Review, Trip } from "@/types";
+import type { Trip } from "@/types";
 
 export const REVIEW_KEYS = {
   all: ["reviews"] as const,
   user: (userId: string) => [...REVIEW_KEYS.all, "user", userId] as const,
+  userPaginated: (userId: string, limit: number) =>
+    [...REVIEW_KEYS.user(userId), "paginated", limit] as const,
   my: () => [...REVIEW_KEYS.all, "my"] as const,
   availableTrips: () => [...REVIEW_KEYS.all, "available-trips"] as const,
 };
@@ -23,16 +25,34 @@ export function useMyReviewsQuery() {
 }
 
 /**
- * Отзывы о конкретном пользователе.
+ * Отзывы о конкретном пользователе (первая страница).
+ * Используется там, где достаточно первых отзывов (ProfilePanel).
  */
 export function useUserReviewsQuery(userId: string) {
   return useQuery({
     queryKey: REVIEW_KEYS.user(userId),
     queryFn: async () => {
       const res = await reviewsApi.getUserReviews(userId);
-      return res as unknown as Review[];
+      return res.items;
     },
     enabled: Boolean(userId),
+  });
+}
+
+/**
+ * Отзывы о пользователе с бесконечной прокруткой (cursor-based).
+ * Используется в DriverProfileModal с кнопкой «Показать ещё».
+ */
+export function useUserReviewsInfiniteQuery(userId: string, limit = 20) {
+  return useInfiniteQuery({
+    queryKey: REVIEW_KEYS.userPaginated(userId, limit),
+    queryFn: ({ pageParam }) =>
+      reviewsApi.getUserReviews(userId, pageParam as string | undefined, limit),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore ? lastPage.pagination.nextCursor : undefined,
+    initialPageParam: undefined as string | undefined,
+    enabled: Boolean(userId),
+    staleTime: 60_000, // 1 минута
   });
 }
 
@@ -61,6 +81,7 @@ export function useCreateReviewMutation() {
       queryClient.invalidateQueries({
         queryKey: REVIEW_KEYS.availableTrips(),
       });
+      // Префикс-инвалидация покрывает и user, и userPaginated (infinite) кэши.
       queryClient.invalidateQueries({
         queryKey: REVIEW_KEYS.user(variables.targetUserId),
       });

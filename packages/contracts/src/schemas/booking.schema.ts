@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { userSchema } from "./user.schema.js";
 import { tripSchema, MAX_SEATS } from "./trip.schema.js";
+import { cursorPaginationSchema } from "./common.schema.js";
 
 export const bookingStatusSchema = z.enum(["pending", "confirmed", "declined", "cancelled"]);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
@@ -36,3 +37,10 @@ export const passengerBookingSchema = bookingSchema.extend({
 });
 
 export type PassengerBooking = z.infer<typeof passengerBookingSchema>;
+
+export const paginatedBookingsResponseSchema = z.object({
+  items: z.array(bookingSchema),
+  pagination: cursorPaginationSchema,
+});
+
+export type PaginatedBookingsResponse = z.infer<typeof paginatedBookingsResponseSchema>;

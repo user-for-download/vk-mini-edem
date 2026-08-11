@@ -5,6 +5,7 @@ export * from "./schemas/booking.schema.js";
 export * from "./schemas/review.schema.js";
 export * from "./schemas/status.const.js";
 export * from "./schemas/ws.schema.js";
+export * from "./schemas/common.schema.js";
 
 // DTO
 export * from "./dto/auth.dto.js";

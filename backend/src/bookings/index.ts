@@ -4,6 +4,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   createBookingDtoSchema,
   updateBookingStatusDtoSchema,
+  paginatedBookingsResponseSchema,
   TRIP_STATUS,
   BOOKING_STATUS,
   ACTIVE_BOOKING_STATUSES,
@@ -33,6 +34,14 @@ class BookingError extends Error {
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
+
+/**
+ * Пагинация заявок на поездку (GET /bookings/trip/:tripId).
+ * nextCursor — id последней заявки страницы; null означает конец списка.
+ */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DEFAULT_BOOKINGS_LIMIT = 50;
+const MAX_BOOKINGS_LIMIT = 50;
 
 export const bookingsRouter = new Hono<AuthEnv>();
 
@@ -288,8 +297,12 @@ bookingsRouter.get("/history", async (c) => {
 });
 
 /**
- * Заявки на поездку для водителя.
+ * Заявки на поездку для водителя (cursor-based пагинация).
  * Этот эндпоинт нужен для TripRequestsPanel в mini-app.
+ *
+ * Параметры:
+ * - limit: 1–50 (по умолчанию 50), значения вне диапазона клампаются;
+ * - cursor: UUID id последней заявки предыдущей страницы (необязательный).
  */
 bookingsRouter.get("/trip/:tripId", async (c) => {
   const user = c.get("user");
@@ -307,32 +320,56 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
     return c.json({ message: "Forbidden" }, 403);
   }
 
+  const rawLimit = Number(c.req.query("limit") ?? DEFAULT_BOOKINGS_LIMIT);
+  const limit = Number.isInteger(rawLimit)
+    ? Math.min(Math.max(rawLimit, 1), MAX_BOOKINGS_LIMIT)
+    : DEFAULT_BOOKINGS_LIMIT;
+
+  const cursor = c.req.query("cursor");
+  if (cursor !== undefined && !UUID_REGEX.test(cursor)) {
+    return c.json(
+      { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid cursor format" },
+      400
+    );
+  }
+
+  // take: limit + 1 — лишний элемент определяет hasMore.
+  // cursor + skip: 1 пропускает саму запись-курсор; связка orderBy
+  // [createdAt desc, id desc] гарантирует стабильный порядок при одинаковых createdAt.
   const bookings = await db.booking.findMany({
-    where: {
-      tripId,
-    },
+    where: { tripId },
+    take: limit + 1,
+    skip: cursor ? 1 : 0,
+    cursor: cursor ? { id: cursor } : undefined,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       trip: {
         include: {
-          driver: {
-            include: {
-              car: true,
-            },
-          },
+          driver: { include: { car: true } },
         },
       },
-      passenger: {
-        include: {
-          car: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
+      passenger: { include: { car: true } },
     },
   });
 
-  return c.json(bookings.map(serializeBooking));
+  const hasMore = bookings.length > limit;
+  const items = hasMore ? bookings.slice(0, limit) : bookings;
+  const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+  const response = {
+    items: items.map(serializeBooking),
+    pagination: { nextCursor, hasMore, limit },
+  };
+
+  const validation = paginatedBookingsResponseSchema.safeParse(response);
+  if (!validation.success) {
+    logger.warn(
+      { issues: validation.error.issues, tripId },
+      "bookings_pagination_response_validation_failed"
+    );
+  }
+
+  return c.json(response);
 });
 
 /**

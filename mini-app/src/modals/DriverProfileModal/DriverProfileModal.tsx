@@ -1,4 +1,4 @@
-import { useState, type FC } from "react";
+import { type FC } from "react";
 import {
   Avatar,
   Box,
@@ -14,7 +14,7 @@ import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import { RatingBadge } from "@/components/RatingBadge";
 import { ReviewCard } from "@/components/ReviewCard";
 import { useUserQuery } from "@/queries/useUsersQuery";
-import { useUserReviewsQuery } from "@/queries/useReviewsQuery";
+import { useUserReviewsInfiniteQuery } from "@/queries/useReviewsQuery";
 import { resolveAvatar } from "@/helpers/avatar";
 
 export type DriverProfileModalProps = CustomModalProps<OpenModalCardProps, { driverId: string }>;
@@ -25,7 +25,7 @@ export type DriverProfileModalProps = CustomModalProps<OpenModalCardProps, { dri
  * Больше не использует mock-fallback.
  * Данные загружаются через:
  * - GET /api/users/:id
- * - GET /api/reviews/user/:userId
+ * - GET /api/reviews/user/:userId (cursor-based пагинация)
  */
 const REVIEWS_PAGE_SIZE = 5;
 
@@ -33,8 +33,6 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   modalProps,
   driverId: driverIdProp,
 }) => {
-  const [visibleReviewsCount, setVisibleReviewsCount] = useState(REVIEWS_PAGE_SIZE);
-
   const driverId = driverIdProp || "";
 
   const {
@@ -44,8 +42,11 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
   } = useUserQuery(driverId);
 
   const {
-    data: reviews,
-  } = useUserReviewsQuery(driver?.id ?? "");
+    data: reviewsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useUserReviewsInfiniteQuery(driver?.id ?? "", REVIEWS_PAGE_SIZE);
 
   if (!driverId) {
     return null;
@@ -84,9 +85,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
     );
   }
 
-  const allReviews = reviews ?? [];
-  const driverReviews = allReviews.slice(0, visibleReviewsCount);
-  const hasMoreReviews = allReviews.length > visibleReviewsCount;
+  const allReviews = reviewsData?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <ModalCard
@@ -127,24 +126,25 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         )}
       </Box>
 
-      {driverReviews.length > 0 && (
+      {allReviews.length > 0 && (
         <>
           <Spacing size={8} />
           <Separator />
 
           <div className="DriverProfileModal__reviews">
-            {driverReviews.map((review) => (
+            {allReviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}
           </div>
-          {hasMoreReviews && (
+          {hasNextPage && (
             <Box padding="system" style={{ textAlign: "center" }}>
               <Button
                 size="s"
                 mode="tertiary"
-                onClick={() => setVisibleReviewsCount((prev) => prev + REVIEWS_PAGE_SIZE)}
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
               >
-                Показать ещё ({allReviews.length - visibleReviewsCount})
+                {isFetchingNextPage ? "Загрузка..." : "Показать ещё"}
               </Button>
             </Box>
           )}

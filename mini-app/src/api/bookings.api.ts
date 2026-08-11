@@ -1,16 +1,16 @@
 // mini-app/src/api/bookings.api.ts
 import { apiClient } from "./client";
-import { passengerBookingSchema, bookingSchema } from "@edem/contracts";
+import { passengerBookingSchema, bookingSchema, paginatedBookingsResponseSchema } from "@edem/contracts";
 import { z } from "zod";
 import type {
   Booking,
   CreateBookingDto,
   UpdateBookingStatusDto,
+  PaginatedBookingsResponse,
 } from "@edem/contracts";
 import type { PassengerBooking, Booking as AppBooking } from "@/types";
 
 const passengerBookingArraySchema = z.array(passengerBookingSchema);
-const bookingArraySchema = z.array(bookingSchema);
 
 export const bookingsApi = {
   getUserBookings: (): Promise<PassengerBooking[]> => {
@@ -24,8 +24,27 @@ export const bookingsApi = {
     return apiClient.request<AppBooking[]>("/bookings/history", {}, passengerBookingArraySchema);
   },
 
-  getTripBookings: (tripId: string): Promise<Booking[]> => {
-    return apiClient.request<Booking[]>(`/bookings/trip/${tripId}`, {}, bookingArraySchema);
+  /**
+   * Заявки на поездку для водителя с cursor-based пагинацией.
+   *
+   * @param tripId ID поездки
+   * @param cursor Опциональный cursor для следующей страницы
+   * @param limit Количество элементов (1-50, default 50)
+   */
+  getTripBookings: (
+    tripId: string,
+    cursor?: string,
+    limit = 50
+  ): Promise<PaginatedBookingsResponse> => {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    params.set("limit", String(limit));
+
+    return apiClient.request<PaginatedBookingsResponse>(
+      `/bookings/trip/${tripId}?${params.toString()}`,
+      {},
+      paginatedBookingsResponseSchema
+    );
   },
 
   createBooking: (data: CreateBookingDto): Promise<Booking> => {

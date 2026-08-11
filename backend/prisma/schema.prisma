@@ -114,6 +114,7 @@ model Booking {
   @@index([tripId, status])
   @@index([passengerId, status])
   @@index([tripId, seat, status])
+  @@index([tripId, createdAt(sort: Desc)])
 }
 
 model Review {
