@@ -43,10 +43,10 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
           <Flex gap={10}>
             <Avatar src={resolveAvatar(booking.passenger.avatar)} size={44} />
 
-            <Flex direction="column" gap={4} className="BookingRequestRow__main">
+            <Flex direction="column" gap={4} style={{ flex: 1, minWidth: 0 }}>
               <Flex justify="space-between" gap={8}>
                 <Text weight="2">{booking.passenger.name}</Text>
-                <Caption level="1" className="BookingRequestRow__seat">
+                <Caption level="1" style={{ flexShrink: 0, color: "var(--vkui--color_text_secondary)" }}>
                   Место {booking.seat}
                 </Caption>
               </Flex>
@@ -60,7 +60,7 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
               {booking.comment && (
                 <>
                   <Spacing size={6} />
-                  <Text className="BookingRequestRow__comment">
+                  <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
                     «{booking.comment}»
                   </Text>
                 </>
@@ -94,7 +94,6 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
                   <Spacing size={8} />
                   <Subhead
                     weight="2"
-                    // eslint-disable-next-line react/forbid-dom-props -- цвет зависит от статуса бронирования
                     style={{ color: statusColor }}
                   >
                     {STATUS_LABEL[booking.status]}

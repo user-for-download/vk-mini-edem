@@ -455,7 +455,8 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               </Button>
 
               <span
-                className="CreateTripModal__seatCounter"
+                // eslint-disable-next-line react/forbid-dom-props
+                style={{ minWidth: 16, textAlign: "center", fontWeight: 600 }}
                 aria-live="polite"
               >
                 {values.seats}

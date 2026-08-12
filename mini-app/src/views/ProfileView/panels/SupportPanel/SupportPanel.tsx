@@ -113,7 +113,7 @@ export const SupportPanel: FC<SupportPanelProps> = ({ id, onBack }) => {
 
               {isOpen && (
                 <Box padding="system" paddingBlockStart={0}>
-                  <Text className="SupportPanel__answer">
+                  <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
                     {item.answer}
                   </Text>
                 </Box>
@@ -156,7 +156,7 @@ export const SupportPanel: FC<SupportPanelProps> = ({ id, onBack }) => {
           </Box>
         ) : (
           <Box padding="system">
-            <Text className="SupportPanel__answer">
+            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
               Чат поддержки появится в одном из следующих обновлений.
             </Text>
           </Box>

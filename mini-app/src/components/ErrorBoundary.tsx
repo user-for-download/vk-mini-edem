@@ -1,5 +1,6 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
+import { Button, Flex, Spacing } from '@vkontakte/vkui';
 
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -30,22 +31,24 @@ export class ErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      // Fallback БЕЗ VKUI-компонентов: ErrorBoundary — последний рубеж,
-      // если упал сам AppRoot, рендерить VKUI-компоненты опасно (они могут
-      // зависеть от контекста AppRoot). Используем чистый HTML + CSS-классы.
       return (
-        <div className="ErrorBoundary">
-          <h1 className="ErrorBoundary__title">Что-то пошло не так</h1>
-          <p className="ErrorBoundary__message">
-            К сожалению, произошла непредвиденная ошибка.
-          </p>
-          <button
-            className="ErrorBoundary__reload"
-            onClick={() => window.location.reload()}
-          >
-            Перезагрузить страницу
-          </button>
-        </div>
+        <Flex direction="column" align="center" justify="center" style={{ textAlign: 'center', minHeight: '100vh' }}>
+          <Spacing size={24} />
+          <div>
+            <Spacing size={8} />
+            <h1>Что-то пошло не так</h1>
+            <Spacing size={24} />
+            <p>К сожалению, произошла непредвиденная ошибка.</p>
+            <Spacing size={16} />
+            <Button
+              size="m"
+              mode="primary"
+              onClick={() => window.location.reload()}
+            >
+              Перезагрузить страницу
+            </Button>
+          </div>
+        </Flex>
       );
     }
 

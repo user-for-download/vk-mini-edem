@@ -7,10 +7,6 @@ import type { Review } from "@/types";
 
 const MAX_PREVIEW_LENGTH = 120;
 
-export interface ReviewCardProps {
-  review: Review;
-}
-
 /**
  * Отзыв в RichCell: аватар, имя, маршрут и роль, рейтинг.
  * Длинный текст обрезается до 120 символов (line-clamp 3) и
@@ -27,20 +23,17 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
       ? review.text.slice(0, MAX_PREVIEW_LENGTH).trimEnd() + "…"
       : review.text;
 
-  const textClassName = [
-    "ReviewCard__text",
-    isLong && "ReviewCard__text--expandable",
-    !isExpanded && "ReviewCard__text--clamped",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   return (
     <RichCell
       before={<Avatar src={resolveAvatar(review.author.avatar)} size={48} />}
       overTitle={`${review.tripRoute} · ${roleLabel}`}
       after={
-        <Flex align="center" gap={4} className="ReviewCard__rating">
+        <Flex
+          align="center"
+          gap={4}
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{ color: "var(--carpool_accent)" }}
+        >
           <Icon16StarAlt />
           <Text weight="2">{review.rating}</Text>
         </Flex>
@@ -48,7 +41,14 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
       afterAlign="center"
       subtitle={
         <span
-          className={textClassName}
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: isExpanded ? undefined : 3,
+            overflow: "hidden",
+            cursor: isLong ? "pointer" : undefined,
+          }}
           onClick={(e) => {
             if (isLong) {
               e.stopPropagation();
@@ -58,14 +58,14 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
         >
           {displayText}
           {isLong && !isExpanded && (
-            <Text weight="2" className="ReviewCard__showMore">
+            <Text weight="2" style={{ color: "var(--vkui--color_text_accent)" }}>
               {" "}Показать полностью
             </Text>
           )}
         </span>
       }
       bottom={
-        <Caption level="1" className="ReviewCard__date">
+        <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
           {review.date}
         </Caption>
       }
@@ -77,3 +77,7 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
     </RichCell>
   );
 };
+
+export interface ReviewCardProps {
+  review: Review;
+}

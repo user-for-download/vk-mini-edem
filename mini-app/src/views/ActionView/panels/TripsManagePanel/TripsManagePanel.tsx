@@ -162,7 +162,8 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
                   }
                 />
               ))}
-              <div ref={sentinelRef} className="TripsManagePanel__sentinel" />
+              {/* eslint-disable-next-line react/forbid-dom-props */}
+              <div ref={sentinelRef} style={{ height: 1 }} />
               {isFetchingNextPage && <TripCardSkeleton />}
             </Flex>
           </Box>

@@ -1,6 +1,6 @@
 // mini-app/src/components/EmptyState.tsx
 import { type FC, type ReactNode } from "react";
-import { Placeholder } from "@vkontakte/vkui";
+import { Placeholder, Text } from "@vkontakte/vkui";
 
 export interface EmptyStateProps {
   title: string;
@@ -14,7 +14,7 @@ export const EmptyState: FC<EmptyStateProps> = ({ title, subtitle, action }) => 
       title={title}
       action={action}
     >
-      {subtitle}
+      {subtitle && <Text style={{ color: "var(--vkui--color_text_secondary)" }}>{subtitle}</Text>}
     </Placeholder>
   );
 };

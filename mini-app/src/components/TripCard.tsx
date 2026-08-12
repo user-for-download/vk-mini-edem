@@ -79,7 +79,7 @@ export const TripCard: FC<TripCardProps> = ({
   return (
     <Card
       mode="shadow"
-      className={isArchived ? "TripCard TripCard--archived" : "TripCard"}
+      style={isArchived ? { opacity: 0.6 } : undefined}
       onClick={isInteractive ? () => onOpen?.(trip) : undefined}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -92,7 +92,7 @@ export const TripCard: FC<TripCardProps> = ({
     >
       <Box padding="system">
         <Flex justify="space-between" align="baseline">
-          <Subhead weight="2" className="TripCard__date">
+          <Subhead weight="2" style={{ color: "var(--vkui--color_text_secondary)" }}>
             {trip.date} · {trip.time}
           </Subhead>
           <Title level="3" weight="2">
@@ -106,11 +106,12 @@ export const TripCard: FC<TripCardProps> = ({
             <Caption
               level="1"
               weight="2"
-              className={
-                archivedStatus === "cancelled"
-                  ? "TripCard__archiveStatus TripCard__archiveStatus--cancelled"
-                  : "TripCard__archiveStatus TripCard__archiveStatus--completed"
-              }
+              style={{
+                color:
+                  archivedStatus === "cancelled"
+                    ? "var(--vkui--color_text_negative)"
+                    : "var(--vkui--color_text_secondary)",
+              }}
             >
               {archivedStatus === "cancelled" ? "ОТМЕНЕНА" : "ЗАВЕРШЕНА"}
             </Caption>
@@ -124,7 +125,7 @@ export const TripCard: FC<TripCardProps> = ({
         />
 
         <Spacing size={8} />
-        <Caption level="1" className="TripCard__duration">
+        <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
           В пути ≈ {formatDuration(trip.durationMinutes)} · {trip.distanceKm} км
         </Caption>
 
@@ -146,10 +147,10 @@ export const TripCard: FC<TripCardProps> = ({
         <Spacing size={12} />
 
         <Flex justify="space-between" align="center">
-          <Flex align="center" gap={8} className="TripCard__driver">
+          <Flex align="center" gap={8} style={{ minWidth: 0 }}>
             <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
-            <Flex direction="column" className="TripCard__driverInfo">
-              <Text weight="2" className="TripCard__driverName">
+            <Flex direction="column" style={{ minWidth: 0 }}>
+              <Text weight="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {trip.driver.name}
               </Text>
               <RatingBadge value={trip.driver.rating} size="s" />
@@ -160,18 +161,19 @@ export const TripCard: FC<TripCardProps> = ({
               <Caption
                 level="1"
                 weight="2"
-                style={seatsColor ? { color: seatsColor } : undefined}
-                className={
-                  trip.seatsAvailable === 0
-                    ? "TripCard__seats TripCard__seats--none"
-                    : "TripCard__seats TripCard__seats--available"
-                }
+                style={{
+                  flexShrink: 0,
+                  color:
+                    trip.seatsAvailable === 0
+                      ? "var(--vkui--color_text_secondary)"
+                      : seatsColor ?? "var(--carpool_accent)",
+                }}
               >
                 {seatsLabel}
               </Caption>
             )}
             {requestsCount > 0 && (
-              <Caption level="1" className="TripCard__requestsCount">
+              <Caption level="1" style={{ color: "var(--carpool_accent)" }}>
                 Новых заявок: {requestsCount}
               </Caption>
             )}

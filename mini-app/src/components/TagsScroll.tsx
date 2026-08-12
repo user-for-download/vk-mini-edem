@@ -1,6 +1,6 @@
 // mini-app/src/components/TagsScroll.tsx
 import { type FC, useState } from "react";
-import { HorizontalScroll } from "@vkontakte/vkui";
+import { SubnavigationBar, SubnavigationButton } from "@vkontakte/vkui";
 
 export interface TagsScrollProps {
   tags: string[];
@@ -20,6 +20,7 @@ export interface TagsScrollProps {
 /**
  * Горизонтальный ряд фильтров-пилюль.
  * Теперь умеет работать и как uncontrolled, и как controlled компонент.
+ * Использует нативный SubnavigationBar + SubnavigationButton из VKUI.
  */
 export const TagsScroll: FC<TagsScrollProps> = ({
   tags,
@@ -44,24 +45,16 @@ export const TagsScroll: FC<TagsScrollProps> = ({
   };
 
   return (
-    <HorizontalScroll showArrows>
-      <div className="TagsScroll__list">
-        {tags.map((tag) => {
-          const active = selected.includes(tag);
-
-          return (
-            <button
-              key={tag}
-              type="button"
-              className={`TagsScroll__pill${active ? " TagsScroll__pill--active" : ""}`}
-              aria-pressed={active}
-              onClick={() => toggle(tag)}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-    </HorizontalScroll>
+    <SubnavigationBar>
+      {tags.map((tag) => (
+        <SubnavigationButton
+          key={tag}
+          selected={selected.includes(tag)}
+          onClick={() => toggle(tag)}
+        >
+          {tag}
+        </SubnavigationButton>
+      ))}
+    </SubnavigationBar>
   );
 };
