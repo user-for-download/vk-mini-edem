@@ -3,18 +3,15 @@ import { type FC, type KeyboardEvent, type ReactNode } from "react";
 import {
   Avatar,
   Card,
-  Caption,
-  Spacing,
+  Footnote,
   Text,
-  Title,
   Box,
-  Subhead,
   Separator,
-  ContentBadge,
   Flex,
+  RichCell,
 } from "@vkontakte/vkui";
+import { Icon16Favorite } from "@vkontakte/icons";
 import { RouteLine } from "@/components/RouteLine";
-import { RatingBadge } from "@/components/RatingBadge";
 import { resolveAvatar } from "@/helpers/avatar";
 import type { Trip } from "@/types";
 
@@ -30,6 +27,7 @@ export interface TripCardProps {
   archivedStatus?: "completed" | "cancelled";
   /** Дополнительный контент в теле карточки (после блока водителя, без Separator). */
   children?: ReactNode;
+  disabled?: boolean;
 }
 
 function formatDuration(minutes: number): string {
@@ -49,37 +47,60 @@ function pluralSeats(n: number): string {
   return "мест";
 }
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return parts[0]?.slice(0, 2).toUpperCase() || "ЭД";
+}
+
 export const TripCard: FC<TripCardProps> = ({
   trip,
   onOpen,
-  requestsCount = 0,
   hideSeats = false,
   seatsLabel: seatsLabelProp,
-  seatsColor,
   archivedStatus,
   children,
+  disabled = false,
 }) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onOpen?.(trip);
+      if (!disabled) {
+        onOpen?.(trip);
+      }
     }
   };
 
-  const isInteractive = Boolean(onOpen);
+  const isInteractive = Boolean(onOpen) && !disabled;
   const isArchived = Boolean(archivedStatus);
 
-  const seatsLabel =
+  const seatsLeft = trip.seatsAvailable;
+  const seatsLabelText =
     seatsLabelProp !== undefined
       ? seatsLabelProp
-      : trip.seatsAvailable === 0
-        ? "Мест нет"
-        : `${trip.seatsAvailable} из ${trip.seatsTotal} ${pluralSeats(trip.seatsTotal)}`;
+      : seatsLeft === 0
+        ? "нет мест"
+        : `${seatsLeft} из ${trip.seatsTotal} ${pluralSeats(trip.seatsTotal)}`;
+
+  const driver = trip.driver;
+  const car = trip.car;
+  const carText = car ? `${car.brand} ${car.model} · ${car.number}` : undefined;
+  const durationText = formatDuration(trip.durationMinutes);
+  const distanceText = trip.distanceKm ? `${trip.distanceKm} км` : "";
 
   return (
     <Card
-      mode="shadow"
-      style={isArchived ? { opacity: 0.6 } : undefined}
+      mode="outline"
+      // eslint-disable-next-line react/forbid-dom-props
+      style={{
+        borderRadius: 12,
+        backgroundColor: "var(--vkui--color_background_content)",
+        overflow: "hidden",
+        cursor: disabled ? "default" : "pointer",
+        opacity: isArchived ? 0.6 : 1,
+      }}
       onClick={isInteractive ? () => onOpen?.(trip) : undefined}
       onKeyDown={isInteractive ? handleKeyDown : undefined}
       tabIndex={isInteractive ? 0 : undefined}
@@ -90,103 +111,66 @@ export const TripCard: FC<TripCardProps> = ({
           : undefined
       }
     >
-      <Box padding="system">
-        <Flex justify="space-between" align="baseline">
-          <Subhead weight="2" style={{ color: "var(--vkui--color_text_secondary)" }}>
-            {trip.date} · {trip.time}
-          </Subhead>
-          <Title level="3" weight="2">
-            {trip.price.toLocaleString("ru-RU")} ₽
-          </Title>
-        </Flex>
-
-        {isArchived && (
-          <>
-            <Spacing size={4} />
-            <Caption
-              level="1"
-              weight="2"
-              style={{
-                color:
-                  archivedStatus === "cancelled"
-                    ? "var(--vkui--color_text_negative)"
-                    : "var(--vkui--color_text_secondary)",
-              }}
-            >
-              {archivedStatus === "cancelled" ? "ОТМЕНЕНА" : "ЗАВЕРШЕНА"}
-            </Caption>
-          </>
-        )}
-
-        <Spacing size={12} />
+      <Box padding={16}>
         <RouteLine
           from={{ city: trip.fromCity, address: trip.fromAddress }}
           to={{ city: trip.toCity, address: trip.toAddress }}
+          dateLabel={trip.date}
+          time={trip.time}
+          price={trip.price}
+          duration={durationText}
+          distance={distanceText}
+          seatsLeft={hideSeats ? undefined : seatsLeft}
+          seatsLabel={hideSeats ? undefined : seatsLabelText}
         />
-
-        <Spacing size={8} />
-        <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
-          В пути ≈ {formatDuration(trip.durationMinutes)} · {trip.distanceKm} км
-        </Caption>
-
-        {trip.tags && trip.tags.length > 0 && (
-          <>
-            <Spacing size={10} />
-            <Flex gap={6} wrap="wrap">
-              {trip.tags.map((tag) => (
-                <ContentBadge key={tag} mode="secondary">
-                  {tag}
-                </ContentBadge>
-              ))}
-            </Flex>
-          </>
-        )}
-
-        <Spacing size={12} />
-        <Separator />
-        <Spacing size={12} />
-
-        <Flex justify="space-between" align="center">
-          <Flex align="center" gap={8} style={{ minWidth: 0 }}>
-            <Avatar src={resolveAvatar(trip.driver.avatar)} size={32} />
-            <Flex direction="column" style={{ minWidth: 0 }}>
-              <Text weight="2" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {trip.driver.name}
-              </Text>
-              <RatingBadge value={trip.driver.rating} size="s" />
-            </Flex>
-          </Flex>
-          <Flex direction="column" align="end">
-            {!hideSeats && (
-              <Caption
-                level="1"
-                weight="2"
-                style={{
-                  flexShrink: 0,
-                  color:
-                    trip.seatsAvailable === 0
-                      ? "var(--vkui--color_text_secondary)"
-                      : seatsColor ?? "var(--carpool_accent)",
-                }}
-              >
-                {seatsLabel}
-              </Caption>
-            )}
-            {requestsCount > 0 && (
-              <Caption level="1" style={{ color: "var(--carpool_accent)" }}>
-                Новых заявок: {requestsCount}
-              </Caption>
-            )}
-          </Flex>
-        </Flex>
-
-        {children && (
-          <>
-            <Spacing size={12} />
-            {children}
-          </>
-        )}
       </Box>
+
+      <Separator />
+
+      <RichCell
+        disabled
+        before={
+          <Avatar
+            size={48}
+            src={resolveAvatar(driver.avatarUrl)}
+            initials={initialsOf(driver.name)}
+          />
+        }
+        // eslint-disable-next-line react/forbid-dom-props
+        style={{ alignItems: "center" }}
+        subtitle={
+          carText ? (
+            <Footnote
+              // eslint-disable-next-line react/forbid-dom-props
+              style={{ color: "var(--vkui--color_text_tertiary)" }}
+            >
+              {carText}
+            </Footnote>
+          ) : undefined
+        }
+        after={
+          <Flex align="center" gap="2xs">
+            <Icon16Favorite style={{ color: "var(--vkui--color_icon_accent_themed)" }} />
+            <Footnote
+              weight="2"
+              // eslint-disable-next-line react/forbid-dom-props
+              style={{ color: "var(--vkui--color_text_primary)" }}
+            >
+              {(driver.driverRating ?? 5.0).toFixed(1)}
+            </Footnote>
+          </Flex>
+        }
+      >
+        <Text
+          weight="2"
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{ color: "var(--vkui--color_text_primary)" }}
+        >
+          {driver.name}
+        </Text>
+      </RichCell>
+
+      {children}
     </Card>
   );
 };
