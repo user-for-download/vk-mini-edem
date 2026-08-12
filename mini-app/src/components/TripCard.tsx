@@ -85,8 +85,8 @@ export const TripCard: FC<TripCardProps> = ({
         : `${seatsLeft} из ${trip.seatsTotal} ${pluralSeats(trip.seatsTotal)}`;
 
   const driver = trip.driver;
-  const car = trip.car;
-  const carText = car ? `${car.brand} ${car.model} · ${car.number}` : undefined;
+  const car = driver?.car;
+  const carText = car ? `${car.model} · ${car.plate}` : undefined;
   const durationText = formatDuration(trip.durationMinutes);
   const distanceText = trip.distanceKm ? `${trip.distanceKm} км` : "";
 
@@ -135,8 +135,8 @@ export const TripCard: FC<TripCardProps> = ({
         before={
           <Avatar
             size={48}
-            src={resolveAvatar(driver.avatarUrl)}
-            initials={initialsOf(driver.name)}
+            src={resolveAvatar(driver?.avatar)}
+            initials={initialsOf(driver?.name || "Водитель")}
           />
         }
         subtitle={
@@ -157,7 +157,7 @@ export const TripCard: FC<TripCardProps> = ({
               // eslint-disable-next-line react/forbid-dom-props
               style={{ color: "var(--vkui--color_text_primary)" }}
             >
-              {(driver.driverRating ?? 5.0).toFixed(1)}
+              {(driver?.rating ?? 5.0).toFixed(1)}
             </Footnote>
           </Flex>
         }
@@ -167,7 +167,7 @@ export const TripCard: FC<TripCardProps> = ({
           // eslint-disable-next-line react/forbid-dom-props
           style={{ color: "var(--vkui--color_text_primary)" }}
         >
-          {driver.name}
+          {driver?.name || "Водитель"}
         </Text>
       </RichCell>
 
