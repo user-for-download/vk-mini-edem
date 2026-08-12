@@ -28,7 +28,6 @@ import {
 import type { Trip } from "@/types";
 import { RouteLine } from "@/components/RouteLine";
 import { RatingBadge } from "@/components/RatingBadge";
-import { SeatScheme } from "@/components/SeatScheme";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
 import { getRateLimitMessage } from "@/helpers/errorMessages";
@@ -65,7 +64,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   onBack,
   onOpenDriver,
 }) => {
-  const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [comment, setComment] = useState("");
 
