@@ -9,6 +9,7 @@ import {
   Separator,
   Flex,
   RichCell,
+  Spacing,
 } from "@vkontakte/vkui";
 import { Icon16Favorite } from "@vkontakte/icons";
 import { RouteLine } from "@/components/RouteLine";
@@ -136,18 +137,6 @@ export const TripCard: FC<TripCardProps> = ({
             initials={initialsOf(driver.name)}
           />
         }
-        // eslint-disable-next-line react/forbid-dom-props
-        style={{ alignItems: "center" }}
-        subtitle={
-          carText ? (
-            <Footnote
-              // eslint-disable-next-line react/forbid-dom-props
-              style={{ color: "var(--vkui--color_text_tertiary)" }}
-            >
-              {carText}
-            </Footnote>
-          ) : undefined
-        }
         after={
           <Flex align="center" gap="2xs">
             <Icon16Favorite style={{ color: "var(--vkui--color_icon_accent_themed)" }} />
@@ -168,6 +157,17 @@ export const TripCard: FC<TripCardProps> = ({
         >
           {driver.name}
         </Text>
+        {carText && (
+          <>
+            <Spacing size={2} />
+            <Footnote
+              // eslint-disable-next-line react/forbid-dom-props
+              style={{ color: "var(--vkui--color_text_tertiary)" }}
+            >
+              {carText}
+            </Footnote>
+          </>
+        )}
       </RichCell>
 
       {children}
