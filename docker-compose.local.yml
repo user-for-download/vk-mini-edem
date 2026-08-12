@@ -1,17 +1,17 @@
-# Local development stack: PostgreSQL only.
-# Usage: docker compose -f docker-compose.local.yml up -d
+# Local development stack: PostgreSQL only on port 5433.
 services:
-  db:
+  db-dev:
     image: postgres:16-alpine
+    container_name: vk-mini-edem-db-dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: edem
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edem_local}
+      POSTGRES_PASSWORD: edem_local
       POSTGRES_DB: edem
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - pgdata_local:/var/lib/postgresql/data
+      - pgdata_dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U edem -d edem"]
       interval: 5s
@@ -19,4 +19,4 @@ services:
       retries: 10
 
 volumes:
-  pgdata_local:
+  pgdata_dev:

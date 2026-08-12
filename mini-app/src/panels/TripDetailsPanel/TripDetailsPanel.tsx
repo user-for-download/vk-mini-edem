@@ -17,6 +17,7 @@ import {
   Paragraph,
   RichCell,
   ScreenSpinner,
+  SegmentedControl,
   Separator,
   SimpleGrid,
   Spacing,
@@ -195,11 +196,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       return;
     }
 
-    if (!bookingOpen) {
-      setBookingOpen(true);
-      return;
-    }
-
     if (selectedSeat === null) {
       return;
     }
@@ -219,7 +215,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         onSuccess: () => {
           enqueueSnackbar({
             type: "success",
-            title: "Заявка отправлена",
+            title: "Забронировано",
             subtitle: "Ожидайте подтверждения от водителя",
             dedupeKey: `book_${trip.id}`,
           });
@@ -251,7 +247,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           } else {
             enqueueSnackbar({
               type: "error",
-              title: "Не удалось отправить заявку",
+              title: "Не удалось забронировать",
               subtitle: error instanceof Error ? error.message : undefined,
               dedupeKey: `book_error_${trip.id}`,
             });
@@ -466,34 +462,46 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
       {canBook && (
         <>
-          <div
-            className={`BookingCollapse${
-              bookingOpen ? " BookingCollapse--open" : ""
-            }`}
-          >
-            <div className="BookingCollapse__inner">
-              <Group header={<Header size="s">Выберите место</Header>}>
-                <Box padding="system">
-                  <SeatScheme
-                    seatsTotal={trip.seatsTotal}
-                    takenSeats={takenSeats}
-                    selectedSeat={selectedSeat}
-                    onSelect={setSelectedSeat}
-                  />
-                </Box>
-              </Group>
+          <Group header={<Header size="s">Выберите место</Header>}>
+            <Box padding="system">
+              {(() => {
+                const availableSeats = Array.from({ length: trip.seatsTotal }, (_, i) => i + 1).filter(
+                  (seat) => !takenSeats.includes(seat)
+                );
 
-              <Group header={<Header size="s">Комментарий водителю</Header>}>
-                <FormItem>
-                  <Textarea
-                    placeholder="Например: буду с небольшим чемоданом, подойду к 9:25"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                if (availableSeats.length === 0) {
+                  return <Text style={{ color: "var(--vkui--color_text_secondary)" }}>Все места заняты</Text>;
+                }
+
+                const options = Array.from({ length: trip.seatsTotal }, (_, i) => i + 1).map((seat) => {
+                  const isTaken = takenSeats.includes(seat);
+                  return {
+                    label: isTaken ? `${seat} (зан.)` : `Место ${seat}`,
+                    value: seat,
+                    disabled: isTaken,
+                  };
+                });
+
+                return (
+                  <SegmentedControl<number>
+                    value={selectedSeat ?? availableSeats[0]}
+                    onChange={(val) => setSelectedSeat(val)}
+                    options={options}
                   />
-                </FormItem>
-              </Group>
-            </div>
-          </div>
+                );
+              })()}
+            </Box>
+          </Group>
+
+          <Group header={<Header size="s">Комментарий водителю</Header>}>
+            <FormItem>
+              <Textarea
+                placeholder="Например: буду с небольшим чемоданом, подойду к 9:25"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+            </FormItem>
+          </Group>
 
           <Box
             padding="system"
@@ -507,14 +515,12 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
             <Spacing size={12} />
 
-            {bookingOpen && (
-              <Flex justify="space-between">
-                <Text weight="2">Итого</Text>
-                <Title level="3" weight="2">
-                  {trip.price.toLocaleString("ru-RU")} ₽
-                </Title>
-              </Flex>
-            )}
+            <Flex justify="space-between">
+              <Text weight="2">Итого</Text>
+              <Title level="3" weight="2">
+                {trip.price.toLocaleString("ru-RU")} ₽
+              </Title>
+            </Flex>
 
             <Spacing size={12} />
 
@@ -522,11 +528,13 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               size="l"
               stretched
               mode="primary"
-              disabled={bookingOpen && selectedSeat === null}
+              disabled={selectedSeat === null}
               loading={isSubmittingBooking}
               onClick={handleFooterClick}
             >
-              {bookingOpen ? "Отправить заявку" : "Забронировать место"}
+              {selectedSeat !== null
+                ? `Забронировать · ${trip.price.toLocaleString("ru-RU")} ₽`
+                : "Забронировать"}
             </Button>
           </Box>
         </>
