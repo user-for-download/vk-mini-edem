@@ -145,33 +145,23 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       {role === "driver" && (
         <Group header={<Header size="s">Автомобиль</Header>}>
           {currentUser.car ? (
-            <>
-              <Box padding="system">
-                <SimpleGrid columns={2} gap={12}>
-                  <InfoRow header="Модель">{currentUser.car.model}</InfoRow>
-                  <InfoRow header="Цвет">{currentUser.car.color}</InfoRow>
-                  <InfoRow header="Номер">{currentUser.car.plate}</InfoRow>
-                </SimpleGrid>
-              </Box>
-
-              <Box padding="system" paddingBlockStart={0}>
-                <Button mode="secondary" size="m" onClick={onOpenCarForm}>
-                  Изменить автомобиль
-                </Button>
-              </Box>
-            </>
+            <SimpleCell
+              before={<Icon24CarOutline />}
+              chevron="always"
+              onClick={onOpenCarForm}
+              subtitle={`${currentUser.car.color} · ${currentUser.car.plate}`}
+            >
+              {currentUser.car.model}
+            </SimpleCell>
           ) : (
-            <Box padding="system">
-              <Text className="ProfilePanel__text--secondary">
-                Чтобы публиковать поездки как водитель, добавьте автомобиль.
-              </Text>
-
-              <Spacing size={12} />
-
-              <Button mode="primary" size="m" onClick={onOpenCarForm}>
-                Добавить автомобиль
-              </Button>
-            </Box>
+            <SimpleCell
+              before={<Icon24CarOutline />}
+              chevron="always"
+              onClick={onOpenCarForm}
+              subtitle="Чтобы публиковать поездки, добавьте автомобиль"
+            >
+              Добавить автомобиль
+            </SimpleCell>
           )}
         </Group>
       )}
