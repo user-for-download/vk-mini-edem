@@ -181,7 +181,11 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
         {!availableReviewTripsLoading &&
           !availableReviewTripsError &&
-          (availableReviewTrips ?? []).length === 0 && null}
+          (availableReviewTrips ?? []).length === 0 && (
+            <SimpleCell before={<Icon24StarsOutline />}>
+              Нет доступных поездок для отзыва
+            </SimpleCell>
+          )}
 
         {!availableReviewTripsLoading &&
           !availableReviewTripsError &&
