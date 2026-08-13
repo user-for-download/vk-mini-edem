@@ -1,6 +1,6 @@
 // mini-app/src/components/TagsScroll.tsx
 import { type FC, useState } from "react";
-import { SubnavigationBar, SubnavigationButton } from "@vkontakte/vkui";
+import { SubnavigationBar, SubnavigationButton, ContentBadge } from "@vkontakte/vkui";
 
 export interface TagsScrollProps {
   tags: string[];
@@ -20,7 +20,7 @@ export interface TagsScrollProps {
 /**
  * Горизонтальный ряд фильтров-пилюль.
  * Теперь умеет работать и как uncontrolled, и как controlled компонент.
- * Использует нативный SubnavigationBar + SubnavigationButton из VKUI.
+ * Использует нативный SubnavigationBar + SubnavigationButton из VKUI с ContentBadge.
  */
 export const TagsScroll: FC<TagsScrollProps> = ({
   tags,
@@ -46,15 +46,23 @@ export const TagsScroll: FC<TagsScrollProps> = ({
 
   return (
     <SubnavigationBar>
-      {tags.map((tag) => (
-        <SubnavigationButton
-          key={tag}
-          selected={selected.includes(tag)}
-          onClick={() => toggle(tag)}
-        >
-          {tag}
-        </SubnavigationButton>
-      ))}
+      {tags.map((tag) => {
+        const isSelected = selected.includes(tag);
+        return (
+          <SubnavigationButton
+            key={tag}
+            selected={isSelected}
+            onClick={() => toggle(tag)}
+          >
+            <ContentBadge
+              appearance={isSelected ? "accent" : undefined}
+              size="m"
+            >
+              {tag}
+            </ContentBadge>
+          </SubnavigationButton>
+        );
+      })}
     </SubnavigationBar>
   );
 };
