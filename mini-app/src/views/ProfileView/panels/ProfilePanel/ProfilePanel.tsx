@@ -181,11 +181,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
         {!availableReviewTripsLoading &&
           !availableReviewTripsError &&
-          (availableReviewTrips ?? []).length === 0 && (
-            <SimpleCell before={<Icon24StarsOutline />} subtitle="Когда вы совершите поездку, она появится здесь">
-              Нет доступных поездок для отзыва
-            </SimpleCell>
-          )}
+          (availableReviewTrips ?? []).length === 0 && null}
 
         {!availableReviewTripsLoading &&
           !availableReviewTripsError &&
@@ -217,7 +213,6 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             before={<Icon24DocumentOutline />}
             chevron="always"
             onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
-            subtitle="Поездки, на которые вы забронировали место"
           >
             Мои брони
           </SimpleCell>
