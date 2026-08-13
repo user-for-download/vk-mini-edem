@@ -208,32 +208,33 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             before={<Icon24CarOutline />}
             chevron="always"
             onClick={() => routeNavigator.push("/trips/my")}
-            subtitle="Ваши опубликованные маршруты (активные и архив)"
           >
-            Мои поездки (водитель)
+            Мои поездки
           </SimpleCell>
         )}
-        <SimpleCell
-          before={<Icon24DocumentOutline />}
-          chevron="always"
-          onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
-          subtitle="Поездки, на которые вы забронировали место"
-        >
-          Мои брони (пассажир)
-        </SimpleCell>
-        <SimpleCell
-          before={<Icon24ServicesOutline />}
-          chevron="always"
-          onClick={() => (onOpenHistory ? onOpenHistory() : routeNavigator.push("/bookings/history"))}
-          subtitle="Завершенные и отмененные брони"
-        >
-          История поездок (пассажир)
-        </SimpleCell>
+        {role === "passenger" && (
+          <SimpleCell
+            before={<Icon24DocumentOutline />}
+            chevron="always"
+            onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
+            subtitle="Поездки, на которые вы забронировали место"
+          >
+            Мои брони
+          </SimpleCell>
+        )}
+        {role === "passenger" && (
+          <SimpleCell
+            before={<Icon24ServicesOutline />}
+            chevron="always"
+            onClick={() => (onOpenHistory ? onOpenHistory() : routeNavigator.push("/bookings/history"))}
+          >
+            История поездок
+          </SimpleCell>
+        )}
         <SimpleCell
           before={<Icon24MessageStarsOutline />}
           chevron="always"
           onClick={onOpenCreateReview}
-          subtitle="Выберите поездку, в которой вы участвовали, и оставьте отзыв"
         >
           Оставить отзыв
         </SimpleCell>
