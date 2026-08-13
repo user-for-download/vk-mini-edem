@@ -60,6 +60,7 @@ export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
         subtitle: item.subtitle,
         before: icon,
         duration: 4000,
+        placement: "top",
       });
     },
     [api]

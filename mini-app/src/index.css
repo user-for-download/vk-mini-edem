@@ -20,3 +20,5 @@ body {
      не мешая внутреннему скроллу Panel__in. */
   overscroll-behavior-y: none;
 }
+
+/* Браузерный reset — не относится к компонентам VKUI */
