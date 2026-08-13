@@ -62,6 +62,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   id,
   trip,
   onBack,
+  onOpenDriver,
 }) => {
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -371,7 +372,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           <Separator />
 
           <RichCell
-            disabled
+            onClick={onOpenDriver}
             beforeAlign="center"
             afterAlign="center"
             contentAlign="center"
