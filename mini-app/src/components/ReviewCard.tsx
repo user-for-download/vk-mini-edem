@@ -12,9 +12,6 @@ const MAX_PREVIEW_LENGTH = 120;
  * Длинный текст обрезается до 120 символов, а полный текст показывается в Tooltip.
  */
 export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
-  const roleLabel =
-    review.targetRole === "driver" ? "о водителе" : "о пассажире";
-
   const isLong = review.text.length > MAX_PREVIEW_LENGTH;
   const displayText = isLong
     ? review.text.slice(0, MAX_PREVIEW_LENGTH).trimEnd() + "…"
@@ -37,7 +34,7 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
   return (
     <RichCell
       before={<Avatar src={resolveAvatar(review.author.avatar)} size={48} />}
-      overTitle={`${review.tripRoute} · ${roleLabel}`}
+      overTitle={review.tripRoute}
       after={
         <Flex
           align="center"
