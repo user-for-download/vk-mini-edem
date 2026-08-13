@@ -4,30 +4,30 @@ import {
   Avatar,
   Button,
   ButtonGroup,
-  Caption,
   Box,
   FormItem,
   FormStatus,
   Flex,
   Group,
   Header,
-  InfoRow,
   Panel,
   PanelHeaderBack,
-  Paragraph,
   RichCell,
   ScreenSpinner,
   SegmentedControl,
   Separator,
-  SimpleGrid,
   Spacing,
   Text,
   Textarea,
   Title,
+  Card,
+  Footnote,
+  Subhead,
+  ContentBadge,
 } from "@vkontakte/vkui";
+import { Icon16Favorite } from "@vkontakte/icons";
 import type { Trip } from "@/types";
 import { RouteLine } from "@/components/RouteLine";
-import { RatingBadge } from "@/components/RatingBadge";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
 import { getRateLimitMessage } from "@/helpers/errorMessages";
@@ -62,7 +62,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   id,
   trip,
   onBack,
-  onOpenDriver,
 }) => {
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -112,20 +111,20 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const handleSetBookingStatus = (bookingId: string, status: DriverBookingAction) => {
     updateBookingStatus.mutate(
-      { id: bookingId, status },
+      { bookingId, status },
       {
         onSuccess: () => {
           enqueueSnackbar({
-            type: status === "confirmed" ? "success" : "info",
-            title:
-              status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
-            dedupeKey: `booking_status_${bookingId}_${status}`,
+            type: "success",
+            title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+            dedupeKey: `booking_status_${bookingId}`,
           });
+          queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
         },
         onError: (error) => {
           enqueueSnackbar({
             type: "error",
-            title: "Не удалось обновить заявку",
+            title: "Не удалось обновить статус",
             subtitle: error instanceof Error ? error.message : undefined,
             dedupeKey: `booking_status_error_${bookingId}`,
           });
@@ -134,67 +133,76 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     );
   };
 
-  if (!currentUser) {
-    return (
-      <Panel id={id}>
-        <AppPanelHeader before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}>Поездка</AppPanelHeader>
-        <ScreenSpinner state="loading" />
-      </Panel>
-    );
-  }
+  const cancelMyBooking = (bookingId: string) => {
+    cancelBooking.mutate(bookingId, {
+      onSuccess: () => {
+        enqueueSnackbar({
+          type: "success",
+          title: "Бронь отменена",
+          dedupeKey: `cancel_booking_${bookingId}`,
+        });
+        queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
+      },
+      onError: (error) => {
+        enqueueSnackbar({
+          type: "error",
+          title: "Не удалось отменить бронь",
+          subtitle: error instanceof Error ? error.message : undefined,
+          dedupeKey: `cancel_booking_error_${bookingId}`,
+        });
+      },
+    });
+  };
 
   if (!trip) {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
-        >
-          Поездка
-        </AppPanelHeader>
+          before={<PanelHeaderBack onClick={onBack} />}
+          text="Поездка"
+        />
+        <ScreenSpinner state="loading" />
       </Panel>
     );
   }
 
-  // Принадлежность поездки определяется ТОЛЬКО данными с сервера.
-  // Клиентский role — это лишь переключатель вкладок и не должен
-  // участвовать в проверках прав (иначе водитель, открывший свою поездку
-  // в роли «пассажир», увидит кнопку бронирования своей же поездки).
-  const isTripActive = trip.status ? trip.status === "active" : true;
-  const isTripCompleted = trip.status === "completed";
-  const isTripCancelled = trip.status === "cancelled";
+  const departureTime = trip.departureAt ? new Date(trip.departureAt).getTime() : null;
+  const noSeats = trip.seatsAvailable <= 0;
+  const hasActiveBooking = trip.myBooking && trip.myBooking.status !== "cancelled" && trip.myBooking.status !== "declined";
 
-  const noSeats = trip.seatsAvailable === 0;
-  const takenSeats = trip.bookedSeats ?? [];
-
-  const myBooking = trip.myBooking ?? null;
-  const hasActiveBooking =
-    myBooking !== null &&
-    (myBooking.status === "pending" || myBooking.status === "confirmed");
-
-  const departureTime = trip.departureAt ? Date.parse(trip.departureAt) : null;
-
-  // Запрещаем бронировать уже уехавшие поездки (синхронно с бэкендом:
-  // POST /bookings теперь возвращает 400 TRIP_IN_PAST для таких случаев).
   const canBook =
     !isOwnTrip &&
-    isTripActive &&
+    isTripActive(trip.status) &&
     !noSeats &&
     !hasActiveBooking &&
     departureTime !== null &&
     departureTime > now;
 
-  const canCompleteTrip =
-    isOwnTrip &&
-    isTripActive &&
-    departureTime !== null &&
-    departureTime <= now;
+  function isTripActive(status?: string): boolean {
+    return !status || status === "active";
+  }
+
+  const isTripActiveStatus = isTripActive(trip.status);
+  const isTripCompleted = trip.status === "completed";
+  const isTripCancelled = trip.status === "cancelled";
+
+  const takenSeats = trip.bookedSeats ?? [];
+
+  // Автоматически выбираем первое доступное место, если ничего не выбрано
+  const availableSeats = Array.from({ length: trip.seatsTotal }, (_, i) => i + 1).filter(
+    (seat) => !takenSeats.includes(seat)
+  );
+
+  const effectiveSelectedSeat = selectedSeat !== null && !takenSeats.includes(selectedSeat)
+    ? selectedSeat
+    : availableSeats[0] ?? null;
 
   const handleFooterClick = () => {
     if (!canBook) {
       return;
     }
 
-    if (selectedSeat === null) {
+    if (effectiveSelectedSeat === null) {
       return;
     }
 
@@ -203,7 +211,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     createBooking.mutate(
       {
         tripId: trip.id,
-        seat: selectedSeat,
+        seat: effectiveSelectedSeat,
         comment: comment.trim() ? comment.trim() : undefined,
       },
       {
@@ -310,7 +318,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         enqueueSnackbar({
           type: "success",
           title: "Поездка завершена",
-          subtitle: "Пассажиры смогут оставить отзыв",
+          subtitle: "Теперь пассажиры могут оставить отзывы",
           dedupeKey: `complete_trip_${trip.id}`,
         });
         onBack();
@@ -326,120 +334,153 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     });
   };
 
+  const canCompleteTrip =
+    isOwnTrip &&
+    isTripActiveStatus &&
+    departureTime !== null &&
+    departureTime <= now;
+
+  const driver = trip.driver;
+  const car = driver?.car;
+  const carText = car ? `${car.model} · ${car.plate}` : undefined;
+
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
-      >
-        Детали поездки
-      </AppPanelHeader>
+        before={<PanelHeaderBack onClick={onBack} />}
+        text="Детали поездки"
+      />
 
-      <Group>
-        <Box padding="system">
-          <Title level="2" weight="2">
-            {trip.date} в {trip.time}
-          </Title>
-          <Spacing size={16} />
-          <RouteLine
-            from={{ city: trip.fromCity, address: trip.fromAddress }}
-            to={{ city: trip.toCity, address: trip.toAddress }}
-          />
-        </Box>
+      <Box padding="system">
+        <Card mode="outline" // eslint-disable-next-line react/forbid-dom-props
+        style={{ borderRadius: 12, backgroundColor: "var(--vkui--color_background_content)", overflow: "hidden" }}>
+          <Box padding={16}>
+            <RouteLine
+              from={{ city: trip.fromCity, address: trip.fromAddress }}
+              to={{ city: trip.toCity, address: trip.toAddress }}
+              dateLabel={trip.date}
+              time={trip.time}
+              price={trip.price}
+              duration={formatDuration(trip.durationMinutes)}
+              distance={trip.distanceKm ? `${trip.distanceKm} км` : undefined}
+            />
+          </Box>
 
-        <Box padding="system">
-          <SimpleGrid columns={2} gap={12}>
-            <InfoRow header="Цена за место">
-              {trip.price.toLocaleString("ru-RU")} ₽
-            </InfoRow>
-            <InfoRow header="Свободно мест">
-              {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
-            </InfoRow>
-            <InfoRow header="В пути">
-              {`${Math.floor(trip.durationMinutes / 60)} ч ${
-                trip.durationMinutes % 60
-              } мин`}
-            </InfoRow>
-            <InfoRow header="Расстояние">{`${trip.distanceKm} км`}</InfoRow>
-          </SimpleGrid>
-        </Box>
+          <Separator />
 
-        {trip.tags.length > 0 && (
-          <Box padding="system">
-            <Flex gap={6} wrap="wrap">
-              {trip.tags.map((tag) => (
-                <Caption
-                  key={tag}
-                  level="1"
+          <RichCell
+            disabled
+            beforeAlign="center"
+            afterAlign="center"
+            contentAlign="center"
+            before={
+              <Avatar
+                size={48}
+                src={resolveAvatar(driver?.avatar)}
+                initials={initialsOf(driver?.name || "Водитель")}
+              />
+            }
+            subtitle={
+              carText ? (
+                <Footnote
+                  // eslint-disable-next-line react/forbid-dom-props
+                  style={{ color: "var(--vkui--color_text_tertiary)" }}
+                >
+                  {carText}
+                </Footnote>
+              ) : undefined
+            }
+            after={
+              <Flex align="center" gap="2xs">
+                <Icon16Favorite style={{ color: "var(--vkui--color_icon_accent_themed)" }} />
+                <Footnote
                   weight="2"
-                  className="TripDetailsPanel__tag"
+                  // eslint-disable-next-line react/forbid-dom-props
+                  style={{ color: "var(--vkui--color_text_primary)" }}
+                >
+                  {(driver?.rating ?? 5.0).toFixed(1)}
+                </Footnote>
+              </Flex>
+            }
+          >
+            <Text
+              weight="2"
+              // eslint-disable-next-line react/forbid-dom-props
+              style={{ color: "var(--vkui--color_text_primary)" }}
+            >
+              {driver?.name || "Водитель"}
+            </Text>
+          </RichCell>
+        </Card>
+      </Box>
+
+      {trip.tags && trip.tags.length > 0 && (
+        <Group header={<Header size="s">Особенности поездки</Header>}>
+          <Box padding="system">
+            <Flex gap="s" wrap="wrap">
+              {trip.tags.map((tag) => (
+                <ContentBadge
+                  key={tag}
+                  appearance="secondary"
+                  size="m"
                 >
                   {tag}
-                </Caption>
+                </ContentBadge>
               ))}
             </Flex>
           </Box>
-        )}
-
-        {trip.comment && (
-          <Box padding="system">
-            <Paragraph style={{ color: "var(--vkui--color_text_secondary)" }}>
-              «{trip.comment}»
-            </Paragraph>
-          </Box>
-        )}
-      </Group>
-
-      <Group header={<Header size="s">Водитель</Header>}>
-        <RichCell
-          before={<Avatar src={resolveAvatar(trip.driver.avatar)} size={48} />}
-          subtitle={
-            <RatingBadge
-              value={trip.driver.rating}
-              reviewsCount={trip.driver.reviewsCount}
-              size="s"
-            />
-          }
-          bottom={
-            trip.driver.car ? (
-              <Caption
-                level="1"
-                style={{ color: "var(--vkui--color_text_secondary)" }}
-              >
-                {trip.driver.car.model}, {trip.driver.car.color}
-              </Caption>
-            ) : undefined
-          }
-          multiline
-          hasHover
-          hasActive
-          onClick={onOpenDriver}
-        >
-          {trip.driver.name}
-        </RichCell>
-      </Group>
-
-      {confirmedPassengers.length > 0 && (
-        <Group header={<Header size="s">Пассажиры ({confirmedPassengers.length})</Header>}>
-          {confirmedPassengers.map((booking) => (
-            <TripPassengerRow key={booking.id} booking={booking} />
-          ))}
         </Group>
       )}
 
+      {hasActiveBooking && (
+        <Box padding="system">
+          <FormStatus
+            mode={trip.myBooking?.status === "confirmed" ? "default" : "default"}
+            title={
+              trip.myBooking?.status === "confirmed"
+                ? `Место №${trip.myBooking.seat} забронировано (Подтверждено)`
+                : `Заявка на место №${trip.myBooking?.seat} отправлена (Ожидает подтверждения)`
+            }
+          >
+            {trip.myBooking?.status === "confirmed"
+              ? "Водитель подтвердил вашу бронь. Приятной поездки!"
+              : "Ожидайте подтверждения от водителя."}
+          </FormStatus>
+          <Spacing size={12} />
+          <Button
+            size="m"
+            mode="secondary"
+            stretched
+            onClick={() => cancelMyBooking(trip.myBooking!.id)}
+          >
+            Отменить бронирование
+          </Button>
+        </Box>
+      )}
+
       {isOwnTrip && (
-        <Group header={<Header size="s">Заявки ({pendingBookings.length})</Header>}>
-          {isLoadingBookings && (
+        <Group header={<Header size="s">Управление заявками ({pendingBookings.length})</Header>}>
+          {confirmedPassengers.length > 0 && (
             <Box padding="system">
-              <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-                Загрузка заявок...
-              </Text>
+              <Subhead weight="2" // eslint-disable-next-line react/forbid-dom-props
+              style={{ color: "var(--vkui--color_text_secondary)" }}>
+                Подтвержденные пассажиры ({confirmedPassengers.length})
+              </Subhead>
+              <Spacing size={8} />
+              {confirmedPassengers.map((booking) => (
+                <TripPassengerRow
+                  key={booking.id}
+                  booking={booking}
+                  onSetStatus={handleSetBookingStatus}
+                />
+              ))}
             </Box>
           )}
 
-          {!isLoadingBookings && pendingBookings.length === 0 && (
+          {!isLoadingBookings && pendingBookings.length === 0 && confirmedPassengers.length === 0 && (
             <Box padding="system">
               <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-                На эту поездку пока нет заявок.
+                Пока нет заявок на эту поездку
               </Text>
             </Box>
           )}
@@ -463,10 +504,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           <Group header={<Header size="s">Выберите место</Header>}>
             <Box padding="system">
               {(() => {
-                const availableSeats = Array.from({ length: trip.seatsTotal }, (_, i) => i + 1).filter(
-                  (seat) => !takenSeats.includes(seat)
-                );
-
                 if (availableSeats.length === 0) {
                   return <Text style={{ color: "var(--vkui--color_text_secondary)" }}>Все места заняты</Text>;
                 }
@@ -482,7 +519,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
                 return (
                   <SegmentedControl<number>
-                    value={selectedSeat ?? availableSeats[0]}
+                    value={effectiveSelectedSeat ?? availableSeats[0]}
                     onChange={(val) => setSelectedSeat(val)}
                     options={options}
                   />
@@ -503,6 +540,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
           <Box
             padding="system"
+            // eslint-disable-next-line react/forbid-dom-props
             style={{
               position: "sticky",
               bottom: 0,
@@ -526,11 +564,11 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               size="l"
               stretched
               mode="primary"
-              disabled={selectedSeat === null}
+              disabled={effectiveSelectedSeat === null}
               loading={isSubmittingBooking}
               onClick={handleFooterClick}
             >
-              {selectedSeat !== null
+              {effectiveSelectedSeat !== null
                 ? `Забронировать · ${trip.price.toLocaleString("ru-RU")} ₽`
                 : "Забронировать"}
             </Button>
@@ -552,7 +590,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </FormStatus>
           )}
 
-          {isTripActive && (
+          {isTripActiveStatus && (
             <>
               <FormStatus mode="default" title="Это ваша поездка">
                 Заявками пассажиров можно управлять на вкладке «Поездки» → «Мои
@@ -586,89 +624,38 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                 <Button
                   size="m"
                   mode="secondary"
-                  appearance="negative"
                   stretched
                   loading={isCancellingTrip}
                   disabled={isCancellingTrip || isCompletingTrip}
                   onClick={handleCancelTrip}
+                  // eslint-disable-next-line react/forbid-dom-props
+                  style={{ color: "var(--vkui--color_text_negative)" }}
                 >
                   Отменить поездку
                 </Button>
               </ButtonGroup>
-
-              {!canCompleteTrip && (
-                <Caption
-                  level="1"
-                  className="TripDetailsPanel__hint TripDetailsPanel__hint--center"
-                >
-                  Завершение будет доступно после времени отправления
-                </Caption>
-              )}
             </>
           )}
         </Box>
       )}
 
-      {!isOwnTrip && hasActiveBooking && myBooking && (
-        <Box padding="system">
-          {myBooking.status === "pending" && (
-            <FormStatus mode="default" title="Заявка на рассмотрении">
-              Вы забронировали место {myBooking.seat}. Ожидайте подтверждения
-              водителя.
-            </FormStatus>
-          )}
-          {myBooking.status === "confirmed" && (
-            <FormStatus mode="default" title="Место подтверждено">
-              Ваше место {myBooking.seat} подтверждено водителем. Увидимся в
-              поездке!
-            </FormStatus>
-          )}
-          <Spacing size={12} />
-          <Button
-            size="m"
-            mode="secondary"
-            appearance="negative"
-            stretched
-            loading={cancelBooking.isPending}
-            onClick={() => {
-              cancelBooking.mutate(myBooking.id, {
-                onSuccess: () => {
-                  enqueueSnackbar({
-                    type: "info",
-                    title: "Бронь отменена",
-                    dedupeKey: `cancel_booking_${myBooking.id}`,
-                  });
-                },
-                onError: (error) => {
-                  enqueueSnackbar({
-                    type: "error",
-                    title: "Не удалось отменить бронь",
-                    subtitle: error instanceof Error ? error.message : undefined,
-                    dedupeKey: `cancel_booking_error_${myBooking.id}`,
-                  });
-                },
-              });
-            }}
-          >
-            Отменить бронь
-          </Button>
-        </Box>
-      )}
-
-      {!isOwnTrip && !isTripActive && !hasActiveBooking && (
-        <Box padding="system">
-          <FormStatus
-            mode="default"
-            title={isTripCompleted ? "Поездка завершена" : "Поездка отменена"}
-          >
-            {isTripCompleted
-              ? "Бронирование этой поездки больше недоступно."
-              : "Эта поездка больше недоступна для бронирования."}
-          </FormStatus>
-        </Box>
-      )}
-
-      <Spacing size={24} />
+      <Spacing size={32} />
     </Panel>
   );
-};
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h} ч ${m} мин`;
+  if (h > 0) return `${h} ч`;
+  return `${m} мин`;
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return parts[0]?.slice(0, 2).toUpperCase() || "ЭД";
+}
