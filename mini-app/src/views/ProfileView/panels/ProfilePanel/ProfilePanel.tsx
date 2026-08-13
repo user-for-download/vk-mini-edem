@@ -1,5 +1,15 @@
 import type { FC } from "react";
 import { Avatar, Button, Caption, Box, Flex, Group, Header, InfoRow, Panel, SimpleCell, SimpleGrid, Spacing, Text, Title } from "@vkontakte/vkui";
+import {
+  Icon24CarOutline,
+  Icon24MessageStarsOutline,
+  Icon24DocumentOutline,
+  Icon24ServicesOutline,
+  Icon24StarsOutline,
+  Icon24NotificationOutline,
+  Icon24HelpOutline,
+  Icon24InfoCircleOutline,
+} from "@vkontakte/icons";
 import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import type { Role, Trip } from "@/types";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -168,13 +178,13 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
       <Group header={<Header size="s">Поездки для отзыва</Header>}>
         {availableReviewTripsLoading && (
-          <SimpleCell subtitle="Ищем завершенные поездки">
+          <SimpleCell before={<Icon24StarsOutline />} subtitle="Ищем завершенные поездки">
             Загрузка...
           </SimpleCell>
         )}
 
         {availableReviewTripsError && (
-          <SimpleCell subtitle="Не удалось загрузить список поездок">
+          <SimpleCell before={<Icon24StarsOutline />} subtitle="Не удалось загрузить список поездок">
             Ошибка загрузки
           </SimpleCell>
         )}
@@ -182,7 +192,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         {!availableReviewTripsLoading &&
           !availableReviewTripsError &&
           (availableReviewTrips ?? []).length === 0 && (
-            <SimpleCell subtitle="Когда вы совершите поездку, она появится здесь">
+            <SimpleCell before={<Icon24StarsOutline />} subtitle="Когда вы совершите поездку, она появится здесь">
               Нет доступных поездок для отзыва
             </SimpleCell>
           )}
@@ -192,6 +202,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           (availableReviewTrips ?? []).map((trip) => (
             <SimpleCell
               key={trip.id}
+              before={<Icon24StarsOutline />}
               chevron="always"
               onClick={() => onOpenReviewForTrip?.(trip)}
               subtitle={`${trip.date} · ${trip.time}`}
@@ -204,6 +215,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       <Group header={<Header size="s">Поездки и брони</Header>}>
         {role === "driver" && (
           <SimpleCell
+            before={<Icon24CarOutline />}
             chevron="always"
             onClick={() => routeNavigator.push("/trips/my")}
             subtitle="Ваши опубликованные маршруты (активные и архив)"
@@ -212,6 +224,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           </SimpleCell>
         )}
         <SimpleCell
+          before={<Icon24DocumentOutline />}
           chevron="always"
           onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
           subtitle="Поездки, на которые вы забронировали место"
@@ -219,6 +232,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           Мои брони (пассажир)
         </SimpleCell>
         <SimpleCell
+          before={<Icon24ServicesOutline />}
           chevron="always"
           onClick={() => (onOpenHistory ? onOpenHistory() : routeNavigator.push("/bookings/history"))}
           subtitle="Завершенные и отмененные брони"
@@ -226,6 +240,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           История поездок (пассажир)
         </SimpleCell>
         <SimpleCell
+          before={<Icon24MessageStarsOutline />}
           chevron="always"
           onClick={onOpenCreateReview}
           subtitle="Выберите поездку, в которой вы участвовали, и оставьте отзыв"
@@ -269,13 +284,13 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Group>
 
       <Group header={<Header size="s">Настройки</Header>}>
-        <SimpleCell chevron="always" onClick={onOpenNotifications}>
+        <SimpleCell before={<Icon24NotificationOutline />} chevron="always" onClick={onOpenNotifications}>
           Уведомления
         </SimpleCell>
-        <SimpleCell chevron="always" onClick={onOpenSupport}>
+        <SimpleCell before={<Icon24HelpOutline />} chevron="always" onClick={onOpenSupport}>
           Помощь и поддержка
         </SimpleCell>
-        <SimpleCell chevron="always" onClick={onOpenAbout}>
+        <SimpleCell before={<Icon24InfoCircleOutline />} chevron="always" onClick={onOpenAbout}>
           О сервисе
         </SimpleCell>
       </Group>
