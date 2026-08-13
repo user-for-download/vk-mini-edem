@@ -87,7 +87,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     );
   }
 
-  const visibleReviews = (reviewsData ?? []).slice(0, 2);
+
 
   return (
     <Panel id={id}>
@@ -256,21 +256,30 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           </Box>
         )}
 
-        {!reviewsLoading && !reviewsError && visibleReviews.length > 0 && (
-          <>
-            {visibleReviews.map((review) => (
-              <ReviewCard key={review.id} review={review} />
-            ))}
-          </>
-        )}
+        {!reviewsLoading && !reviewsError && (() => {
+          const filteredReviews = (reviewsData ?? []).filter(
+            (r) => r.targetRole === role
+          );
+          const visibleReviews = filteredReviews.slice(0, 2);
 
-        {!reviewsLoading && !reviewsError && visibleReviews.length === 0 && (
-          <Box padding="system">
-            <Text className="ProfilePanel__text--secondary">
-              Отзывов пока нет
-            </Text>
-          </Box>
-        )}
+          if (visibleReviews.length > 0) {
+            return (
+              <>
+                {visibleReviews.map((review) => (
+                  <ReviewCard key={review.id} review={review} />
+                ))}
+              </>
+            );
+          }
+
+          return (
+            <Box padding="system">
+              <Text className="ProfilePanel__text--secondary">
+                Отзывов пока нет
+              </Text>
+            </Box>
+          );
+        })()}
       </Group>
 
       <Group header={<Header size="s">настройки</Header>}>
