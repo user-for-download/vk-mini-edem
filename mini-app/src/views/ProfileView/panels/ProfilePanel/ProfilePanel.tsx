@@ -143,7 +143,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Group>
 
       {role === "driver" && (
-        <Group header={<Header size="s">Автомобиль</Header>}>
+        <Group header={<Header size="s">автомобиль</Header>}>
           {currentUser.car ? (
             <SimpleCell
               before={<Icon24CarOutline />}
@@ -166,7 +166,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         </Group>
       )}
 
-      <Group header={<Header size="s">Поездки для отзыва</Header>}>
+      <Group header={<Header size="s">поездки для отзыва</Header>}>
         {availableReviewTripsLoading && (
           <SimpleCell before={<Icon24StarsOutline />} subtitle="Ищем завершенные поездки">
             Загрузка...
@@ -202,7 +202,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           ))}
       </Group>
 
-      <Group header={<Header size="s">Поездки и брони</Header>}>
+      <Group header={<Header size="s">поездки и бронирования</Header>}>
         {role === "driver" && (
           <SimpleCell
             before={<Icon24CarOutline />}
@@ -239,7 +239,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         </SimpleCell>
       </Group>
 
-      <Group header={<Header size="s">Отзывы о вас</Header>}>
+      <Group header={<Header size="s">отзывы о вас</Header>}>
         {reviewsLoading && (
           <Box padding="system">
             <Text className="ProfilePanel__text--secondary">
@@ -273,7 +273,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         )}
       </Group>
 
-      <Group header={<Header size="s">Настройки</Header>}>
+      <Group header={<Header size="s">настройки</Header>}>
         <SimpleCell before={<Icon24NotificationOutline />} chevron="always" onClick={onOpenNotifications}>
           Уведомления
         </SimpleCell>
