@@ -5,7 +5,6 @@ import {
   Button,
   Flex,
   ModalCard,
-  Separator,
   Spacing,
   Text,
   ScreenSpinner,
@@ -61,9 +60,10 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         <Box
           padding="system"
           paddingBlockStart={0}
-          className="DriverProfileModal__centered"
         >
-          <ScreenSpinner state="loading" />
+          <Flex justify="center">
+            <ScreenSpinner state="loading" />
+          </Flex>
         </Box>
       </ModalCard>
     );
@@ -77,7 +77,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         description="Не удалось загрузить данные водителя"
       >
         <Box padding="system" paddingBlockStart={0}>
-          <Text className="DriverProfileModal__meta">
+          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
             Пользователь недоступен или был удален.
           </Text>
         </Box>
@@ -96,46 +96,44 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       <Box
         padding="system"
         paddingBlockStart={0}
-        className="DriverProfileModal__centered"
       >
-        <Avatar
-          src={resolveAvatar(driver.avatar)}
-          size={72}
-          className="DriverProfileModal__avatar"
-        />
+        <Flex direction="column" align="center" gap={12}>
+          <Avatar
+            src={resolveAvatar(driver.avatar)}
+            size={72}
+          />
 
-        <Flex justify="center">
-          <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
-        </Flex>
+          <Flex justify="center">
+            <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
+          </Flex>
 
-        <Text className="DriverProfileModal__meta">
-          {driver.tripsCount} поездок на сервисе
-        </Text>
-
-        {driver.car && (
-          <>
-            <Spacing size={12} />
-            <Text weight="2">{driver.car.model} · {driver.car.color}</Text>
-          </>
-        )}
-
-        {driver.about && (
-          <Text className="DriverProfileModal__about">
-            {driver.about}
+          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            {driver.tripsCount} поездок на сервисе
           </Text>
-        )}
+
+          {driver.car && (
+            <>
+              <Spacing size={12} />
+              <Text weight="2">{driver.car.model} · {driver.car.color}</Text>
+            </>
+          )}
+
+          {driver.about && (
+            <Text style={{ textAlign: "center", color: "var(--vkui--color_text_secondary)" }}>
+              {driver.about}
+            </Text>
+          )}
+        </Flex>
       </Box>
 
       {allReviews.length > 0 && (
         <>
           <Spacing size={8} />
-          <Separator />
-
-          <div className="DriverProfileModal__reviews">
+          <Flex direction="column" gap={8}>
             {allReviews.map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}
-          </div>
+          </Flex>
           {hasNextPage && (
             <Box padding="system" style={{ textAlign: "center" }}>
               <Button

@@ -88,7 +88,15 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           aria-label={`${n} из 5`}
           tabIndex={n === value ? 0 : -1}
           onClick={() => onChange(n)}
-          className="CreateReviewModal__starButton"
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <svg
             width="30"
@@ -267,7 +275,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
       }
     >
       <Box padding="system" paddingBlockStart={0}>
-        <Title level="3" weight="2" className="CreateReviewModal__title">
+        <Title level="3" weight="2">
           Как прошла поездка?
         </Title>
 
@@ -334,11 +342,13 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
         {text.length > 0 && (
           <Caption
             level="1"
-            className={`CreateReviewModal__counter ${
-              text.length > MAX_TEXT_LENGTH - 50
-                ? "CreateReviewModal__counter--danger"
-                : "CreateReviewModal__counter--normal"
-            }`}
+            style={{
+              textAlign: "right",
+              color:
+                text.length > MAX_TEXT_LENGTH - 50
+                  ? "var(--vkui--color_text_negative)"
+                  : "var(--vkui--color_text_secondary)",
+            }}
             aria-live="polite"
           >
             {text.length}/{MAX_TEXT_LENGTH}

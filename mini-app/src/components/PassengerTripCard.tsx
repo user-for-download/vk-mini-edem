@@ -114,7 +114,7 @@ export const PassengerTripCard: FC<{
       {hasDetails && (
         <>
           {booking.comment && (
-            <Text className="PassengerTripCard__comment">
+            <Text style={{ fontStyle: "italic", color: "var(--vkui--color_text_secondary)" }}>
               «{booking.comment}»
             </Text>
           )}
@@ -136,7 +136,7 @@ export const PassengerTripCard: FC<{
       )}
 
           {booking.hasReview && (
-            <Caption level="1" className="PassengerTripCard__comment">
+            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
               Отзыв оставлен
             </Caption>
           )}

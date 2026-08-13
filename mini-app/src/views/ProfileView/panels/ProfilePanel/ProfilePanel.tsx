@@ -93,20 +93,19 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     <Panel id={id}>
       <AppPanelHeader>Профиль</AppPanelHeader>
       <Group>
-        <Box padding="system" className="ProfilePanel__profileHeader">
-          <Avatar src={resolveAvatar(currentUser.avatar)} size={80} className="ProfilePanel__avatar" />
+        <Spacing size={12} />
+        <Flex direction="column" align="center" gap={12}>
+          <Avatar src={resolveAvatar(currentUser.avatar)} size={80} />
           <Title level="2" weight="2">
             {currentUser.name}
           </Title>
-          <Flex justify="center" className="ProfilePanel__rating">
-            <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
-          </Flex>
+          <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
           {currentUser.isVerified ? (
-            <Caption level="1" className="ProfilePanel__statusText ProfilePanel__statusText--verified">
+            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
               Личность подтверждена ВКонтакте
             </Caption>
           ) : currentUser.verificationStatus === "pending" ? (
-            <Caption level="1" className="ProfilePanel__statusText ProfilePanel__statusText--pending">
+            <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
               Заявка на верификацию на рассмотрении
             </Caption>
           ) : (
@@ -115,16 +114,16 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
               mode="outline"
               onClick={() => verifyMutation.mutate()}
               loading={verifyMutation.isPending}
-              className="ProfilePanel__verifyButton"
             >
               Пройти верификацию
             </Button>
           )}
-          <Spacing size={16} />
+          <Spacing size={4} />
           <Button mode="secondary" size="m" onClick={onOpenEditProfile}>
             Редактировать
           </Button>
-        </Box>
+        </Flex>
+        <Spacing size={16} />
 
         <Box padding="system">
           <SimpleGrid columns={2} gap={12}>

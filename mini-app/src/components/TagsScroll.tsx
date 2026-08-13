@@ -1,6 +1,6 @@
 // mini-app/src/components/TagsScroll.tsx
 import { type FC, useState } from "react";
-import { SubnavigationBar, SubnavigationButton, ContentBadge } from "@vkontakte/vkui";
+import { SubnavigationBar, SubnavigationButton } from "@vkontakte/vkui";
 
 export interface TagsScrollProps {
   tags: string[];
@@ -54,12 +54,7 @@ export const TagsScroll: FC<TagsScrollProps> = ({
             selected={isSelected}
             onClick={() => toggle(tag)}
           >
-            <ContentBadge
-              appearance={isSelected ? "accent" : undefined}
-              size="m"
-            >
-              {tag}
-            </ContentBadge>
+            {tag}
           </SubnavigationButton>
         );
       })}

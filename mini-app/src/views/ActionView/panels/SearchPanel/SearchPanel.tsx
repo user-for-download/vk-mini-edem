@@ -156,27 +156,27 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
         </Box>
         {showFilters && (
           <Box padding="system" paddingBlockStart={0}>
-            <Flex gap={8}>
-              <div className="SearchPanel__field">
-                <Caption level="1" className="SearchPanel__fieldLabel">Дата от</Caption>
-                <DateInput
-                  value={dateFrom}
-                  onChange={setDateFrom}
-                  disablePast
-                  placeholder="Не выбрано"
-                />
-              </div>
-              <div className="SearchPanel__field">
-                <Caption level="1" className="SearchPanel__fieldLabel">Дата до</Caption>
-                <DateInput
-                  value={dateTo}
-                  onChange={setDateTo}
-                  disablePast
-                  minDateTime={dateFrom ?? undefined}
-                  placeholder="Не выбрано"
-                />
-              </div>
-            </Flex>
+              <Flex gap={8}>
+                <Flex direction="column" gap={4} style={{ flex: 1 }}>
+                  <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>Дата от</Caption>
+                  <DateInput
+                    value={dateFrom}
+                    onChange={setDateFrom}
+                    disablePast
+                    placeholder="Не выбрано"
+                  />
+                </Flex>
+                <Flex direction="column" gap={4} style={{ flex: 1 }}>
+                  <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>Дата до</Caption>
+                  <DateInput
+                    value={dateTo}
+                    onChange={setDateTo}
+                    disablePast
+                    minDateTime={dateFrom ?? undefined}
+                    placeholder="Не выбрано"
+                  />
+                </Flex>
+              </Flex>
             {(dateFrom || dateTo) && (
               <Spacing size={8} />
             )}
@@ -237,7 +237,8 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
               {results.map((trip) => (
                 <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
               ))}
-              <div ref={sentinelRef} className="SearchPanel__sentinel" />
+              {/* eslint-disable-next-line react/forbid-dom-props */}
+              <div ref={sentinelRef} style={{ height: 1 }} />
               {isFetchingNextPage && <TripCardSkeleton />}
             </Flex>
           </Box>

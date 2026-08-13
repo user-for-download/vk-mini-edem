@@ -205,7 +205,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
                 {!canComplete && (
                   <Caption
                     level="1"
-                    className="TripRequestsPanel__hint TripRequestsPanel__hint--center"
+                    style={{ textAlign: "center", color: "var(--vkui--color_text_secondary)" }}
                   >
                     Завершение будет доступно после времени отправления
                   </Caption>
