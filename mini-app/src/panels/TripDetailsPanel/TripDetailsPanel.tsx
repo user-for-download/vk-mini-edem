@@ -111,7 +111,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const handleSetBookingStatus = (bookingId: string, status: DriverBookingAction) => {
     updateBookingStatus.mutate(
-      { bookingId, status },
+      { id: bookingId, status },
       {
         onSuccess: () => {
           enqueueSnackbar({
@@ -159,8 +159,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       <Panel id={id}>
         <AppPanelHeader
           before={<PanelHeaderBack onClick={onBack} />}
-          text="Поездка"
-        />
+        >
+          Поездка
+        </AppPanelHeader>
         <ScreenSpinner state="loading" />
       </Panel>
     );
@@ -348,8 +349,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     <Panel id={id}>
       <AppPanelHeader
         before={<PanelHeaderBack onClick={onBack} />}
-        text="Детали поездки"
-      />
+      >
+        Детали поездки
+      </AppPanelHeader>
 
       <Box padding="system">
         <Card mode="outline" // eslint-disable-next-line react/forbid-dom-props
@@ -421,7 +423,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               {trip.tags.map((tag) => (
                 <ContentBadge
                   key={tag}
-                  appearance="secondary"
+                  appearance="accent"
                   size="m"
                 >
                   {tag}
@@ -471,7 +473,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                 <TripPassengerRow
                   key={booking.id}
                   booking={booking}
-                  onSetStatus={handleSetBookingStatus}
                 />
               ))}
             </Box>
