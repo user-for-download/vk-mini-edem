@@ -69,9 +69,7 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
           {review.date}
         </Caption>
       }
-      multiline
-      hasHover={isLong}
-      hasActive={isLong}
+      multiline={false}
     >
       {review.author.name}
     </RichCell>
