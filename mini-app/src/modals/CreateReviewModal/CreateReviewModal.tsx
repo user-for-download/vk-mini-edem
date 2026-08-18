@@ -13,7 +13,9 @@ import {
   Text,
   Textarea,
   Title,
+  Tappable,
 } from "@vkontakte/vkui";
+import { Icon16StarAlt } from "@vkontakte/icons";
 import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import type { Trip, User } from "@/types";
 import { useSnackbar } from "@/providers/SnackbarProvider";
@@ -80,9 +82,9 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
       onKeyDown={handleKeyDown}
     >
       {[1, 2, 3, 4, 5].map((n) => (
-        <button
+        <Tappable
           key={n}
-          type="button"
+          Component="button"
           role="radio"
           aria-checked={n === value}
           aria-label={`${n} из 5`}
@@ -90,26 +92,13 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           onClick={() => onChange(n)}
           // eslint-disable-next-line react/forbid-dom-props
           style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
+            color: n <= value ? "var(--vkui--color_icon_accent)" : "var(--vkui--color_icon_secondary)",
+            minWidth: 46,
+            minHeight: 46,
           }}
         >
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 16 16"
-            fill={n <= value ? "var(--carpool_accent)" : "none"}
-            stroke="var(--carpool_accent)"
-            strokeWidth="1"
-            aria-hidden="true"
-          >
-            <path d="M8 1.2l1.98 4.28 4.62.56-3.42 3.24.9 4.72L8 11.7l-4.08 2.3.9-4.72L1.4 6.04l4.62-.56L8 1.2z" />
-          </svg>
-        </button>
+          <Icon16StarAlt width={30} height={30} aria-hidden="true" />
+        </Tappable>
       ))}
     </Flex>
   );

@@ -61,7 +61,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   if (booking.status === "pending") {
     return {
       label: "ожидает",
-      color: "var(--vkui--color_text_accent, #3f8ae0)",
+      color: "var(--vkui--color_text_accent)",
     };
   }
 
@@ -72,7 +72,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   ) {
     return {
       label: "завершено",
-      color: "var(--carpool_accent)",
+      color: "var(--vkui--color_text_accent)",
     };
   }
 
@@ -80,7 +80,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
   if (booking.status === "confirmed") {
     return {
       label: "подтверждено",
-      color: "var(--carpool_accent)",
+      color: "var(--vkui--color_text_accent)",
     };
   }
 
@@ -109,7 +109,6 @@ export const PassengerTripCard: FC<{
       trip={booking.trip}
       onOpen={onOpen}
       seatsLabel={`Место ${booking.seat} ${status.label}`}
-      seatsColor={status.color}
     >
       {hasDetails && (
         <>

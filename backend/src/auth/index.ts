@@ -63,6 +63,8 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     return c.json({ message: "Invalid or expired signature" }, 401);
   }
 
+  const isProductionVkAuth = !env.ALLOW_DEV_AUTH || !queryToVerify.includes("sign=dev-sign");
+
   let user = await db.user.findFirst({
     where: { vkUserId },
     include: { car: true },
@@ -77,7 +79,19 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
         rating: 5.0,
         reviewsCount: 0,
         tripsCount: 0,
-        isVerified: false,
+        isVerified: isProductionVkAuth,
+        verificationStatus: isProductionVkAuth ? "approved" : "none",
+        verifiedAt: isProductionVkAuth ? new Date() : null,
+      },
+      include: { car: true },
+    });
+  } else if (isProductionVkAuth) {
+    user = await db.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationStatus: "approved",
+        verifiedAt: user.verifiedAt ?? new Date(),
       },
       include: { car: true },
     });

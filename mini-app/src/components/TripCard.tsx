@@ -1,5 +1,5 @@
 // mini-app/src/components/TripCard.tsx
-import { type FC, type KeyboardEvent, type ReactNode } from "react";
+import { type FC, type ReactNode } from "react";
 import {
   Avatar,
   Card,
@@ -9,6 +9,7 @@ import {
   Separator,
   Flex,
   RichCell,
+  Tappable,
 } from "@vkontakte/vkui";
 import { Icon16Favorite } from "@vkontakte/icons";
 import { RouteLine } from "@/components/RouteLine";
@@ -21,8 +22,6 @@ export interface TripCardProps {
   hideSeats?: boolean;
   /** Переопределяет автоматический текст «X из Y мест». */
   seatsLabel?: string;
-  /** Цвет текста мест (перекрывает цвет по умолчанию). */
-  seatsColor?: string;
   archivedStatus?: "completed" | "cancelled";
   /** Дополнительный контент в теле карточки (после блока водителя, без Separator). */
   children?: ReactNode;
@@ -63,15 +62,6 @@ export const TripCard: FC<TripCardProps> = ({
   children,
   disabled = false,
 }) => {
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      if (!disabled) {
-        onOpen?.(trip);
-      }
-    }
-  };
-
   const isInteractive = Boolean(onOpen) && !disabled;
   const isArchived = Boolean(archivedStatus);
 
@@ -91,6 +81,7 @@ export const TripCard: FC<TripCardProps> = ({
 
   return (
     <Card
+      Component="div"
       mode="outline"
       // eslint-disable-next-line react/forbid-dom-props
       style={{
@@ -100,29 +91,28 @@ export const TripCard: FC<TripCardProps> = ({
         cursor: disabled ? "default" : "pointer",
         opacity: isArchived ? 0.6 : 1,
       }}
-      onClick={isInteractive ? () => onOpen?.(trip) : undefined}
-      onKeyDown={isInteractive ? handleKeyDown : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      role={isInteractive ? "button" : undefined}
-      aria-label={
-        isInteractive
-          ? `Поездка ${trip.fromCity} — ${trip.toCity}, ${trip.date} в ${trip.time}, ${trip.price} рублей`
-          : undefined
-      }
     >
-      <Box padding={16}>
-        <RouteLine
-          from={{ city: trip.fromCity, address: trip.fromAddress }}
-          to={{ city: trip.toCity, address: trip.toAddress }}
-          dateLabel={trip.date}
-          time={trip.time}
-          price={trip.price}
-          duration={durationText}
-          distance={distanceText}
-          seatsLeft={hideSeats ? undefined : seatsLeft}
-          seatsLabel={hideSeats ? undefined : seatsLabelText}
-        />
-      </Box>
+      <Tappable
+        Component={isInteractive ? "button" : "div"}
+        disabled={!isInteractive}
+        onClick={isInteractive ? () => onOpen?.(trip) : undefined}
+        aria-label={isInteractive ? `Поездка ${trip.fromCity} — ${trip.toCity}, ${trip.date} в ${trip.time}, ${trip.price} рублей` : undefined}
+        style={{ display: "block", width: "100%", textAlign: "left" }}
+      >
+        <Box padding={16}>
+          <RouteLine
+            from={{ city: trip.fromCity, address: trip.fromAddress }}
+            to={{ city: trip.toCity, address: trip.toAddress }}
+            dateLabel={trip.date}
+            time={trip.time}
+            price={trip.price}
+            duration={durationText}
+            distance={distanceText}
+            seatsLeft={hideSeats ? undefined : seatsLeft}
+            seatsLabel={hideSeats ? undefined : seatsLabelText}
+          />
+        </Box>
+      </Tappable>
 
       <Separator />
 

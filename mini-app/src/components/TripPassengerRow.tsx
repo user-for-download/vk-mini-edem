@@ -52,6 +52,7 @@ export const TripPassengerRow: FC<TripPassengerRowProps> = ({
       hasHover={Boolean(onOpenProfile)}
       hasActive={Boolean(onOpenProfile)}
       onClick={onOpenProfile}
+      aria-label={onOpenProfile ? `Открыть профиль пассажира ${booking.passenger.name}` : undefined}
     >
       {booking.passenger.name}
     </RichCell>

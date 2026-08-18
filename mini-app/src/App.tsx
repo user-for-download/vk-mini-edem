@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useState, useEffect, useCallback } from "react";
-import { Epic, SplitCol, SplitLayout, PanelHeader } from "@vkontakte/vkui";
+import { Epic, SplitCol, SplitLayout } from "@vkontakte/vkui";
 import {
   useActiveVkuiLocation,
   useRouteNavigator,
@@ -137,8 +137,8 @@ export default function App() {
   return (
     <>
       <OfflineBanner isOnline={isOnline} wasOffline={wasOffline} />
-      <SplitLayout center header={<PanelHeader delimiter="none" fixed={false} />}>
-        <SplitCol autoSpaced maxWidth={720}>
+      <SplitLayout center>
+        <SplitCol autoSpaced stretchedOnMobile maxWidth="720px">
           <Epic
             activeStory={activeView as ViewId}
             tabbar={<AppTabbar activeView={activeView as ViewId} role={role} />}

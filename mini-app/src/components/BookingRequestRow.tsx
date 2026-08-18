@@ -32,10 +32,10 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
   ({ booking, onSetStatus }) => {
     const statusColor =
       booking.status === "confirmed"
-        ? "var(--carpool_accent)"
+        ? "var(--vkui--color_text_accent)"
         : booking.status === "declined"
           ? "var(--vkui--color_text_secondary)"
-          : "var(--vkui--color_text_accent, #3f8ae0)";
+          : "var(--vkui--color_text_accent)";
 
     return (
       <>

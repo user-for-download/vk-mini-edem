@@ -1,6 +1,7 @@
 // mini-app/src/components/SeatScheme.tsx
 import { type FC } from "react";
-import { Caption } from "@vkontakte/vkui";
+import { Caption, Tappable } from "@vkontakte/vkui";
+import { Icon24CarOutline } from "@vkontakte/icons";
 
 export interface SeatSchemeProps {
   seatsTotal: number;
@@ -23,9 +24,9 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
     if (isSelected) className += " SeatScheme__seat--selected";
 
     return (
-      <button
+      <Tappable
         key={seat}
-        type="button"
+        Component="button"
         className={className}
         disabled={isTaken}
         onClick={() => onSelect(isSelected ? null : seat)}
@@ -35,14 +36,14 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
         tabIndex={isTaken ? -1 : 0}
       >
         {seat}
-      </button>
+      </Tappable>
     );
   };
 
   return (
     <div className="SeatScheme" role="radiogroup" aria-label="Выбор места">
       <div className="SeatScheme__row">
-        <div className="SeatScheme__seat SeatScheme__seat--driver" aria-label="Водитель">🚗</div>
+        <div className="SeatScheme__seat SeatScheme__seat--driver" aria-label="Водитель"><Icon24CarOutline /></div>
         {frontSeats.map(renderSeat)}
       </div>
       {backSeats.length > 0 && (

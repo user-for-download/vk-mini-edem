@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { bridge, getVkUserInfo } from "@/helpers/bridge";
+import { bridge } from "@/helpers/bridge";
 import type { User } from "@/types";
 import { authApi } from "@/api/auth.api";
 import { apiClient } from "@/api/client";
@@ -57,23 +57,10 @@ async function getVkAuthPayload(): Promise<AuthRequest> {
     return { searchParams: devParams.toString() };
   }
 
-  // Прод: при первом запуске получаем информацию о пользователе из VK
-  // (имя, фамилия, аватар) и автоматически валидируем профиль этими данными.
-  const vkProfile = import.meta.env.DEV ? null : await getVkUserInfo();
-  const profileFields: Pick<AuthRequest, "firstName" | "lastName" | "photo"> =
-    vkProfile
-      ? {
-          firstName: vkProfile.firstName,
-          lastName: vkProfile.lastName,
-          photo: vkProfile.photo,
-        }
-      : {};
-
   // Способ 1: параметры в URL (window.location.search) — стандартный случай
   if (urlParams.has("vk_user_id") && urlParams.has("sign")) {
     return {
       searchParams: search.replace(/^\?/, ""),
-      ...profileFields,
     };
   }
 
@@ -94,13 +81,13 @@ async function getVkAuthPayload(): Promise<AuthRequest> {
           params.set(key, String(value));
         }
       }
-      return { searchParams: params.toString(), ...profileFields };
+      return { searchParams: params.toString() };
     }
   } catch {
     // ignore — вернём пустой searchParams ниже
   }
 
-    throw new Error("VK launch parameters are unavailable");
+  throw new Error("VK launch parameters are unavailable");
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({

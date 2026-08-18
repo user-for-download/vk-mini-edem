@@ -1,6 +1,6 @@
 // mini-app/src/components/ReviewCard.tsx
 import { type CSSProperties, type FC, useState } from "react";
-import { Avatar, Caption, Flex, RichCell, Text } from "@vkontakte/vkui";
+import { Avatar, Caption, Flex, RichCell, Text, Tappable } from "@vkontakte/vkui";
 import { Icon12ChevronDownSmall, Icon12ChevronUpSmall, Icon16StarAlt } from "@vkontakte/icons";
 import { resolveAvatar } from "@/helpers/avatar";
 import type { Review } from "@/types";
@@ -30,31 +30,33 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
   const toggle = () => setExpanded((v) => !v);
 
   const subtitle = isExpandable ? (
-    <Flex
-      align="center"
-      gap={4}
+    <Tappable
+      Component="button"
       onClick={toggle}
       aria-expanded={expanded}
-      role="button"
+      aria-label={expanded ? "Свернуть отзыв" : "Развернуть отзыв"}
+      style={{ display: "block", width: "100%", textAlign: "left" }}
     >
-      <span
-        // eslint-disable-next-line react/forbid-dom-props
-        style={expanded ? undefined : collapsedStyle}
-      >
-        {review.text}
-      </span>
-      {expanded ? (
-        <Icon12ChevronUpSmall
+      <Flex align="center" gap={4}>
+        <span
           // eslint-disable-next-line react/forbid-dom-props
-          style={{ color: "var(--vkui--color_icon_secondary)" }}
-        />
-      ) : (
-        <Icon12ChevronDownSmall
-          // eslint-disable-next-line react/forbid-dom-props
-          style={{ color: "var(--vkui--color_icon_secondary)" }}
-        />
-      )}
-    </Flex>
+          style={expanded ? undefined : collapsedStyle}
+        >
+          {review.text}
+        </span>
+        {expanded ? (
+          <Icon12ChevronUpSmall
+            // eslint-disable-next-line react/forbid-dom-props
+            style={{ color: "var(--vkui--color_icon_secondary)" }}
+          />
+        ) : (
+          <Icon12ChevronDownSmall
+            // eslint-disable-next-line react/forbid-dom-props
+            style={{ color: "var(--vkui--color_icon_secondary)" }}
+          />
+        )}
+      </Flex>
+    </Tappable>
   ) : (
     review.text
   );
@@ -68,7 +70,7 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
           align="center"
           gap={4}
           // eslint-disable-next-line react/forbid-dom-props
-          style={{ color: "var(--carpool_accent)" }}
+          style={{ color: "var(--vkui--color_icon_accent)" }}
         >
           <Icon16StarAlt />
           <Text weight="2">{review.rating}</Text>

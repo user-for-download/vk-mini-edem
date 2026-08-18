@@ -12,7 +12,7 @@ export interface RatingBadgeProps {
 export const RatingBadge: FC<RatingBadgeProps> = ({ value, reviewsCount, size = "m" }) => {
   return (
     <Flex gap={3}>
-      <Icon12Star style={{ color: "var(--carpool_accent)" }} />
+      <Icon12Star style={{ color: "var(--vkui--color_icon_accent)" }} />
       <Caption level={size === "s" ? "1" : "2"} weight="2">
         {value.toFixed(1)}
         {typeof reviewsCount === "number" && reviewsCount > 0 && (

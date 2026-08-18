@@ -5,8 +5,7 @@ import { PanelHeader, PanelHeaderProps } from "@vkontakte/vkui";
 /**
  * Единый PanelHeader для всех экранов приложения.
  *
- * В WebView (VK Mini Apps) автоматически добавляет системный отступ,
- * чтобы контент не перекрывался статус-баром.
+ * Настройки safe area задаются на уровне AppRoot.
  */
 export const AppPanelHeader: FC<PropsWithChildren<PanelHeaderProps>> = ({
   children,

@@ -18,8 +18,7 @@ export const useModalApi = (): ModalApi => {
 };
 
 /**
- * Единая точка управления модальными окнами вместо устаревшего ModalRoot.
- * Рендерит contextHolder (внутренний ModalRoot) рядом с children.
+ * Единая точка управления модальными окнами через useModalManager.
  */
 export const ModalProvider: FC<PropsWithChildren> = ({ children }) => {
   const [api, contextHolder] = useModalManager({

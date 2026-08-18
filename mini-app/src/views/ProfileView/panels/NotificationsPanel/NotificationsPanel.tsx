@@ -151,7 +151,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
 
         {showSaved && (
           <Box padding="system" paddingBlockStart={0}>
-            <Caption level="1" style={{ color: "var(--carpool_accent)" }}>
+            <Caption level="1" style={{ color: "var(--vkui--color_text_accent)" }}>
               Настройки сохранены
             </Caption>
           </Box>

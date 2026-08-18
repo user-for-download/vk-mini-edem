@@ -1,6 +1,6 @@
 // mini-app/src/components/RouteLine.tsx
 import { type FC } from "react";
-import { Text, Footnote, Flex, Spacing } from "@vkontakte/vkui";
+import { Text, Footnote, Flex, Spacing, ContentBadge } from "@vkontakte/vkui";
 
 export interface RoutePoint {
   city: string;
@@ -78,7 +78,7 @@ export const RouteLine: FC<RouteLineProps> = ({
               width: 9,
               height: 9,
               borderRadius: "50%",
-              background: "var(--vkui--color_icon_accent, #2bb673)",
+              background: "var(--vkui--color_icon_accent)",
               flexShrink: 0,
               boxShadow: "0 0 0 3px var(--vkui--color_background_accent_themed_alpha, rgba(43, 182, 115, 0.15))",
             }}
@@ -91,7 +91,7 @@ export const RouteLine: FC<RouteLineProps> = ({
               width: 2,
               minHeight: 22,
               opacity: 0.55,
-              background: "repeating-linear-gradient(to bottom, var(--vkui--color_icon_accent, #2bb673) 0, var(--vkui--color_icon_accent, #2bb673) 3px, transparent 3px, transparent 7px)",
+              background: "repeating-linear-gradient(to bottom, var(--vkui--color_icon_accent) 0, var(--vkui--color_icon_accent) 3px, transparent 3px, transparent 7px)",
             }}
           />
           <Spacing size={4} />
@@ -124,18 +124,9 @@ export const RouteLine: FC<RouteLineProps> = ({
               {from.city}
             </Text>
             {seatsLabelProp || seatsLeft !== undefined ? (
-              <Footnote
-                weight="2"
-                // eslint-disable-next-line react/forbid-dom-props
-                style={{
-                  color: seatsLeft !== undefined && seatsLeft <= 0
-                    ? "var(--vkui--color_text_negative, #ff334b)"
-                    : "var(--vkui--color_text_accent, #2bb673)",
-                  flexShrink: 0,
-                }}
-              >
+              <ContentBadge appearance={seatsLeft !== undefined && seatsLeft <= 0 ? "accent-red" : "accent-green"} size="s">
                 {seatsLabelProp || (seatsLeft! > 0 ? `${seatsLeft} мест` : "нет мест")}
-              </Footnote>
+              </ContentBadge>
             ) : null}
           </Flex>
 

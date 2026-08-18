@@ -254,11 +254,6 @@ export const HomePanel: FC<HomePanelProps> = ({
                       ? " ожидает"
                       : ""
                 }`}
-                seatsColor={
-                  nextActiveBooking.status === "pending"
-                    ? "var(--vkui--color_text_accent, #3f8ae0)"
-                    : undefined
-                }
               />
             </Box>
           )}

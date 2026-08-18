@@ -62,6 +62,36 @@ describe("auth bootstrap", () => {
     expect(body.user.id).toBeTruthy();
     expect(body.user.name).toBeTruthy();
   });
+
+  it("does not trust client-supplied VK profile fields", async () => {
+    await cleanDb();
+
+    const response = await app.request("/api/v1/auth/vk", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        searchParams: "vk_user_id=111112&sign=dev-sign",
+        firstName: "Ирина",
+        lastName: "Козлова",
+        photo: "https://example.com/attacker-avatar.png",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      user: {
+        name: string;
+        avatar: string;
+        isVerified: boolean;
+        verificationStatus: string;
+      };
+    };
+
+    expect(body.user.name).toBe("Пользователь VK 111112");
+    expect(body.user.avatar).toBe("https://vk.com/images/camera_200.png?ava=1");
+    expect(body.user.isVerified).toBe(false);
+    expect(body.user.verificationStatus).toBe("none");
+  });
 });
 
 describe("trips", () => {
