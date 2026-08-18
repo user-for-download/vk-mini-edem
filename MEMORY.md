@@ -14,7 +14,7 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 
 - Local root `npm run dev` starts frontend on `3010` and backend on `3011`.
 - `VITE_API_TARGET` controls the Vite API/WebSocket proxy target.
-- Production Docker backend listens on `3000` and serves `mini-app/dist`.
+- Production Docker backend listens on `3000` and serves `mini-app/dist`; current compose also publishes backend `3000` and PostgreSQL `5432` on all host interfaces, which requires production firewall/proxy hardening.
 - Production requires `DATABASE_URL`, `JWT_SECRET`, `VK_APP_SECRET`, and `CORS_ORIGINS`.
 - `ALLOW_DEV_AUTH` is disabled in production and only supports local/test mock auth.
 
@@ -42,21 +42,25 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - `VKWebAppInit` is fire-and-forget in `mini-app/src/main.tsx`.
 - VKUI receives appearance, insets, adaptivity, platform, and WebView state through `AppConfig`.
 - Session state reacts to browser visibility and VK view hide/restore events.
-- WebSocket auth sends `{ type: "auth", token }` after connecting to `/api/v1/ws`; the token is not placed in the URL.
+- WebSocket auth sends `{ type: "auth", token }` after connecting to `/api/v1/ws`; the token is not placed in the URL. Existing connections are not explicitly closed when the access JWT expires.
 - WebSocket cleanup guards against stale sockets and reconnects after provider unmount.
 - Swipe settings use `VKWebAppSetSwipeSettings`; raw swipe messages require a parent window and allowed VK origins.
 - VK community messaging is optional. `VK_GROUP_TOKEN` is submitted to VK API in a POST body.
 
 ## Verification
 
-Last verified after commit `a35dadc` (`fix: harden auth and trip workflows`):
+Verified on 2026-08-18 after the current source audit:
 
 - `npm run typecheck` passed for all workspaces.
 - Frontend tests: 8 passed.
-- Contracts tests: 24 passed.
-- Backend tests: 81 passed.
+- Contracts tests: 25 passed.
+- Backend tests: 82 passed.
 - Production `npm run build` passed.
 - `git diff --check` passed.
+
+The backend test run logs a known contract-validation warning for booking pagination: test fixtures use seat values above the shared schema maximum, while the endpoint still returns HTTP 200. This is documented as an open defect, not treated as a clean contract result.
+
+The audit also identified unresolved issues around trip-detail stale data/error states, driver booking pagination, WebSocket/Vite proxy path consistency, date/timezone boundaries, multi-instance WebSocket/rate-limit state, review availability per target, and production Docker exposure/runtime hardening. See the production limitations and audit section in `README.md`.
 
 The build still reports a non-blocking large main JavaScript chunk warning. Further vendor/route splitting is a performance follow-up, not a correctness blocker.
 

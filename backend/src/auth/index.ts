@@ -65,37 +65,30 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
 
   const isProductionVkAuth = !env.ALLOW_DEV_AUTH || !queryToVerify.includes("sign=dev-sign");
 
-  let user = await db.user.findFirst({
+  // The unique VK ID is the synchronization point for concurrent launches.
+  // Upsert prevents two requests from both observing a missing user.
+  const user = await db.user.upsert({
     where: { vkUserId },
+    create: {
+      vkUserId,
+      name: `Пользователь VK ${vkUserId}`,
+      avatar: DEFAULT_AVATAR_URL,
+      rating: 5.0,
+      reviewsCount: 0,
+      tripsCount: 0,
+      isVerified: isProductionVkAuth,
+      verificationStatus: isProductionVkAuth ? "approved" : "none",
+      verifiedAt: isProductionVkAuth ? new Date() : null,
+    },
+    update: isProductionVkAuth
+      ? {
+          isVerified: true,
+          verificationStatus: "approved",
+          verifiedAt: new Date(),
+        }
+      : {},
     include: { car: true },
   });
-
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        vkUserId,
-        name: `Пользователь VK ${vkUserId}`,
-        avatar: DEFAULT_AVATAR_URL,
-        rating: 5.0,
-        reviewsCount: 0,
-        tripsCount: 0,
-        isVerified: isProductionVkAuth,
-        verificationStatus: isProductionVkAuth ? "approved" : "none",
-        verifiedAt: isProductionVkAuth ? new Date() : null,
-      },
-      include: { car: true },
-    });
-  } else if (isProductionVkAuth) {
-    user = await db.user.update({
-      where: { id: user.id },
-      data: {
-        isVerified: true,
-        verificationStatus: "approved",
-        verifiedAt: user.verifiedAt ?? new Date(),
-      },
-      include: { car: true },
-    });
-  }
 
   const accessToken = await signAccessToken(user.id);
   const refreshToken = await signRefreshToken(user.id); // Создаёт запись в БД

@@ -99,41 +99,45 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   // Заявки на места видны только водителю поездки — пассажиру бэкенд
   // вернёт 403 (driver-only эндпоинт), поэтому запрос не делаем вовсе.
-  const { data: tripBookings, isLoading: isLoadingBookings } = useTripBookingsQuery(
+  const {
+    data: tripBookingsData,
+    isLoading: isLoadingBookings,
+    isError: isErrorBookings,
+    refetch: refetchBookings,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useTripBookingsQuery(
     trip?.id ?? "",
     { enabled: isOwnTrip }
   );
   const updateBookingStatus = useUpdateBookingStatusMutation();
 
-  const confirmedPassengers = (tripBookings ?? []).filter(
+  const tripBookings = tripBookingsData?.pages.flatMap((page) => page.items) ?? [];
+  const confirmedPassengers = tripBookings.filter(
     (booking) => booking.status === "confirmed"
   );
-  const pendingBookings = (tripBookings ?? []).filter(
+  const pendingBookings = tripBookings.filter(
     (booking) => booking.status === "pending"
   );
 
-  const handleSetBookingStatus = (bookingId: string, status: DriverBookingAction) => {
-    updateBookingStatus.mutate(
-      { id: bookingId, status },
-      {
-        onSuccess: () => {
-          enqueueSnackbar({
-            type: "success",
-            title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
-            dedupeKey: `booking_status_${bookingId}`,
-          });
-          queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
-        },
-        onError: (error) => {
-          enqueueSnackbar({
-            type: "error",
-            title: "Не удалось обновить статус",
-            subtitle: error instanceof Error ? error.message : undefined,
-            dedupeKey: `booking_status_error_${bookingId}`,
-          });
-        },
-      }
-    );
+  const handleSetBookingStatus = async (bookingId: string, status: DriverBookingAction) => {
+    try {
+      await updateBookingStatus.mutateAsync({ id: bookingId, status });
+      enqueueSnackbar({
+        type: "success",
+        title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+        dedupeKey: `booking_status_${bookingId}`,
+      });
+      queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
+    } catch (error) {
+      enqueueSnackbar({
+        type: "error",
+        title: "Не удалось обновить статус",
+        subtitle: error instanceof Error ? error.message : undefined,
+        dedupeKey: `booking_status_error_${bookingId}`,
+      });
+    }
   };
 
   const cancelMyBooking = async (bookingId: string) => {
@@ -503,7 +507,14 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </Box>
           )}
 
-          {!isLoadingBookings && pendingBookings.length === 0 && confirmedPassengers.length === 0 && (
+           {isErrorBookings && (
+             <Box padding="system">
+               <Text>Не удалось загрузить заявки.</Text>
+               <Button size="m" mode="secondary" onClick={() => refetchBookings()}>Попробовать снова</Button>
+             </Box>
+           )}
+
+           {!isLoadingBookings && !isErrorBookings && pendingBookings.length === 0 && confirmedPassengers.length === 0 && (
             <Box padding="system">
               <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
                 Пока нет заявок на эту поездку
@@ -511,8 +522,8 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             </Box>
           )}
 
-          {!isLoadingBookings && pendingBookings.length > 0 && (
-            <Box aria-live="polite" aria-label={`Список заявок, ${pendingBookings.length}`}>
+           {!isLoadingBookings && !isErrorBookings && pendingBookings.length > 0 && (
+             <Box aria-live="polite" aria-label={`Список заявок, ${pendingBookings.length}`}>
               {pendingBookings.map((booking) => (
                 <BookingRequestRow
                   key={booking.id}
@@ -520,10 +531,31 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
                   onSetStatus={handleSetBookingStatus}
                 />
               ))}
-            </Box>
-          )}
-        </Group>
-      )}
+              {hasNextPage && (
+                <Box padding="system">
+                  <Button size="m" mode="secondary" stretched onClick={() => fetchNextPage()} loading={isFetchingNextPage}>
+                    Загрузить ещё
+                  </Button>
+                </Box>
+              )}
+             </Box>
+           )}
+
+           {!isLoadingBookings && !isErrorBookings && hasNextPage && pendingBookings.length === 0 && (
+             <Box padding="system">
+               <Button
+                 size="m"
+                 mode="secondary"
+                 stretched
+                 onClick={() => fetchNextPage()}
+                 loading={isFetchingNextPage}
+               >
+                 Загрузить ещё
+               </Button>
+             </Box>
+           )}
+         </Group>
+       )}
 
       {canBook && (
         <>

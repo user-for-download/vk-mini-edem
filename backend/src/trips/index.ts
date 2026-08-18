@@ -28,6 +28,9 @@ type TripWithDriver = Prisma.TripGetPayload<{
   include: { driver: { include: { car: true } } };
 }>;
 
+const MAX_SEARCH_LENGTH = 100;
+const MAX_PAGE = 10_000;
+
 async function getActiveBookingSeatsByTripIds(
   tripIds: string[]
 ): Promise<Map<string, number[]>> {
@@ -77,9 +80,20 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
   const pageParam = c.req.query("page");
   const limitParam = c.req.query("limit");
 
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const page = Math.min(
+    MAX_PAGE,
+    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1)
+  );
   const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
   const skip = (page - 1) * limit;
+
+  if ([q, fromCity, toCity].some((value) => value && value.length > MAX_SEARCH_LENGTH)) {
+    return c.json({ message: `Search parameters must not exceed ${MAX_SEARCH_LENGTH} characters` }, 400);
+  }
+
+  if (tagsParam && tagsParam.length > 600) {
+    return c.json({ message: "Invalid tags" }, 400);
+  }
 
   const where: Prisma.TripWhereInput = {
     status: "active",
@@ -125,6 +139,9 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
 
   if (tagsParam) {
     const tags = tagsParam.split(",").filter(Boolean);
+    if (tags.length > 6 || tags.some((tag) => tag.length > MAX_SEARCH_LENGTH)) {
+      return c.json({ message: "Invalid tags" }, 400);
+    }
     if (tags.length > 0) {
       where.tags = { hasEvery: tags };
     }
@@ -190,7 +207,10 @@ tripsRouter.get("/my", requireUser, async (c) => {
   const pageParam = c.req.query("page");
   const limitParam = c.req.query("limit");
   const statusParam = c.req.query("status"); // "active" | "archive"
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const page = Math.min(
+    MAX_PAGE,
+    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1)
+  );
   const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
   const skip = (page - 1) * limit;
 
@@ -500,67 +520,54 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   }
 
   const dto = parseResult.data;
-  const trip = await db.trip.findUnique({ where: { id } });
 
-  if (!trip) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
-  if (trip.driverId !== user.id) return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Forbidden" }, 403);
-  if (trip.status !== "active") return c.json({ code: ERROR_CODES.TRIP_NOT_ACTIVE, message: "Trip is not active" }, 400);
-
-  if (dto.departureAt) {
-    const newDepartureAt = new Date(dto.departureAt);
-    if (newDepartureAt <= new Date()) {
-      return c.json({ code: ERROR_CODES.TRIP_IN_PAST, message: "Departure time must be in the future" }, 400);
-    }
-  }
-
-  if (dto.seatsTotal !== undefined) {
-    // Проверяем не только количество активных броней, но и максимальный
-    // номер занятого места. Без этого можно уменьшить seatsTotal так,
-    // что активная бронь окажется на несуществующем месте (например,
-    // seatsTotal=4 → 2, при активной брони на месте №4).
-    const activeBookings = await db.booking.findMany({
-      where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
-      select: { seat: true },
-    });
-    const activeCount = activeBookings.length;
-    const maxTakenSeat = activeBookings.reduce(
-      (max, b) => (b.seat > max ? b.seat : max),
-      0
-    );
-    if (dto.seatsTotal < activeCount) {
-      return c.json(
-        { message: `Cannot reduce seats below active bookings count (${activeCount})` },
-        400
-      );
-    }
-    if (maxTakenSeat > 0 && dto.seatsTotal < maxTakenSeat) {
-      return c.json(
-        { message: `Seat #${maxTakenSeat} is occupied — cannot set seatsTotal below ${maxTakenSeat}` },
-        400
-      );
-    }
-  }
-
-  const updateData: Record<string, unknown> = {};
-  if (dto.fromCity !== undefined) updateData.fromCity = dto.fromCity;
-  if (dto.fromAddress !== undefined) updateData.fromAddress = dto.fromAddress;
-  if (dto.toCity !== undefined) updateData.toCity = dto.toCity;
-  if (dto.toAddress !== undefined) updateData.toAddress = dto.toAddress;
-  if (dto.departureAt !== undefined) updateData.departureAt = new Date(dto.departureAt);
-  if (dto.durationMinutes !== undefined) updateData.durationMinutes = dto.durationMinutes;
-  if (dto.distanceKm !== undefined) updateData.distanceKm = dto.distanceKm;
-  if (dto.price !== undefined) updateData.price = dto.price;
-  if (dto.tags !== undefined) updateData.tags = dto.tags;
-  if (dto.comment !== undefined) updateData.comment = dto.comment;
-
-  let updated;
+  let result: { previous: TripWithDriver; updated: TripWithDriver };
   try {
-    // Пересчёт мест и обновление поездки выполняем в одной Serializable-
-    // транзакции: без неё между проверкой activeCount и update могла
-    // пройти параллельная отмена/подтверждение брони, и seatsAvailable
-    // «протухал» (рассинхронизация мест).
-    updated = await db.$transaction(
+    result = await db.$transaction(
       async (tx) => {
+        const trip = await tx.trip.findUnique({
+          where: { id },
+          include: { driver: { include: { car: true } } },
+        });
+
+        if (!trip) {
+          throw new TripError(TripErrors.notFound(), "Trip not found");
+        }
+        if (trip.driverId !== user.id) {
+          throw new TripError(TripErrors.forbidden(), "Forbidden");
+        }
+        if (trip.status !== "active") {
+          throw new TripError(TripErrors.notActive(), "Trip is not active");
+        }
+
+        const fromCity = dto.fromCity ?? trip.fromCity;
+        const toCity = dto.toCity ?? trip.toCity;
+        if (fromCity.trim().toLowerCase() === toCity.trim().toLowerCase()) {
+          throw new TripError(
+            { code: ERROR_CODES.VALIDATION_FAILED, status: 400 },
+            "Города отправления и назначения совпадают"
+          );
+        }
+
+        if (dto.departureAt !== undefined && new Date(dto.departureAt) <= new Date()) {
+          throw new TripError(
+            TripErrors.notStarted(),
+            "Departure time must be in the future"
+          );
+        }
+
+        const updateData: Prisma.TripUpdateInput = {};
+        if (dto.fromCity !== undefined) updateData.fromCity = dto.fromCity;
+        if (dto.fromAddress !== undefined) updateData.fromAddress = dto.fromAddress;
+        if (dto.toCity !== undefined) updateData.toCity = dto.toCity;
+        if (dto.toAddress !== undefined) updateData.toAddress = dto.toAddress;
+        if (dto.departureAt !== undefined) updateData.departureAt = new Date(dto.departureAt);
+        if (dto.durationMinutes !== undefined) updateData.durationMinutes = dto.durationMinutes;
+        if (dto.distanceKm !== undefined) updateData.distanceKm = dto.distanceKm;
+        if (dto.price !== undefined) updateData.price = dto.price;
+        if (dto.tags !== undefined) updateData.tags = dto.tags;
+        if (dto.comment !== undefined) updateData.comment = dto.comment;
+
         if (dto.departureAt !== undefined || dto.durationMinutes !== undefined) {
           const newDeparture =
             dto.departureAt !== undefined
@@ -605,6 +612,12 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
             (max, booking) => Math.max(max, booking.seat),
             0,
           );
+          if (dto.seatsTotal < activeBookingsForSeats.length) {
+            throw new TripError(
+              TripErrors.invalidSeats(),
+              `Cannot reduce seats below active bookings count (${activeBookingsForSeats.length})`,
+            );
+          }
           if (dto.seatsTotal < maxTakenSeat) {
             throw new TripError(
               TripErrors.invalidSeats(),
@@ -615,11 +628,13 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
           updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats.length);
         }
 
-        return tx.trip.update({
+        const updated = await tx.trip.update({
           where: { id },
           data: updateData,
           include: { driver: { include: { car: true } } },
         });
+
+        return { previous: trip, updated };
       },
       { isolationLevel: "Serializable" }
     );
@@ -643,6 +658,8 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
     }
     throw error;
   }
+
+  const { previous: trip, updated } = result;
 
   /**
    * Если изменились важные для пассажиров поля — уведомляем подтверждённых пассажиров

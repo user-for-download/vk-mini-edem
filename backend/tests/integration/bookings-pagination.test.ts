@@ -36,16 +36,16 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
         durationMinutes: 120,
         distanceKm: 700,
         price: 1500,
-        seatsTotal: 15,
-        seatsAvailable: 0,
+        seatsTotal: 4,
+        seatsAvailable: 4,
         tags: [],
       },
     });
     tripId = trip.id;
 
     // 15 заявок с убывающими createdAt.
-    // Места уникальны: partial unique индекс active_seat_booking не
-    // позволяет двум активным броням занимать одно место.
+    // Архивные заявки позволяют проверить pagination, не нарушая
+    // продуктовый лимит в четыре места и active-seat unique index.
     for (let i = 0; i < 15; i++) {
       const passenger = await db.user.create({
         data: {
@@ -60,8 +60,8 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
         data: {
           tripId,
           passengerId: passenger.id,
-          seat: i + 1,
-          status: "pending",
+          seat: (i % 4) + 1,
+          status: "cancelled",
           createdAt: new Date(Date.now() - i * 1000),
         },
       });

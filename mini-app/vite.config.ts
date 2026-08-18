@@ -9,10 +9,9 @@ const pkg = JSON.parse(
   version?: string;
 };
 
-// Таргет прокси для /api и /ws. Прод-бэкенд слушает 3000, dev — свой порт
+// Таргет прокси для /api (включая /api/v1/ws). Прод-бэкенд слушает 3000, dev — свой порт
 // (например 3011). Задаётся через ENV, чтобы не хардкодить окружение.
 const apiTarget = process.env.VITE_API_TARGET ?? "http://127.0.0.1:3000";
-const wsTarget = apiTarget.replace(/^http/, "ws");
 
 export default defineConfig(() => {
   return {
@@ -83,10 +82,6 @@ export default defineConfig(() => {
       proxy: {
         "/api": {
           target: apiTarget,
-          changeOrigin: true,
-        },
-        "/ws": {
-          target: wsTarget,
           ws: true,
           changeOrigin: true,
         },

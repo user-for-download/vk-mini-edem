@@ -388,13 +388,14 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
 
   const validation = paginatedBookingsResponseSchema.safeParse(response);
   if (!validation.success) {
-    logger.warn(
+    logger.error(
       { issues: validation.error.issues, tripId },
       "bookings_pagination_response_validation_failed"
     );
+    return c.json({ message: "Internal response validation failed" }, 500);
   }
 
-  return c.json(response);
+  return c.json(validation.data);
 });
 
 /**

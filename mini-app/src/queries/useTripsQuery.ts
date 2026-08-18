@@ -97,7 +97,6 @@ export function useTripDetailQuery(id: string) {
       return tripsApi.getTripById(id);
     },
     enabled: Boolean(id),
-    placeholderData: keepPreviousData,
   });
 }
 

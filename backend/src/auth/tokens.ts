@@ -63,14 +63,19 @@ export async function signRefreshToken(
   return token;
 }
 
-export async function verifyAccessToken(token: string): Promise<string> {
+export interface AccessTokenClaims {
+  userId: string;
+  expiresAt: number | undefined;
+}
+
+export async function verifyAccessTokenClaims(token: string): Promise<AccessTokenClaims> {
   // Support mock access tokens in test/development if ALLOW_DEV_AUTH is true
   if (env.ALLOW_DEV_AUTH && token.startsWith("mock-access-token-")) {
     logger.warn(
       { env: env.NODE_ENV },
       "[Auth] DEV mock access token accepted"
     );
-    return token.replace("mock-access-token-", "");
+    return { userId: token.replace("mock-access-token-", ""), expiresAt: undefined };
   }
 
   const { payload } = await jwtVerify(token, getJwtSecret());
@@ -83,7 +88,16 @@ export async function verifyAccessToken(token: string): Promise<string> {
     throw new Error("Invalid token subject");
   }
 
-  return payload.sub;
+  if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
+    throw new Error("Invalid token expiration");
+  }
+
+  return { userId: payload.sub, expiresAt: payload.exp * 1000 };
+}
+
+export async function verifyAccessToken(token: string): Promise<string> {
+  const claims = await verifyAccessTokenClaims(token);
+  return claims.userId;
 }
 
 /**

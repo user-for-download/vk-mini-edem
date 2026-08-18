@@ -145,11 +145,16 @@ export const HomePanel: FC<HomePanelProps> = ({
             readOnly
             value=""
             inputMode="none"
-            onFocus={onGoSearch}
             onClick={onGoSearch}
             tabIndex={0}
             aria-label="Поиск поездки"
             role="button"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onGoSearch();
+              }
+            }}
           />
         </Box>
       </Group>

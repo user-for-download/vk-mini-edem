@@ -128,6 +128,24 @@ describe("trip lifecycle: cancel/complete", () => {
     expect(body.code).toBe("FORBIDDEN");
   });
 
+  it("rejects a partial city update that matches the stored opposite city", async () => {
+    const res = await app.request(`/api/v1/trips/${tripId}`, {
+      method: "PATCH",
+      headers: {
+        ...JSON_HEADERS,
+        Authorization: `Bearer mock-access-token-${users.driverId}`,
+      },
+      body: JSON.stringify({ toCity: "Москва" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_FAILED");
+
+    const trip = await db.trip.findUnique({ where: { id: tripId } });
+    expect(trip?.toCity).toBe("Тула");
+  });
+
   it("returns 404 for cancel of a missing trip", async () => {
     const res = await app.request(`/api/v1/trips/nonexistent/cancel`, {
       method: "PATCH",

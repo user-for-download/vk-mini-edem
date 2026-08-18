@@ -1,5 +1,5 @@
 // mini-app/src/components/BookingRequestRow.tsx
-import { type FC, memo } from "react";
+import { type FC, memo, useState } from "react";
 import {
   Avatar,
   Button,
@@ -25,17 +25,31 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 
 export interface BookingRequestRowProps {
   booking: Booking;
-  onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
+  onSetStatus: (bookingId: string, status: DriverBookingAction) => Promise<void>;
 }
 
 export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
   ({ booking, onSetStatus }) => {
+    const [isUpdating, setIsUpdating] = useState(false);
     const statusColor =
       booking.status === "confirmed"
         ? "var(--vkui--color_text_accent)"
         : booking.status === "declined"
           ? "var(--vkui--color_text_secondary)"
           : "var(--vkui--color_text_accent)";
+
+    const handleStatus = async (status: DriverBookingAction) => {
+      if (isUpdating) {
+        return;
+      }
+
+      setIsUpdating(true);
+      try {
+        await onSetStatus(booking.id, status);
+      } finally {
+        setIsUpdating(false);
+      }
+    };
 
     return (
       <>
@@ -74,7 +88,9 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
                       size="s"
                       mode="primary"
                       appearance="positive"
-                      onClick={() => onSetStatus(booking.id, "confirmed")}
+                      onClick={() => handleStatus("confirmed")}
+                      disabled={isUpdating}
+                      loading={isUpdating}
                     >
                       Подтвердить
                     </Button>
@@ -83,7 +99,8 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
                       size="s"
                       mode="secondary"
                       appearance="negative"
-                      onClick={() => onSetStatus(booking.id, "declined")}
+                      onClick={() => handleStatus("declined")}
+                      disabled={isUpdating}
                     >
                       Отклонить
                     </Button>

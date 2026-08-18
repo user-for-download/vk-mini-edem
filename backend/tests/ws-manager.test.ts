@@ -66,6 +66,17 @@ describe("WebSocketManager", () => {
     expect(wsManager.getStats().authenticatedUsers).toBe(1);
   });
 
+  it("closes an authenticated connection when its access token expires", () => {
+    const ws = makeFakeWs();
+    const connId = wsManager.register(ws);
+
+    expect(wsManager.authenticate(connId, "user-expiring", Date.now() + 10_000)).toBe(true);
+    vi.advanceTimersByTime(10_000);
+
+    expect(ws.close).toHaveBeenCalledWith(4401, "Access token expired");
+    expect(wsManager.getStats().totalConnections).toBe(0);
+  });
+
   it("closes an unauthenticated connection after the auth timeout (4401)", () => {
     const ws = makeFakeWs();
     const connId = wsManager.register(ws);

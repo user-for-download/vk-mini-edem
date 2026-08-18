@@ -30,7 +30,6 @@ function getWsUrl(): string {
 
 // Константы вместо magic numbers.
 const WS_RECONNECT_DELAY_MS = 3_000;
-const WS_REFRESH_WAIT_DELAY_MS = 1_000;
 
 export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -99,16 +98,9 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       // 1008 Policy Violation (стандарт), 4401 (наш кастомный код) —
       // токен протух/невалиден: пробуем обновить и переподключиться.
       if (e.code === 1008 || e.code === 4401) {
-        console.warn("[WS] Auth failed, trying to refresh token...");
-
         // Refresh уже идёт (например, из-за 401 в HTTP-клиенте) — просто
-        // ждём его завершения. После успеха onTokenUpdate переподключит нас.
+        // ждём его завершения. Подписка onRefreshEnd переподключит нас.
         if (apiClient.isRefreshing()) {
-          console.log("[WS] Refresh already in progress, waiting...");
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            if (!disposedRef.current) connectRef.current();
-          }, WS_REFRESH_WAIT_DELAY_MS);
           return;
         }
 
@@ -140,6 +132,21 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribeRefreshEnd = apiClient.onRefreshEnd((success) => {
+      if (!success || disposedRef.current || wsRef.current || reconnectTimeoutRef.current) return;
+
+      // ApiClient emits refreshEnd immediately before clearing refreshPromise.
+      // Reconnect on the next task so connect() observes isRefreshing() === false.
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        if (!disposedRef.current) connectRef.current();
+      }, 0);
+    });
+
+    return unsubscribeRefreshEnd;
+  }, []);
+
   // Синхронизируем актуальную ссылку для самовызовов внутри connect (reconnect)
   useEffect(() => {
     connectRef.current = connect;
@@ -150,7 +157,6 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   useEffect(() => {
     const unsubscribeTokenUpdate = apiClient.onTokenUpdate(() => {
       if (!wsRef.current && !reconnectTimeoutRef.current) {
-        console.log("[WS] Token updated, reconnecting...");
         connectRef.current();
       }
     });

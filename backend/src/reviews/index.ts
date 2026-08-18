@@ -252,6 +252,10 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
           car: true,
         },
       },
+      bookings: {
+        where: { status: "confirmed" },
+        select: { passengerId: true },
+      },
     },
     orderBy: {
       departureAt: "desc",
@@ -278,25 +282,26 @@ reviewsRouter.get("/available-trips", requireUser, async (c) => {
     },
     select: {
       tripId: true,
+      targetUserId: true,
     },
   });
 
-  const reviewedTripIds = new Set(
+  const reviewedTargets = new Set(
     existingReviews
-      .map((review) => review.tripId)
-      .filter((tripId): tripId is string => Boolean(tripId))
+      .filter((review): review is typeof review & { tripId: string } => Boolean(review.tripId))
+      .map((review) => `${review.tripId}:${review.targetUserId}`)
   );
 
   const availableTripsMap = new Map<string, TripWithDriver>();
 
   for (const booking of passengerBookings) {
-    if (!reviewedTripIds.has(booking.tripId)) {
+    if (!reviewedTargets.has(`${booking.tripId}:${booking.trip.driverId}`)) {
       availableTripsMap.set(booking.tripId, booking.trip);
     }
   }
 
   for (const trip of driverTrips) {
-    if (!reviewedTripIds.has(trip.id)) {
+    if (trip.bookings.some((booking) => !reviewedTargets.has(`${trip.id}:${booking.passengerId}`))) {
       availableTripsMap.set(trip.id, trip);
     }
   }
@@ -381,9 +386,13 @@ reviewsRouter.get("/user/:userId", publicReadLimiter, async (c) => {
       { issues: validation.error.issues, userId },
       "reviews_pagination_response_validation_failed"
     );
+    return c.json(
+      { code: ERROR_CODES.INTERNAL_ERROR, message: "Invalid reviews response" },
+      500
+    );
   }
 
-  return c.json(response);
+  return c.json(validation.data);
 });
 
 /**

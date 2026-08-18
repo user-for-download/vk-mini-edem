@@ -1,4 +1,4 @@
-import { verifyAccessToken } from "../auth/tokens.js";
+import { verifyAccessTokenClaims } from "../auth/tokens.js";
 import { wsManager } from "../services/wsManager.js";
 import { logger } from "../logger.js";
 import { wsClientMessageSchema } from "@edem/contracts";
@@ -37,8 +37,8 @@ export function createWsHandler(upgradeWebSocket: any) {
 
       if (msg.type === "auth") {
         try {
-          const userId = await verifyAccessToken(msg.token);
-          const ok = wsManager.authenticate(connId, userId);
+          const { userId, expiresAt } = await verifyAccessTokenClaims(msg.token);
+          const ok = wsManager.authenticate(connId, userId, expiresAt);
           // authenticate() возвращает false только если соединение уже
           // принадлежит ДРУГОМУ пользователю (повторная auth тем же
           // пользователем идемпотентна и возвращает true).

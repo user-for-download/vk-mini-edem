@@ -89,6 +89,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
 }) => {
   const [settings, setSettings] = useState<NotificationSettings>(loadSettings);
   const [showSaved, setShowSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!showSaved) {
@@ -116,12 +117,22 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
   };
 
   const toggleNotifications = async (enabled: boolean) => {
-    setSettings((prev) => ({ ...prev, disableAll: !enabled }));
+    if (isSaving) {
+      return;
+    }
+
+    const previous = settings;
+    const next = { ...previous, disableAll: !enabled };
+    setSettings(next);
+    setIsSaving(true);
     try {
       await usersApi.updateNotificationSettings(enabled);
+      saveSettings(next);
       setShowSaved(true);
     } catch {
-      setSettings((prev) => ({ ...prev, disableAll: !enabled })); // Откат при ошибке
+      setSettings(previous);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -142,6 +153,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
           after={
             <Switch
               checked={settings.disableAll}
+              disabled={isSaving}
               onChange={(e) => toggleNotifications(!e.target.checked)}
             />
           }

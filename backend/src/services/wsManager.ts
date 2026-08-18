@@ -9,12 +9,14 @@ const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 60_000;
 const REAPER_INTERVAL_MS = 30_000;
 const MAX_CONNECTIONS_PER_USER = 5;
+const MAX_TOTAL_CONNECTIONS = 1_000;
 
 interface Connection {
   ws: WSContext<WebSocket>;
   userId: string | null;
   lastPongAt: number;
   authTimer?: ReturnType<typeof setTimeout>;
+  accessExpiryTimer?: ReturnType<typeof setTimeout>;
   pingTimer?: ReturnType<typeof setInterval>;
 }
 
@@ -25,6 +27,17 @@ class WebSocketManager {
 
   register(ws: WSContext<WebSocket>): string {
     const connId = `ws-${this.nextConnId++}`;
+    if (this.byId.size >= MAX_TOTAL_CONNECTIONS) {
+      wsConnectionLimitHits.inc();
+      logger.warn({ connId, limit: MAX_TOTAL_CONNECTIONS }, "ws_global_connection_limit_reached");
+      try {
+        ws.close(1013, "Too many connections");
+      } catch {
+        // ignore
+      }
+      return connId;
+    }
+
     const conn: Connection = {
       ws,
       userId: null,
@@ -51,7 +64,7 @@ class WebSocketManager {
     return connId;
   }
 
-  authenticate(connId: string, userId: string): boolean {
+  authenticate(connId: string, userId: string, expiresAt?: number): boolean {
     const conn = this.byId.get(connId);
     if (!conn) return false;
 
@@ -64,6 +77,7 @@ class WebSocketManager {
         clearTimeout(conn.authTimer);
         conn.authTimer = undefined;
       }
+      this.scheduleAccessExpiry(connId, conn, expiresAt);
       logger.debug({ connId, userId }, "ws_reauthenticated_same_user");
       return true;
     }
@@ -86,6 +100,7 @@ class WebSocketManager {
       clearTimeout(conn.authTimer);
       conn.authTimer = undefined;
     }
+    this.scheduleAccessExpiry(connId, conn, expiresAt);
 
     let connSet = this.connections.get(userId);
     if (!connSet) {
@@ -97,6 +112,21 @@ class WebSocketManager {
 
     logger.info({ connId, userId }, "ws_authenticated");
     return true;
+  }
+
+  private scheduleAccessExpiry(
+    connId: string,
+    conn: Connection,
+    expiresAt: number | undefined
+  ): void {
+    if (conn.accessExpiryTimer) clearTimeout(conn.accessExpiryTimer);
+    if (expiresAt === undefined) return;
+
+    const delayMs = Math.max(0, expiresAt - Date.now());
+    conn.accessExpiryTimer = setTimeout(() => {
+      logger.info({ connId }, "ws_access_token_expired");
+      this.close(connId, 4401, "Access token expired");
+    }, delayMs);
   }
 
   handlePong(connId: string): void {
@@ -152,6 +182,7 @@ class WebSocketManager {
     if (!conn) return;
 
     if (conn.authTimer) clearTimeout(conn.authTimer);
+    if (conn.accessExpiryTimer) clearTimeout(conn.accessExpiryTimer);
     if (conn.pingTimer) clearInterval(conn.pingTimer);
 
     if (conn.userId) {

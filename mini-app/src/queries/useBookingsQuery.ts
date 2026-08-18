@@ -3,6 +3,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  useInfiniteQuery,
   keepPreviousData,
 } from "@tanstack/react-query";
 import { bookingsApi } from "../api/bookings.api";
@@ -48,14 +49,15 @@ export function usePassengerHistoryQuery() {
 }
 
 export function useTripBookingsQuery(tripId: string, options?: { enabled?: boolean }) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: BOOKING_KEYS.trip(tripId),
-    queryFn: async () => {
-      const res = await bookingsApi.getTripBookings(tripId);
-      return res.items;
+    queryFn: async ({ pageParam }) => {
+      return bookingsApi.getTripBookings(tripId, pageParam);
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore ? lastPage.pagination.nextCursor ?? undefined : undefined,
     enabled: Boolean(tripId) && (options?.enabled ?? true),
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -99,4 +101,3 @@ export function useCancelBookingMutation() {
     },
   });
 }
-

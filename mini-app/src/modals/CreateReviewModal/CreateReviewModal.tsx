@@ -126,7 +126,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
     trip && currentUser && trip.driver.id === currentUser.id
   );
 
-  const { data: tripBookings } = useTripBookingsQuery(trip?.id ?? "", {
+  const { data: tripBookingsData } = useTripBookingsQuery(trip?.id ?? "", {
     enabled: isDriver,
   });
 
@@ -134,10 +134,11 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
     if (!isDriver) {
       return [];
     }
-    return (tripBookings ?? [])
+    const tripBookings = tripBookingsData?.pages.flatMap((page) => page.items) ?? [];
+    return tripBookings
       .filter((b) => b.status === "confirmed")
       .map((b) => b.passenger);
-  }, [isDriver, tripBookings]);
+  }, [isDriver, tripBookingsData]);
 
   const [selectedPassengerId, setSelectedPassengerId] = useState<string | null>(
     null

@@ -1,5 +1,8 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper.tsx
-import { type FC, useCallback } from "react";
+import { type FC, useCallback, useMemo } from "react";
+import { Box, Button, Panel, PanelHeaderBack, ScreenSpinner } from "@vkontakte/vkui";
+import { AppPanelHeader } from "@/components/AppPanelHeader";
+import { EmptyState } from "@/components/EmptyState";
 import { useParams, useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import { TripRequestsPanel } from "@/views/ActionView/panels/TripRequestsPanel/TripRequestsPanel";
 import { useTripDetailQuery } from "@/queries/useTripsQuery";
@@ -17,47 +20,52 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   const tripId = params?.tripId;
 
-  const { data: trip, refetch: refetchTrip } = useTripDetailQuery(tripId ?? "");
+  const {
+    data: trip,
+    isLoading: isTripLoading,
+    isError: isTripError,
+    refetch: refetchTrip,
+  } = useTripDetailQuery(tripId ?? "");
   const currentUser = useCurrentUser();
 
   // Заявки видит только водитель поездки (driver-only эндпоинт, иначе 403).
   const isOwnTrip = !!currentUser && !!trip && trip.driver.id === currentUser.id;
 
   const {
-    data: bookings,
+    data: bookingsData,
     isLoading,
     isFetching,
     isError,
     refetch: refetchBookings,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
   } = useTripBookingsQuery(tripId ?? "", { enabled: isOwnTrip });
 
   const updateBooking = useUpdateBookingStatusMutation();
   const { enqueue: enqueueSnackbar } = useSnackbar();
 
-  const handleSetStatus = useCallback((bookingId: string, status: DriverBookingAction) => {
-    updateBooking.mutate(
-      { id: bookingId, status },
-      {
-        onSuccess: () => {
-          enqueueSnackbar({
-            type: status === "confirmed" ? "success" : "info",
-            title:
-              status === "confirmed"
-                ? "Заявка подтверждена"
-                : "Заявка отклонена",
-            dedupeKey: `booking_status_${bookingId}_${status}`,
-          });
-        },
-        onError: (error) => {
-          enqueueSnackbar({
-            type: "error",
-            title: "Не удалось обновить заявку",
-            subtitle: error instanceof Error ? error.message : undefined,
-            dedupeKey: `booking_status_error_${bookingId}`,
-          });
-        },
-      }
-    );
+  const bookings = useMemo(
+    () => bookingsData?.pages.flatMap((page) => page.items) ?? [],
+    [bookingsData]
+  );
+
+  const handleSetStatus = useCallback(async (bookingId: string, status: DriverBookingAction) => {
+    try {
+      await updateBooking.mutateAsync({ id: bookingId, status });
+      enqueueSnackbar({
+        type: status === "confirmed" ? "success" : "info",
+        title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+        dedupeKey: `booking_status_${bookingId}_${status}`,
+      });
+    } catch (error) {
+      enqueueSnackbar({
+        type: "error",
+        title: "Не удалось обновить заявку",
+        subtitle: error instanceof Error ? error.message : undefined,
+        dedupeKey: `booking_status_error_${bookingId}`,
+      });
+    }
   }, [updateBooking, enqueueSnackbar]);
 
   const handleRefresh = useCallback(async () => {
@@ -66,11 +74,47 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   const isRefreshing = isFetching && !isLoading;
 
+  if (isTripLoading) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader
+          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+        >
+          Управление поездкой
+        </AppPanelHeader>
+        <ScreenSpinner state="loading" />
+      </Panel>
+    );
+  }
+
+  if (!tripId || isTripError || !trip) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader
+          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+        >
+          Управление поездкой
+        </AppPanelHeader>
+        <EmptyState
+          title="Не удалось загрузить поездку"
+          subtitle="Проверьте соединение и попробуйте снова"
+          action={
+            <Box padding="system">
+              <Button size="m" mode="primary" onClick={() => refetchTrip()}>
+                Попробовать снова
+              </Button>
+            </Box>
+          }
+        />
+      </Panel>
+    );
+  }
+
   return (
     <TripRequestsPanel
       id={id}
-      trip={trip ?? null}
-      bookings={bookings ?? []}
+      trip={trip}
+      bookings={bookings}
       isLoading={isLoading}
       isError={isError}
       isRefreshing={isRefreshing}
@@ -78,6 +122,9 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
       onRefresh={handleRefresh}
       onSetStatus={handleSetStatus}
       onRetry={() => refetchBookings()}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={() => fetchNextPage()}
     />
   );
 };

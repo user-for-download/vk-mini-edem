@@ -92,6 +92,26 @@ describe("auth bootstrap", () => {
     expect(body.user.isVerified).toBe(false);
     expect(body.user.verificationStatus).toBe("none");
   });
+
+  it("creates one user for concurrent VK launches", async () => {
+    await cleanDb();
+
+    const requests = await Promise.all(
+       Array.from({ length: 2 }, () =>
+        app.request("/api/v1/auth/vk", {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            searchParams: "vk_user_id=111113&sign=dev-sign",
+          }),
+        })
+      )
+    );
+
+    expect(requests.every((response) => response.status === 200)).toBe(true);
+    const users = await db.user.findMany({ where: { vkUserId: 111113 } });
+    expect(users).toHaveLength(1);
+  });
 });
 
 describe("trips", () => {

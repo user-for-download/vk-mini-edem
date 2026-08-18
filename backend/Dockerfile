@@ -3,12 +3,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* bun.lock* ./
+COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
 COPY mini-app/package.json ./mini-app/
 
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY packages/contracts ./packages/contracts
@@ -40,6 +40,10 @@ COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/packages/contracts/dist ./node_modules/@edem/contracts/dist
 COPY --from=builder /app/packages/contracts/package.json ./node_modules/@edem/contracts/
 COPY --from=builder /app/mini-app/dist ./mini-app/dist
+
+# The application does not need root privileges at runtime.
+RUN chown -R node:node /app
+USER node
 
 EXPOSE 3000
 

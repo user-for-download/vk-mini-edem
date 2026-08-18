@@ -189,7 +189,7 @@ LOG_LEVEL=debug
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
 - **Статусы брони**: только `pending → confirmed|declined`; отменённые, отклонённые и подтверждённые брони нельзя воскресить через водительский endpoint.
 - **Отзывы**: Serializable-транзакция с одним ретраем при P2034; разрешены только направления пассажир → водитель и водитель → подтверждённый пассажир.
-- **Валидация**: Zod-схемы на входе backend и fail-closed проверка ответов frontend; нарушение контракта не превращается в `data as T`.
+- **Валидация**: Zod-схемы на входе backend и проверка ответов frontend; runtime-проверки некоторых paginated-ответов backend пока только логируют contract drift и не прерывают ответ. Это открытый дефект, см. аудит ниже.
 - **Приватность**: публичные профили не содержат госномер, публичные поездки не раскрывают точные адреса встречи.
 - **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
@@ -217,11 +217,37 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 
 ## 🚀 Деплой (Production)
 
-Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) проксирует на порт 3000.
+Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) должен проксировать на порт 3000. Текущий `docker-compose.yml` также публикует backend на `0.0.0.0:3000` и PostgreSQL на `0.0.0.0:5432`; перед production-развёртыванием доступ к этим портам нужно ограничить firewall/прокси или убрать host port mapping для DB.
 
 ```
 Пользователь → VK (WebView/iframe) → https://<your-domain> → Traefik (443) → 0.0.0.0:3000 (backend)
 ```
+
+### Известные ограничения перед production
+
+- `GET /api/v1/bookings/trip/:tripId` поддерживает cursor pagination на backend, но frontend загружает только первую страницу.
+- `useTripDetailQuery` сохраняет предыдущий результат при смене `tripId`; переход между поездками может кратко показать старые данные, пока новый запрос не завершён.
+- Ошибки загрузки деталей поездки и запроса поездки водителя не имеют отдельного полноценного error/retry состояния и могут отображаться как бесконечная загрузка или пустой список заявок.
+- Даты поиска и редактирования используют разные предположения о timezone: date-only фильтры парсятся на backend через runtime timezone, а UI редактирует даты через browser-local `Date`; для продукта зафиксирован `Europe/Moscow`.
+- WebSocket авторизуется при подключении, но expiry access token не планирует закрытие уже открытого соединения.
+- WebSocket proxy в Vite настроен для `/ws`, тогда как клиент при относительном API URL подключается к `/api/v1/ws`; локальный realtime-сценарий требует проверки/исправления маршрута.
+- Rate limiting и WebSocket fan-out хранят состояние в памяти процесса и не подходят для нескольких backend-инстансов без Redis/pub-sub или ограничения deployment до одного инстанса.
+- `GET /reviews/available-trips` исключает поездку целиком после одного отзыва автора, хотя модель допускает отдельные отзывы водителя каждому подтверждённому пассажиру.
+- Production image запускается от root, а dependency installation в Docker допускает `npm install` без lockfile; production pipeline должен перейти на фиксированный lockfile и непривилегированного пользователя.
+
+### Аудит состояния
+
+Аудит исходников выполнен 18 августа 2026. Подтверждённые проблемы перечислены выше; они не означают, что текущая сборка или тесты падают.
+
+Проверено:
+
+```bash
+npm run typecheck   # все workspace: успешно
+npm run test        # mini-app 8, backend 82, contracts 25: успешно
+npm run build       # contracts + backend + production frontend: успешно
+```
+
+В backend-тестах уже воспроизводится contract drift: fixture для pagination использует `seatsTotal`/`seat` больше ограничения shared schema, endpoint отвечает `200` и пишет `bookings_pagination_response_validation_failed` вместо controlled error. Это требует исправления схемы/fixture и выбора fail-closed поведения.
 
 ### Требования VK Mini Apps
 

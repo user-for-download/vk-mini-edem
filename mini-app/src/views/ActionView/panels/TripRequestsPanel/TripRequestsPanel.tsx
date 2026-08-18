@@ -37,8 +37,11 @@ export interface TripRequestsPanelProps {
   isRefreshing: boolean;
   onBack: () => void;
   onRefresh: () => void | Promise<void>;
-  onSetStatus: (bookingId: string, status: DriverBookingAction) => void;
+  onSetStatus: (bookingId: string, status: DriverBookingAction) => Promise<void>;
   onRetry: () => void;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
 }
 
 export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
@@ -52,6 +55,9 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   onRefresh,
   onSetStatus,
   onRetry,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }) => {
   const modalApi = useModalApi();
   const cancelTrip = useCancelTripMutation();
@@ -274,13 +280,20 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
             aria-live="polite"
             aria-label={`Список заявок, ${bookings.length}`}
           >
-            {bookings.map((booking) => (
+             {bookings.map((booking) => (
               <BookingRequestRow
                 key={booking.id}
                 booking={booking}
                 onSetStatus={onSetStatus}
               />
-            ))}
+             ))}
+             {hasNextPage && (
+               <Box padding="system">
+                 <Button size="m" mode="secondary" stretched onClick={onLoadMore} loading={isFetchingNextPage}>
+                   Загрузить ещё
+                 </Button>
+               </Box>
+             )}
           </Box>
         )}
 
