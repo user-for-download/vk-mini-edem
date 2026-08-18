@@ -11,12 +11,12 @@
 - **Отзывы и рейтинги**: система рейтингов водителей и пассажиров, отзывы после завершённых поездок в обе стороны (пассажир → водитель и водитель → пассажир).
 - **Уведомления**: встроенные уведомления + WebSocket-пуши (новая заявка, статус брони, отмена поездки).
 - **Управление автомобилями**: добавление и редактирование информации об авто для водителей.
-- **Интеграция с VK**: авторизация через VK ID (имитация в Dev-режиме), компоненты VKUI, PWA.
+- **Интеграция с VK**: авторизация через подписанные launch params VK, имитация только в Dev/Test, VKUI, WebSocket и опциональные сообщения от имени сообщества.
 
 ## 📁 Структура монорепозитория
 
 ```edem/
-├── mini-app/                    # Frontend: React + VKUI + Vite (PWA)
+├── mini-app/                    # Frontend: React + VKUI + Vite (Service Worker отключён для VK WebView)
 │   ├── public/                  # Иконки PWA
 │   ├── src/
 │   │   ├── api/                 # HTTP-клиент (таймауты, Zod-валидация ответов) + API-запросы
@@ -29,7 +29,7 @@
 │   │   ├── router/              # Роутинг (vk-mini-apps-router)
 │   │   ├── store/               # Zustand сторы
 │   │   └── views/               # Экраны (Views)
-│   └── vite.config.ts           # Vite + vite-plugin-pwa (Workbox)
+│   └── vite.config.ts           # Vite + VK WebView-compatible build configuration
 │
 ├── backend/                     # Backend: Hono + Prisma ORM + PostgreSQL
 │   ├── prisma/
@@ -70,9 +70,9 @@
 ```bash
 npm run dev          # или: bun run dev
 ```
-Команда параллельно запустит бэкенд на порту 3001 и фронтенд (Vite) на порту 3000. Vite проксирует `/api/v1` и `/ws` на бэкенд.
+Команда параллельно запустит бэкенд на порту 3011 и фронтенд (Vite) на порту 3010. Vite проксирует `/api` и `/ws` на бэкенд. Порты можно изменить через `BACKEND_PORT`, `VITE_PORT` и `VITE_API_TARGET`.
 
-> **Примечание**: `dev:backend` использует `bun run --cwd backend dev` (bun-совместимый синтаксис). Если bun не установлен — поставьте его (`curl -fsSL https://bun.sh/install | bash`) или замените скрипт на `npm run dev --workspace=backend`.
+> **Примечание**: `dev:backend` использует `bun run --cwd backend dev`. Если Bun не установлен, запускайте бэкенд отдельно через `npm run dev --workspace=backend` или измените root script.
 
 ### Запуск в Docker (бэкенд в контейнере)
 ```bash
@@ -92,7 +92,7 @@ npm install
 
 ### Сборка приложения (включая общий пакет)
 ```bash
-npm run build          # contracts → backend → mini-app (vite build + PWA)
+npm run build          # contracts → backend → mini-app (Vite build)
 npm run build:contracts  # только contracts
 ```
 
@@ -133,7 +133,7 @@ JWT_SECRET=your-jwt-secret-key-32-chars-long
 VK_APP_SECRET=your-vk-app-secret
 SENTRY_DSN=                    # Sentry DSN (пусто — Sentry выключен)
 CORS_ORIGINS=http://localhost:3000
-BACKEND_PORT=3001
+BACKEND_PORT=3011
 JWT_ACCESS_TTL_SECONDS=900
 JWT_REFRESH_TTL_SECONDS=2592000
 AUTH_RATE_WINDOW_MS=900000
@@ -160,7 +160,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/trips/:id/cancel` | Отмена поездки |
 | PATCH | `/api/v1/trips/:id/complete` | Завершение поездки (`?force=1` — только dev/test) |
 | POST | `/api/v1/bookings` | Создание брони (гонка → 409 SEAT_TAKEN; уехавшая поездка → 400 TRIP_IN_PAST) |
-| PATCH | `/api/v1/bookings/:id/status` | Подтвердить/отклонить заявку |
+| PATCH | `/api/v1/bookings/:id/status` | Подтвердить/отклонить pending-заявку до отправления |
 | PATCH | `/api/v1/bookings/:id/cancel` | Отмена брони пассажиром |
 | GET | `/api/v1/bookings/my` | Мои брони (пассажир) |
 | GET | `/api/v1/bookings/history` | История броней |
@@ -169,7 +169,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/notifications/:id/read` | Отметить прочитанным |
 | PATCH | `/api/v1/notifications/read-all` | Отметить все прочитанными |
 | GET | `/api/v1/reviews` | Отзывы |
-| POST | `/api/v1/reviews` | Создание отзыва (участник поездки, не себе, не повторно) |
+| POST | `/api/v1/reviews` | Отзыв после поездки: пассажир → водитель или водитель → подтверждённый пассажир |
 | GET | `/api/v1/reviews/my` | Отзывы, оставленные текущим пользователем |
 | GET | `/api/v1/reviews/available-trips` | Поездки для отзыва (пассажир или водитель с подтверждёнными пассажирами) |
 | GET | `/api/v1/reviews/user/:userId` | Публичный список отзывов о пользователе |
@@ -178,7 +178,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/users/me/car` | Управление авто |
 | PATCH | `/api/v1/users/me/notification-settings` | Настройки уведомлений |
 | GET | `/api/v1/users/:id` | Публичный профиль |
-| WS | `/api/v1/ws?token=` | WebSocket-события (booking:new, status_changed, notification:new и др.) |
+| WS | `/api/v1/ws` | WebSocket-события; access token отправляется первым auth-сообщением |
 | GET | `/health`, `/health/live`, `/health/ready` | Проверки здоровья |
 
 ## 🔒 Безопасность
@@ -187,8 +187,10 @@ LOG_LEVEL=debug
 - **Refresh-токены**: хранятся в БД хэшированными (SHA-256), одноразовые — при каждом `/refresh` старый отзывается, выдаётся новый (`rotateRefreshToken`, атомарная транзакция).
 - **Rate limiting**: раздельные лимитеры для `/auth/vk`, `/auth/refresh`, чтения и мутаций.
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
-- **Отзывы**: Serializable-транзакция с одним ретраем при P2034; повторный конфликт → 503 (не маскируется под «отзыв уже оставлен» 409 — дубль ловится отдельно по уникальному индексу).
-- **Валидация**: Zod-схемы на входе (backend) и на выходе (frontend, `apiClient.request<T>(url, opts, schema)`).
+- **Статусы брони**: только `pending → confirmed|declined`; отменённые, отклонённые и подтверждённые брони нельзя воскресить через водительский endpoint.
+- **Отзывы**: Serializable-транзакция с одним ретраем при P2034; разрешены только направления пассажир → водитель и водитель → подтверждённый пассажир.
+- **Валидация**: Zod-схемы на входе backend и fail-closed проверка ответов frontend; нарушение контракта не превращается в `data as T`.
+- **Приватность**: публичные профили не содержат госномер, публичные поездки не раскрывают точные адреса встречи.
 - **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
 - **Время**: даты сериализуются в `Europe/Moscow` (в контейнере задано через `TZ`).
@@ -197,25 +199,18 @@ LOG_LEVEL=debug
 
 ## 📡 WebSocket
 
-После авторизации клиент подключается к `/api/v1/ws?token=...` и отправляет `{ type: "auth", token }`. Сервер рассылает события:
+После авторизации клиент подключается к `/api/v1/ws` и отправляет `{ type: "auth", token }`. Токен не находится в URL. Сервер рассылает события:
 `booking:new`, `booking:status_changed`, `trip:status_changed`, `notification:new`, `pong`/`ping`. Клиент автоматически реконнектится (3с), инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
 
 Reaper (`startWsReaper`/`stopWsReaper`): каждые 30 с сервер закрывает соединения без pong дольше 60 с; остановка идемпотентна, «зомби»-тики после остановки не чистят соединения (graceful shutdown).
 
 ## 🌐 PWA
 
-Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
-- манифест с иконками 192/512 (maskable);
-- service worker с прекэшем статики и runtime-кэшированием:
-  - `NetworkFirst` для публичного списка поездок (офлайн-доступ к результатам поиска, 1 час);
-  - `CacheFirst` для аватаров (`i.pravatar.cc`, 30 дней);
-- авторизованные API-эндпоинты намеренно не кэшируются (защита данных пользователей).
-
-> **Примечание (деплой в VK Mini App):** PWA отключён в `mini-app/vite.config.ts` — Service Worker кэширует старую версию приложения и конфликтует с деплоем (URL меняется при каждом обновлении). В WebView VK офлайн-сценарий не критичен, а риски белого экрана — критичны.
+PWA-плагин и Service Worker отключены в `mini-app/vite.config.ts` для деплоя в VK Mini App. Это предотвращает загрузку устаревшей версии приложения после обновления сборки. Авторизованные данные намеренно не кэшируются.
 
 ## 🛠 Технологии
 
-- **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, vite-plugin-pwa, Sentry
+- **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, Sentry
 - **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
@@ -233,6 +228,9 @@ Frontend собран как PWA (`vite-plugin-pwa`, `autoUpdate`):
 - **HTTPS обязателен** в production (кроме localhost).
 - Сервер должен **разрешать iframe** — бэкенд отдаёт CSP `frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru` (не `X-Frame-Options: DENY`).
 - `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин; дрейф часов > 1 мин логируется и отправляется в Sentry для диагностики). Принимается только полный `searchParams` из launch-параметров — реконструкция подписи по отдельным полям не поддерживается.
+- Клиентские `firstName`, `lastName` и `photo` не используются как доказательство личности; статус `isVerified` не выводится из неподписанных полей.
+- Swipe-back синхронизируется через `VKWebAppSetSwipeSettings`, а сообщения навигации принимаются только от родительского VK-контейнера из разрешённых origin.
+- Опциональная отправка сообщений через `messages.send` использует `VK_GROUP_ID` и `VK_GROUP_TOKEN`; токен отправляется в POST body.
 
 ### Шаги деплоя
 
