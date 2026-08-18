@@ -35,7 +35,15 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
       onClick={toggle}
       aria-expanded={expanded}
       aria-label={expanded ? "Свернуть отзыв" : "Развернуть отзыв"}
-      style={{ display: "block", width: "100%", textAlign: "left" }}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        border: "none",
+        background: "transparent",
+        font: "inherit",
+        color: "inherit",
+      }}
     >
       <Flex align="center" gap={4}>
         <span

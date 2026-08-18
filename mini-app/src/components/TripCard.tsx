@@ -97,7 +97,15 @@ export const TripCard: FC<TripCardProps> = ({
         disabled={!isInteractive}
         onClick={isInteractive ? () => onOpen?.(trip) : undefined}
         aria-label={isInteractive ? `Поездка ${trip.fromCity} — ${trip.toCity}, ${trip.date} в ${trip.time}, ${trip.price} рублей` : undefined}
-        style={{ display: "block", width: "100%", textAlign: "left" }}
+        style={{
+          display: "block",
+          width: "100%",
+          textAlign: "left",
+          border: "none",
+          background: "transparent",
+          font: "inherit",
+          color: "inherit",
+        }}
       >
         <Box padding={16}>
           <RouteLine

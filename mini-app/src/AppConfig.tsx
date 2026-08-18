@@ -14,6 +14,7 @@ import { WsProvider } from "@/providers/WsProvider";
 import { GlobalWsListener } from "@/components/GlobalWsListener";
 import { ModalProvider } from "@/providers/ModalProvider";
 import { SnackbarProvider } from "@/providers/SnackbarProvider";
+import { ConfirmProvider } from "@/providers/ConfirmProvider";
 
 import { ApiError } from "@/api/client";
 
@@ -66,14 +67,16 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
             <ErrorBoundary>
               <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
                 <SnackbarProvider>
-                  <ModalProvider>
-                    <AuthGate>
-                      <WsProvider>
-                        <GlobalWsListener />
-                        {children}
-                      </WsProvider>
-                    </AuthGate>
-                  </ModalProvider>
+                  <ConfirmProvider>
+                    <ModalProvider>
+                      <AuthGate>
+                        <WsProvider>
+                          <GlobalWsListener />
+                          {children}
+                        </WsProvider>
+                      </AuthGate>
+                    </ModalProvider>
+                  </ConfirmProvider>
                 </SnackbarProvider>
               </AppRoot>
             </ErrorBoundary>
@@ -83,4 +86,3 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
     </ConfigProvider>
   );
 };
-

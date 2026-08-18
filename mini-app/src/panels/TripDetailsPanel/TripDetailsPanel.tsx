@@ -50,6 +50,7 @@ import { useModalApi } from "@/providers/ModalProvider";
 import { BookingRequestRow } from "@/components/BookingRequestRow";
 import { TripPassengerRow } from "@/components/TripPassengerRow";
 import type { DriverBookingAction } from "@edem/contracts";
+import { useConfirm } from "@/providers/ConfirmProvider";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -83,6 +84,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
   const modalApi = useModalApi();
+  const confirm = useConfirm();
 
   const createBooking = useCreateBookingMutation();
   const cancelBooking = useCancelBookingMutation();
@@ -134,7 +136,14 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     );
   };
 
-  const cancelMyBooking = (bookingId: string) => {
+  const cancelMyBooking = async (bookingId: string) => {
+    const confirmed = await confirm({
+      title: "Отменить бронирование?",
+      description: "Заявка на поездку будет отменена, а место снова станет доступно.",
+      confirmTitle: "Отменить бронь",
+    });
+    if (!confirmed) return;
+
     cancelBooking.mutate(bookingId, {
       onSuccess: () => {
         enqueueSnackbar({
@@ -274,10 +283,17 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     });
   };
 
-  const handleCancelTrip = () => {
+  const handleCancelTrip = async () => {
     if (!isOwnTrip || trip.status !== "active") {
       return;
     }
+
+    const confirmed = await confirm({
+      title: "Отменить поездку?",
+      description: "Поездка станет недоступна, а пассажиры получат уведомление об отмене.",
+      confirmTitle: "Отменить поездку",
+    });
+    if (!confirmed) return;
 
     setIsCancellingTrip(true);
 
@@ -305,10 +321,18 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     });
   };
 
-  const handleCompleteTrip = () => {
+  const handleCompleteTrip = async () => {
     if (!canCompleteTrip) {
       return;
     }
+
+    const confirmed = await confirm({
+      title: "Завершить поездку?",
+      description: "Поездка будет перенесена в архив, а пассажиры смогут оставить отзывы.",
+      confirmTitle: "Завершить",
+      confirmMode: "default",
+    });
+    if (!confirmed) return;
 
     setIsCompletingTrip(true);
 

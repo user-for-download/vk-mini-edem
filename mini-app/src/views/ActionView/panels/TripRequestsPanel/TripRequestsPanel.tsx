@@ -26,6 +26,7 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useModalApi } from "@/providers/ModalProvider";
 import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTripsQuery";
 import { useSnackbar } from "@/providers/SnackbarProvider";
+import { useConfirm } from "@/providers/ConfirmProvider";
 
 export interface TripRequestsPanelProps {
   id: string;
@@ -56,6 +57,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   const cancelTrip = useCancelTripMutation();
   const completeTrip = useCompleteTripMutation();
   const { enqueue: enqueueSnackbar } = useSnackbar();
+  const confirm = useConfirm();
 
   // Date.now() в рендере запрещён (react-hooks/purity) — время обновляем по таймеру
   const [now, setNow] = useState(() => Date.now());
@@ -74,8 +76,16 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
     });
   };
 
-  const handleCancelTrip = () => {
+  const handleCancelTrip = async () => {
     if (!trip || trip.status !== "active") return;
+
+    const confirmed = await confirm({
+      title: "Отменить поездку?",
+      description: "Поездка станет недоступна, а пассажиры получат уведомление об отмене.",
+      confirmTitle: "Отменить поездку",
+    });
+    if (!confirmed) return;
+
     cancelTrip.mutate(trip.id, {
       onSuccess: () => {
         enqueueSnackbar({
@@ -96,8 +106,17 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
     });
   };
 
-  const handleCompleteTrip = () => {
+  const handleCompleteTrip = async () => {
     if (!trip || trip.status !== "active") return;
+
+    const confirmed = await confirm({
+      title: "Завершить поездку?",
+      description: "Поездка будет перенесена в архив, а пассажиры смогут оставить отзывы.",
+      confirmTitle: "Завершить",
+      confirmMode: "default",
+    });
+    if (!confirmed) return;
+
     completeTrip.mutate(trip.id, {
       onSuccess: () => {
         enqueueSnackbar({
