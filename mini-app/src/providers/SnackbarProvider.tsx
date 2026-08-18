@@ -61,6 +61,14 @@ export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
         before: icon,
         duration: 4000,
         placement: "top",
+        slotProps: {
+          root: {
+            style: {
+              inlineSize: "100vw",
+              maxInlineSize: "none",
+            },
+          },
+        },
       });
     },
     [api]
