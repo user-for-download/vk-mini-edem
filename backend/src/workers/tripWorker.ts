@@ -51,7 +51,7 @@ export async function processExpiredTrips() {
       logger.info({ firstBatchSize: expiredTrips.length, cutoff }, "trip_worker_found_expired");
 
       for (const trip of expiredTrips) {
-        await processExpiredTrip(trip);
+        await processExpiredTrip(trip, cutoff);
         processedCount++;
       }
 
@@ -67,16 +67,24 @@ export async function processExpiredTrips() {
   }
 }
 
-async function processExpiredTrip(trip: ExpiredTrip) {
+async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
   try {
     // Транзакция — только изменение данных (без уведомлений, чтобы
     // не держать соединение из пула открытым дольше необходимого).
-    const { confirmedPassengerIds, declinedPassengerIds } = await db.$transaction(
+    const { processed, confirmedPassengerIds, declinedPassengerIds } = await db.$transaction(
       async (tx) => {
-        await tx.trip.update({
-          where: { id: trip.id },
+        const claimed = await tx.trip.updateMany({
+          where: { id: trip.id, status: "active", departureAt: { lt: cutoff } },
           data: { status: "completed", seatsAvailable: 0 },
         });
+
+        if (claimed.count !== 1) {
+          return {
+            processed: false,
+            confirmedPassengerIds: [] as string[],
+            declinedPassengerIds: [] as string[],
+          };
+        }
 
         // Перечитываем брони ВНУТРИ транзакции: в batch-запросе
         // processExpiredTrips брони не грузятся, а бронь, созданная в
@@ -128,10 +136,14 @@ async function processExpiredTrip(trip: ExpiredTrip) {
           ),
         ];
 
-        return { confirmedPassengerIds, declinedPassengerIds };
+        return { processed: true, confirmedPassengerIds, declinedPassengerIds };
       },
       { isolationLevel: "Serializable" }
     );
+
+    if (!processed) {
+      return;
+    }
 
     logBusinessEvent("trip.completed", {
       tripId: trip.id,

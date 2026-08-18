@@ -47,4 +47,62 @@ export const bridge = import.meta.env.DEV
   ? (customBridgeMock as unknown as typeof vkBridge)
   : vkBridge;
 
+/**
+ * Профильные данные пользователя из VK (VKWebAppGetUserInfo).
+ * В dev-режиме не используется для автозаполнения ФИО/аватара —
+ * синхронизация профиля выполняется только в продакшене.
+ */
+export interface VkUserInfo {
+  id: number;
+  firstName?: string;
+  lastName?: string;
+  photo?: string;
+}
+
+export async function getVkUserInfo(): Promise<VkUserInfo | null> {
+  try {
+    const data = (await bridge.send(
+      "VKWebAppGetUserInfo"
+    )) as Record<string, unknown> | null;
+    if (!data || typeof data.id !== "number") {
+      return null;
+    }
+    return {
+      id: data.id,
+      firstName:
+        typeof data.first_name === "string" ? data.first_name : undefined,
+      lastName:
+        typeof data.last_name === "string" ? data.last_name : undefined,
+      photo: typeof data.photo_200 === "string" ? data.photo_200 : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Запрашивает у пользователя разрешение на отправку сообщений
+ * от имени сообщества (VKWebAppAllowMessagesFromGroup).
+ * Без этого согласия VK API messages.send вернёт ошибку
+ * "Can't send messages for users without permission".
+ *
+ * Вызывается только в продакшене (в dev пропускаем), результат не критичен.
+ * В качестве key используем VK ID пользователя (из VKWebAppGetUserInfo).
+ */
+export async function requestVkMessagesPermission(groupId: number): Promise<boolean> {
+  if (import.meta.env.DEV) {
+    return false;
+  }
+  try {
+    const userInfo = await getVkUserInfo();
+    const data = (await bridge.send("VKWebAppAllowMessagesFromGroup", {
+      group_id: groupId,
+      key: userInfo ? String(userInfo.id) : "",
+    })) as { result?: boolean } | null;
+    return data?.result === true;
+  } catch {
+    return false;
+  }
+}
+
 

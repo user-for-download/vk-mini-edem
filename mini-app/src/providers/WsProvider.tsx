@@ -38,6 +38,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const disposedRef = useRef(false);
 
   // connect вызывается сам из себя (reconnect в onclose), а самоссылка
   // в инициализаторе useCallback запрещена (react-hooks/immutability).
@@ -46,7 +47,11 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (disposedRef.current) return;
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) return;
     // Если идёт refresh (из HTTP-клиента или WsProvider) — не пытаемся
     // переподключиться: после завершения нас разбудит onTokenUpdate.
     if (apiClient.isRefreshing()) return;
@@ -87,6 +92,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
 
     ws.onclose = async (e) => {
+      if (disposedRef.current || wsRef.current !== ws) return;
       setIsConnected(false);
       wsRef.current = null;
 
@@ -100,7 +106,8 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         if (apiClient.isRefreshing()) {
           console.log("[WS] Refresh already in progress, waiting...");
           reconnectTimeoutRef.current = window.setTimeout(() => {
-            connectRef.current();
+            reconnectTimeoutRef.current = null;
+            if (!disposedRef.current) connectRef.current();
           }, WS_REFRESH_WAIT_DELAY_MS);
           return;
         }
@@ -109,7 +116,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         const refreshed = await apiClient.tryRefresh();
 
         if (refreshed) {
-          connectRef.current();
+          if (!disposedRef.current) connectRef.current();
         } else {
           // Refresh не удался — сессия мертва, полный логаут.
           useAuthStore.getState().clearSession("WS Auth failed");
@@ -119,7 +126,10 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
       // Обычный реконнект при обрыве сети
       reconnectTimeoutRef.current = window.setTimeout(
-        () => connectRef.current(),
+        () => {
+          reconnectTimeoutRef.current = null;
+          if (!disposedRef.current) connectRef.current();
+        },
         WS_RECONNECT_DELAY_MS
       );
     };
@@ -156,14 +166,20 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       reconnectTimeoutRef.current = null;
     }
     if (wsRef.current) {
-      wsRef.current.close();
+      const ws = wsRef.current;
       wsRef.current = null;
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      ws.close(1000, "Provider disconnected");
     }
     setIsConnected(false);
   }, []);
 
   // Poll for token existence since we don't have a reactive token hook here yet
   useEffect(() => {
+    disposedRef.current = false;
     const interval = setInterval(() => {
       const token = apiClient.getToken();
       if (token && !wsRef.current && !reconnectTimeoutRef.current) {
@@ -174,6 +190,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }, 1000);
     
     return () => {
+      disposedRef.current = true;
       clearInterval(interval);
       disconnect();
     };

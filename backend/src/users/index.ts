@@ -162,5 +162,5 @@ usersRouter.get("/:id", publicReadLimiter, async (c) => {
     return c.json({ message: "User not found" }, 404);
   }
 
-  return c.json(serializeUser(user));
+  return c.json(serializeUser(user, { includePlate: false }));
 });

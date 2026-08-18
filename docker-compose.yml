@@ -33,6 +33,9 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       VK_APP_SECRET: ${VK_APP_SECRET:?VK_APP_SECRET is required}
+      # VK API: отправка сообщений пользователям от имени сообщества (опционально)
+      VK_GROUP_ID: ${VK_GROUP_ID:-}
+      VK_GROUP_TOKEN: ${VK_GROUP_TOKEN:-}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ALLOW_DEV_AUTH: "false"

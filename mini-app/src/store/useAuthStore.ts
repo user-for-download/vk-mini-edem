@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { bridge } from "@/helpers/bridge";
+import { bridge, getVkUserInfo } from "@/helpers/bridge";
 import type { User } from "@/types";
 import { authApi } from "@/api/auth.api";
 import { apiClient } from "@/api/client";
+import type { AuthRequest } from "@edem/contracts";
 
 export type AuthStatus =
   | "idle"
@@ -31,10 +32,12 @@ interface AuthState {
 let bootstrapPromise: Promise<void> | null = null;
 let refreshPromise: Promise<void> | null = null;
 
-async function getVkAuthPayload(): Promise<{ searchParams: string }> {
+async function getVkAuthPayload(): Promise<AuthRequest> {
   const search = window.location.search;
   const urlParams = new URLSearchParams(search);
 
+  // Dev-режим: не автозаполняем ФИО/аватар и не проставляем isVerified —
+  // профильная синхронизация через VKWebAppGetUserInfo выполняется только в проде.
   if (import.meta.env.DEV && !urlParams.has("vk_user_id")) {
     let devUserId = 100001;
     try {
@@ -54,9 +57,24 @@ async function getVkAuthPayload(): Promise<{ searchParams: string }> {
     return { searchParams: devParams.toString() };
   }
 
+  // Прод: при первом запуске получаем информацию о пользователе из VK
+  // (имя, фамилия, аватар) и автоматически валидируем профиль этими данными.
+  const vkProfile = import.meta.env.DEV ? null : await getVkUserInfo();
+  const profileFields: Pick<AuthRequest, "firstName" | "lastName" | "photo"> =
+    vkProfile
+      ? {
+          firstName: vkProfile.firstName,
+          lastName: vkProfile.lastName,
+          photo: vkProfile.photo,
+        }
+      : {};
+
   // Способ 1: параметры в URL (window.location.search) — стандартный случай
   if (urlParams.has("vk_user_id") && urlParams.has("sign")) {
-    return { searchParams: search.replace(/^\?/, "") };
+    return {
+      searchParams: search.replace(/^\?/, ""),
+      ...profileFields,
+    };
   }
 
   // Способ 2: параметры через VK Bridge (VKWebAppGetLaunchParams) —
@@ -76,13 +94,13 @@ async function getVkAuthPayload(): Promise<{ searchParams: string }> {
           params.set(key, String(value));
         }
       }
-      return { searchParams: params.toString() };
+      return { searchParams: params.toString(), ...profileFields };
     }
   } catch {
     // ignore — вернём пустой searchParams ниже
   }
 
-  return { searchParams: "" };
+    throw new Error("VK launch parameters are unavailable");
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({

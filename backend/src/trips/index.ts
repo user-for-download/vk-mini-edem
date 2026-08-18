@@ -165,8 +165,10 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
 
   return c.json({
     items: trips.map((trip) =>
-      serializeTrip(trip, {
+    serializeTrip(trip, {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
+        includePlate: false,
+        includePrivateDetails: false,
       })
     ),
     pagination: {
@@ -342,6 +344,8 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
     serializeTrip(trip, {
       bookedSeats: activeBookings.map((booking) => booking.seat),
       myBooking,
+      includePlate: false,
+      includePrivateDetails: false,
     })
   );
 });
@@ -584,11 +588,22 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
         }
 
         if (dto.seatsTotal !== undefined) {
-          const activeBookingsForSeats = await tx.booking.count({
+          const activeBookingsForSeats = await tx.booking.findMany({
             where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+            select: { seat: true },
           });
+          const maxTakenSeat = activeBookingsForSeats.reduce(
+            (max, booking) => Math.max(max, booking.seat),
+            0,
+          );
+          if (dto.seatsTotal < maxTakenSeat) {
+            throw new TripError(
+              TripErrors.invalidSeats(),
+              `Seat #${maxTakenSeat} is occupied — cannot set seatsTotal below ${maxTakenSeat}`,
+            );
+          }
           updateData.seatsTotal = dto.seatsTotal;
-          updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats);
+          updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats.length);
         }
 
         return tx.trip.update({

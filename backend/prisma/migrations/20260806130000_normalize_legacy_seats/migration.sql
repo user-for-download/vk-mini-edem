@@ -5,7 +5,7 @@
 -- Pending-брони на места > 4 отклоняем: таких мест в поездке больше не будет.
 UPDATE "Booking"
 SET "status" = 'declined'
-WHERE "status" = 'pending'
+WHERE "status" IN ('pending', 'confirmed')
   AND "seat" > 4
   AND "tripId" IN (SELECT "id" FROM "Trip" WHERE "seatsTotal" > 4);
 

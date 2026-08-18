@@ -4,10 +4,13 @@ import { userSchema } from "../schemas/user.schema.js";
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
 export const authRequestSchema = z.object({
-  searchParams: z.string().optional(),
+  searchParams: z.string().min(1).max(4096),
   vkUserId: z.number().int().positive().optional(),
   sign: z.string().optional(),
   ts: z.number().int().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  photo: z.string().optional(),
 });
 
 export type AuthRequest = z.infer<typeof authRequestSchema>;

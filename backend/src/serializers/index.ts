@@ -72,7 +72,7 @@ export function formatTimeRu(date: Date): string {
   return timeFmt.format(date);
 }
 
-export function serializeUser(user: UserWithCar) {
+export function serializeUser(user: UserWithCar, options?: { includePlate?: boolean }) {
   return {
     id: user.id,
     name: user.name,
@@ -88,7 +88,7 @@ export function serializeUser(user: UserWithCar) {
       ? {
           model: user.car.model,
           color: user.car.color,
-          plate: user.car.plate,
+          ...(options?.includePlate === false ? {} : { plate: user.car.plate }),
         }
       : undefined,
     about: user.about ?? undefined,
@@ -107,14 +107,16 @@ export function serializeTrip(
       status: string;
       createdAt?: Date;
     } | null;
+    includePlate?: boolean;
+    includePrivateDetails?: boolean;
   }
 ) {
   return {
     id: trip.id,
     fromCity: trip.fromCity,
-    fromAddress: trip.fromAddress,
+    fromAddress: options?.includePrivateDetails === false ? trip.fromCity : trip.fromAddress,
     toCity: trip.toCity,
-    toAddress: trip.toAddress,
+    toAddress: options?.includePrivateDetails === false ? trip.toCity : trip.toAddress,
     date: formatDateRu(trip.departureAt),
     time: formatTimeRu(trip.departureAt),
     departureAt: trip.departureAt.toISOString(),
@@ -123,7 +125,7 @@ export function serializeTrip(
     price: trip.price,
     seatsTotal: trip.seatsTotal,
     seatsAvailable: trip.seatsAvailable,
-    driver: serializeUser(trip.driver),
+    driver: serializeUser(trip.driver, { includePlate: options?.includePlate }),
     tags: trip.tags,
     comment: trip.comment ?? undefined,
     status: trip.status as TripStatus,

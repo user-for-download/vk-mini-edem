@@ -19,6 +19,7 @@ import {
   mutationLimiter,
   createBookingLimiter,
   cancelBookingLimiter,
+  createUserRateLimiter,
 } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
@@ -39,6 +40,7 @@ class BookingError extends Error {
 
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
+import { sendVkMessage } from "../services/vkMessenger.js";
 import { wsManager } from "../ws/manager.js";
 
 type BookingFull = Prisma.BookingGetPayload<{
@@ -61,6 +63,12 @@ const DEFAULT_BOOKINGS_LIMIT = 50;
 const MAX_BOOKINGS_LIMIT = 50;
 
 export const bookingsRouter = new Hono<AuthEnv>();
+
+const bookingDecisionLimiter = createUserRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 100,
+  keyPrefix: "driver-booking-decision",
+});
 
 bookingsRouter.use("*", requireUser);
 
@@ -598,6 +606,16 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
       `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`
     );
 
+    // Отправляем водителю личное сообщение ВКонтакте от имени сообщества.
+    // Сервис глотает ошибки внутри (токен не настроен, пользователь не
+    // разрешил сообщения, сеть недоступна) — флоу бронирования не ломается.
+    if (booking.trip.driver.vkUserId) {
+      void sendVkMessage(
+        booking.trip.driver.vkUserId,
+        `🚗 Новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}.\nОткрыть приложение «Едем» и рассмотреть заявку.`
+      );
+    }
+
     wsManager.sendToUser(booking.trip.driverId, {
       type: "booking:new",
       payload: { bookingId: booking.id, tripId },
@@ -717,7 +735,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
  * pending/confirmed считаются активным удержанием места.
  * declined освобождает место.
  */
-bookingsRouter.patch("/:id/status", async (c) => {
+bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
 
@@ -773,7 +791,15 @@ bookingsRouter.patch("/:id/status", async (c) => {
       passengerId = booking.passengerId;
 
       if (booking.status === newStatus) {
-        return booking;
+        return { booking, changed: false };
+      }
+
+      if (booking.status !== "pending") {
+        throw new BookingError(
+          "Only pending bookings can be confirmed or declined",
+          409,
+          ERROR_CODES.CONFLICT
+        );
       }
       
       const trip = await tx.trip.findUnique({
@@ -782,6 +808,10 @@ bookingsRouter.patch("/:id/status", async (c) => {
 
       if (!trip) {
         throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      if (trip.status !== "active" || trip.departureAt <= new Date()) {
+        throw new BookingError("Trip can no longer be changed", 409, ERROR_CODES.TRIP_NOT_ACTIVE);
       }
 
       /**
@@ -886,12 +916,16 @@ bookingsRouter.patch("/:id/status", async (c) => {
         },
       });
 
-      return updatedBooking;
+      return { booking: updatedBooking, changed: true };
     }, { isolationLevel: "Serializable" });
+
+    if (!updated.changed) {
+      return c.json(serializeBooking(updated.booking));
+    }
 
     logBusinessEvent("booking.status_changed", {
       bookingId: id,
-      tripId: updated.tripId,
+      tripId: updated.booking.tripId,
       oldStatus,
       newStatus,
       driverId: user.id,
@@ -901,12 +935,12 @@ bookingsRouter.patch("/:id/status", async (c) => {
       passengerId,
       "booking_status_changed",
       newStatus === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
-      `Водитель ${newStatus === "confirmed" ? "подтвердил" : "отклонил"} вашу заявку в поездке ${updated.trip.fromCity} → ${updated.trip.toCity}`
+      `Водитель ${newStatus === "confirmed" ? "подтвердил" : "отклонил"} вашу заявку в поездке ${updated.booking.trip.fromCity} → ${updated.booking.trip.toCity}`
     );
 
     wsManager.sendToUser(passengerId, {
       type: "booking:status_changed",
-      payload: { bookingId: id, tripId: updated.tripId, status: newStatus },
+      payload: { bookingId: id, tripId: updated.booking.tripId, status: newStatus },
     });
 
     wsManager.sendToUser(passengerId, {
@@ -914,7 +948,7 @@ bookingsRouter.patch("/:id/status", async (c) => {
       payload: { id: "refresh" },
     });
 
-    return c.json(serializeBooking(updated));
+    return c.json(serializeBooking(updated.booking));
   } catch (error) {
     if (error instanceof BookingError) {
       return c.json(
@@ -1056,4 +1090,3 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
     return c.json({ message: "Internal server error" }, 500);
   }
 });
-

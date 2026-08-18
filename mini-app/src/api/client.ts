@@ -164,14 +164,8 @@ export class ApiClient {
     if (schema) {
       const parsed = schema.safeParse(data);
       if (!parsed.success) {
-        // Graceful degradation: при дрейфе схемы не роняем запрос.
-        // В dev — подробности в консоль, в prod — предупреждение.
-        if (import.meta.env.DEV) {
-          console.error("[ApiClient] Zod validation failed:", parsed.error, "Data:", data);
-        } else {
-          console.warn("[ApiClient] Zod validation failed:", parsed.error.issues[0]?.message);
-        }
-        return data as T;
+        console.error("[ApiClient] Zod validation failed:", parsed.error);
+        throw new ApiError("Invalid server response", "INVALID_RESPONSE", 502);
       }
       return parsed.data;
     }

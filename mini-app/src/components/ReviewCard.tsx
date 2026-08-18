@@ -1,34 +1,62 @@
 // mini-app/src/components/ReviewCard.tsx
-import { type FC } from "react";
-import { Avatar, Caption, Flex, RichCell, Text, Tooltip } from "@vkontakte/vkui";
-import { Icon16StarAlt } from "@vkontakte/icons";
+import { type CSSProperties, type FC, useState } from "react";
+import { Avatar, Caption, Flex, RichCell, Text } from "@vkontakte/vkui";
+import { Icon12ChevronDownSmall, Icon12ChevronUpSmall, Icon16StarAlt } from "@vkontakte/icons";
 import { resolveAvatar } from "@/helpers/avatar";
 import type { Review } from "@/types";
 
-const MAX_PREVIEW_LENGTH = 120;
+// Ниже этого порога текст наверняка влезает в одну строку — раскрытие не нужно.
+// Выше — текст почти гарантированно обрезается, поэтому по тапу раскрываем полностью.
+const MIN_EXPAND_LENGTH = 40;
+
+// Однострочное обрезание текста ellipsis'ом (когда комментарий свёрнут)
+const collapsedStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 /**
- * Отзыв в RichCell: аватар, имя, маршрут и роль, рейтинг.
- * Длинный текст обрезается до 120 символов, а полный текст показывается в Tooltip.
+ * Отзыв в RichCell: аватар, имя, маршрут, рейтинг.
+ * Короткий текст — одной строкой; длинный — свёрнут в одну строку с многоточием,
+ * по тапу раскрывается полный комментарий (без дублирования текста).
  */
 export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
-  const isLong = review.text.length > MAX_PREVIEW_LENGTH;
-  const displayText = isLong
-    ? review.text.slice(0, MAX_PREVIEW_LENGTH).trimEnd() + "…"
-    : review.text;
+  const [expanded, setExpanded] = useState(false);
+  const isExpandable = review.text.length > MIN_EXPAND_LENGTH;
 
-  const content = (
-    <span
-      // eslint-disable-next-line react/forbid-dom-props
-      style={{
-        display: "-webkit-box",
-        WebkitBoxOrient: "vertical",
-        WebkitLineClamp: 3,
-        overflow: "hidden",
-      }}
+  const toggle = () => setExpanded((v) => !v);
+
+  const subtitle = isExpandable ? (
+    <Flex
+      align="center"
+      gap={4}
+      onClick={toggle}
+      aria-expanded={expanded}
+      role="button"
     >
-      {displayText}
-    </span>
+      <span
+        // eslint-disable-next-line react/forbid-dom-props
+        style={expanded ? undefined : collapsedStyle}
+      >
+        {review.text}
+      </span>
+      {expanded ? (
+        <Icon12ChevronUpSmall
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{ color: "var(--vkui--color_icon_secondary)" }}
+        />
+      ) : (
+        <Icon12ChevronDownSmall
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{ color: "var(--vkui--color_icon_secondary)" }}
+        />
+      )}
+    </Flex>
+  ) : (
+    review.text
   );
 
   return (
@@ -47,21 +75,12 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
         </Flex>
       }
       afterAlign="center"
-      subtitle={
-        isLong ? (
-          <Tooltip description={review.text} placement="bottom" arrowPadding={10}>
-            {content}
-          </Tooltip>
-        ) : (
-          content
-        )
-      }
+      subtitle={subtitle}
       bottom={
         <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
           {review.date}
         </Caption>
       }
-      multiline={false}
     >
       {review.author.name}
     </RichCell>
@@ -71,5 +90,3 @@ export const ReviewCard: FC<ReviewCardProps> = ({ review }) => {
 export interface ReviewCardProps {
   review: Review;
 }
-
-

@@ -56,6 +56,34 @@ async function createReviewTransaction(params: CreateReviewParams) {
   const run = () =>
     db.$transaction(
       async (tx) => {
+        const trip = await tx.trip.findUnique({ where: { id: params.tripId } });
+        if (!trip || trip.status === "cancelled") {
+          throw new ReviewError("Trip is no longer reviewable", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
+        }
+
+        const authorIsDriver = trip.driverId === params.authorId;
+        const targetIsDriver = trip.driverId === params.targetUserId;
+        if (authorIsDriver === targetIsDriver) {
+          throw new ReviewError(
+            "Reviews must be between driver and passenger",
+            403,
+            ERROR_CODES.FORBIDDEN,
+          );
+        }
+
+        if (!authorIsDriver || !targetIsDriver) {
+          const participant = await tx.booking.findFirst({
+            where: {
+              tripId: params.tripId,
+              passengerId: authorIsDriver ? params.targetUserId : params.authorId,
+              status: "confirmed",
+            },
+          });
+          if (!participant) {
+            throw new ReviewError("Review participant is not confirmed", 403, ERROR_CODES.NOT_PARTICIPANT);
+          }
+        }
+
         // Повторная проверка внутри транзакции с Serializable-изоляцией:
         // при параллельных запросах уникальный индекс (unique_review_per_trip)
         // и отлов P2002 гарантируют отсутствие дублей.
@@ -455,6 +483,13 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
    * Проверяем, что target-пользователь участвовал в поездке.
    */
   const isTargetDriver = trip.driverId === targetUserId;
+
+  if (isAuthorDriver === isTargetDriver) {
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Reviews must be between driver and passenger" },
+      403,
+    );
+  }
 
   if (!isTargetDriver) {
     const targetBooking = await db.booking.findFirst({

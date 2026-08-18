@@ -101,6 +101,14 @@ export const env = {
   VK_APP_SECRET: secretEnv("VK_APP_SECRET"),
 
   /**
+   * Интеграция с VK API для отправки сообщений пользователям
+   * (messages.send от имени сообщества). Опциональна: если не задана —
+   * сообщения не отправляются, приложение продолжает работать.
+   */
+  VK_GROUP_ID: Number.parseInt(process.env.VK_GROUP_ID ?? "", 10) || 0,
+  VK_GROUP_TOKEN: process.env.VK_GROUP_TOKEN || "",
+
+  /**
    * CORS.
    * В production список origin обязателен.
    */

@@ -1,8 +1,14 @@
 import { Hono } from "hono";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
+import { z } from "zod";
 
 export const notificationsRouter = new Hono<AuthEnv>();
+
+const notificationCursorSchema = z.object({
+  createdAt: z.string().datetime(),
+  id: z.string().uuid(),
+});
 
 notificationsRouter.use("*", requireUser);
 
@@ -10,13 +16,16 @@ notificationsRouter.get("/my", async (c) => {
   const user = c.get("user");
   const cursorStr = c.req.query("cursor");
   const limitRaw = Number(c.req.query("limit") || 20);
-  const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 20, 1), 50);
+  const limit = Number.isInteger(limitRaw)
+    ? Math.min(Math.max(limitRaw, 1), 50)
+    : 20;
 
   let cursor: { createdAt: Date; id: string } | undefined;
   if (cursorStr) {
     try {
       const parsed = JSON.parse(Buffer.from(cursorStr, "base64").toString("utf-8"));
-      cursor = { createdAt: new Date(parsed.createdAt), id: parsed.id };
+      const validated = notificationCursorSchema.parse(parsed);
+      cursor = { createdAt: new Date(validated.createdAt), id: validated.id };
     } catch {
       return c.json({ message: "Invalid cursor" }, 400);
     }
