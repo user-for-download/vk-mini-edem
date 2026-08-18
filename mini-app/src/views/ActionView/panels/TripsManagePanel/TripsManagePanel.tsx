@@ -28,6 +28,27 @@ export interface TripsManagePanelProps {
 
 type DriverTripTab = "active" | "archive";
 
+function pluralSeats(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "место";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "места";
+  return "мест";
+}
+
+function getSeatsLabel(trip: Trip): string {
+  const pending = trip.pendingRequestsCount ?? 0;
+  const confirmed = trip.confirmedBookingsCount ?? 0;
+
+  if (pending > 0) {
+    return `Заявки: ${pending}`;
+  }
+
+  return confirmed > 0
+    ? `Забронировано: ${confirmed} ${pluralSeats(confirmed)}`
+    : `Свободно: ${trip.seatsAvailable} ${pluralSeats(trip.seatsAvailable)}`;
+}
+
 /**
  * Список поездок водителя.
  *
@@ -153,8 +174,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
                   key={trip.id}
                   trip={trip}
                   onOpen={onOpenTrip}
-                  requestsCount={trip.pendingRequestsCount ?? 0}
-                  hideSeats
+                  seatsLabel={getSeatsLabel(trip)}
                   archivedStatus={
                     tab === "archive"
                       ? (trip.status as "completed" | "cancelled")

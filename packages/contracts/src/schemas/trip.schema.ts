@@ -57,6 +57,7 @@ export const tripSchema = z.object({
 
   bookedSeats: z.array(z.number().int().min(1)).optional(),
   pendingRequestsCount: z.number().int().min(0).optional(),
+  confirmedBookingsCount: z.number().int().min(0).optional(),
   myBooking: myBookingSchema.nullable().optional(),
 });
 

@@ -8,7 +8,8 @@ export type VerificationStatus = z.infer<typeof verificationStatusSchema>;
 export const carSchema = z.object({
   model: z.string().min(1).max(50),
   color: z.string().min(1).max(30),
-  plate: z.string().max(15),
+  // Public trip/user serializers omit the plate to avoid exposing vehicle identifiers.
+  plate: z.string().max(15).optional(),
 });
 
 export type Car = z.infer<typeof carSchema>;

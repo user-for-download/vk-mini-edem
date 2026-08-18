@@ -33,6 +33,18 @@ describe("tripSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should parse public trips without a car plate", () => {
+    const result = tripSchema.safeParse({
+      ...validTrip,
+      confirmedBookingsCount: 1,
+      driver: {
+        ...validTrip.driver,
+        car: { model: "Skoda Octavia", color: "белый" },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("should reject trip with seatsAvailable > seatsTotal", () => {
     const result = tripSchema.safeParse({ ...validTrip, seatsAvailable: 5, seatsTotal: 4 });
     // Zod не проверяет cross-field по умолчанию, это ок

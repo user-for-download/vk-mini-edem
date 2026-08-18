@@ -344,7 +344,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   const driver = trip.driver;
   const car = driver?.car;
-  const carText = car ? `${car.model} · ${car.plate}` : undefined;
+  const carText = car ? [car.model, car.plate].filter(Boolean).join(" · ") : undefined;
 
   return (
     <Panel id={id}>

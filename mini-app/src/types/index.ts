@@ -8,7 +8,7 @@ export type Role = "passenger" | "driver";
 export interface Car {
   model: string;
   color: string;
-  plate: string;
+  plate?: string;
 }
 
 export interface User {
@@ -75,6 +75,9 @@ export interface Trip {
    * Актуально для поездок водителя.
    */
   pendingRequestsCount?: number;
+
+  /** Количество мест с подтвержденными бронированиями. */
+  confirmedBookingsCount?: number;
 
   /**
    * Активная бронь текущего пользователя в этой поездке.

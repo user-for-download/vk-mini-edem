@@ -101,6 +101,7 @@ export function serializeTrip(
   options?: {
     bookedSeats?: number[];
     pendingRequestsCount?: number;
+    confirmedBookingsCount?: number;
     myBooking?: {
       id: string;
       seat: number;
@@ -131,6 +132,7 @@ export function serializeTrip(
     status: trip.status as TripStatus,
     bookedSeats: options?.bookedSeats ?? [],
     pendingRequestsCount: options?.pendingRequestsCount,
+    confirmedBookingsCount: options?.confirmedBookingsCount,
     myBooking: options?.myBooking
       ? {
           id: options.myBooking.id,

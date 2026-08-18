@@ -18,7 +18,6 @@ import type { Trip } from "@/types";
 export interface TripCardProps {
   trip: Trip;
   onOpen?: (trip: Trip) => void;
-  requestsCount?: number;
   hideSeats?: boolean;
   /** Переопределяет автоматический текст «X из Y мест». */
   seatsLabel?: string;
@@ -86,7 +85,7 @@ export const TripCard: FC<TripCardProps> = ({
 
   const driver = trip.driver;
   const car = driver?.car;
-  const carText = car ? `${car.model} · ${car.plate}` : undefined;
+  const carText = car ? [car.model, car.plate].filter(Boolean).join(" · ") : undefined;
   const durationText = formatDuration(trip.durationMinutes);
   const distanceText = trip.distanceKm ? `${trip.distanceKm} км` : "";
 

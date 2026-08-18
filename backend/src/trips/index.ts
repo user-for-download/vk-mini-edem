@@ -247,12 +247,20 @@ tripsRouter.get("/my", requireUser, async (c) => {
 
   const bookedSeatsMap = new Map<string, number[]>();
   const pendingCountMap = new Map<string, number>();
+  const confirmedCountMap = new Map<string, number>();
 
   for (const booking of bookings) {
     if (booking.status === "pending") {
       pendingCountMap.set(
         booking.tripId,
         (pendingCountMap.get(booking.tripId) ?? 0) + 1
+      );
+    }
+
+    if (booking.status === "confirmed") {
+      confirmedCountMap.set(
+        booking.tripId,
+        (confirmedCountMap.get(booking.tripId) ?? 0) + 1
       );
     }
 
@@ -268,6 +276,7 @@ tripsRouter.get("/my", requireUser, async (c) => {
       serializeTrip(trip, {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
         pendingRequestsCount: pendingCountMap.get(trip.id) ?? 0,
+        confirmedBookingsCount: confirmedCountMap.get(trip.id) ?? 0,
       })
     ),
     pagination: {
