@@ -28,14 +28,28 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function intEnv(name: string, fallback: number): number {
-  const parsed = Number.parseInt(process.env[name] ?? "", 10);
-
-  if (!Number.isFinite(parsed)) {
+export function positiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") {
     return fallback;
   }
 
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`[env] ${name} must be a positive integer.`);
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`[env] ${name} must be a positive integer.`);
+  }
+
   return parsed;
+}
+
+function optionalPositiveIntEnv(name: string): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return 0;
+  return positiveIntEnv(name, 0);
 }
 
 function boolEnv(name: string, fallback: boolean): boolean {
@@ -83,8 +97,8 @@ export const env = {
   isProduction,
 
   PORT: isProduction
-    ? intEnv("PORT", 3000)
-    : intEnv("BACKEND_PORT", 3001),
+    ? positiveIntEnv("PORT", 3000)
+    : positiveIntEnv("BACKEND_PORT", 3001),
 
   /**
    * DATABASE_URL обязателен всегда.
@@ -105,7 +119,7 @@ export const env = {
    * (messages.send от имени сообщества). Опциональна: если не задана —
    * сообщения не отправляются, приложение продолжает работать.
    */
-  VK_GROUP_ID: Number.parseInt(process.env.VK_GROUP_ID ?? "", 10) || 0,
+  VK_GROUP_ID: optionalPositiveIntEnv("VK_GROUP_ID"),
   VK_GROUP_TOKEN: process.env.VK_GROUP_TOKEN || "",
 
   /**
@@ -129,8 +143,8 @@ export const env = {
   /**
    * JWT TTL.
    */
-  JWT_ACCESS_TTL_SECONDS: intEnv("JWT_ACCESS_TTL_SECONDS", 15 * 60),
-  JWT_REFRESH_TTL_SECONDS: intEnv("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60),
+  JWT_ACCESS_TTL_SECONDS: positiveIntEnv("JWT_ACCESS_TTL_SECONDS", 15 * 60),
+  JWT_REFRESH_TTL_SECONDS: positiveIntEnv("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60),
 
   /**
    * Если приложение стоит за доверенным прокси (Nginx), прокси
@@ -142,28 +156,28 @@ export const env = {
   /**
    * Rate limit для auth.
    */
-  AUTH_RATE_WINDOW_MS: intEnv("AUTH_RATE_WINDOW_MS", 15 * 60 * 1000),
-  AUTH_RATE_MAX: intEnv("AUTH_RATE_MAX", 20),
+  AUTH_RATE_WINDOW_MS: positiveIntEnv("AUTH_RATE_WINDOW_MS", 15 * 60 * 1000),
+  AUTH_RATE_MAX: positiveIntEnv("AUTH_RATE_MAX", 20),
 
   /**
    * Rate limits (IP-based).
    */
-  PUBLIC_READ_RATE_WINDOW_MS: intEnv("PUBLIC_READ_RATE_WINDOW_MS", 60 * 1000),
-  PUBLIC_READ_RATE_MAX: intEnv("PUBLIC_READ_RATE_MAX", 100),
-  MUTATION_RATE_WINDOW_MS: intEnv("MUTATION_RATE_WINDOW_MS", 60 * 1000),
-  MUTATION_RATE_MAX: intEnv("MUTATION_RATE_MAX", 30),
+  PUBLIC_READ_RATE_WINDOW_MS: positiveIntEnv("PUBLIC_READ_RATE_WINDOW_MS", 60 * 1000),
+  PUBLIC_READ_RATE_MAX: positiveIntEnv("PUBLIC_READ_RATE_MAX", 100),
+  MUTATION_RATE_WINDOW_MS: positiveIntEnv("MUTATION_RATE_WINDOW_MS", 60 * 1000),
+  MUTATION_RATE_MAX: positiveIntEnv("MUTATION_RATE_MAX", 30),
 
   /**
    * Rate limits (user-based): «дорогие» действия по аккаунту.
    */
-  CREATE_TRIP_RATE_WINDOW_MS: intEnv("CREATE_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CREATE_TRIP_RATE_MAX: intEnv("CREATE_TRIP_RATE_MAX", 10),
-  CANCEL_TRIP_RATE_WINDOW_MS: intEnv("CANCEL_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CANCEL_TRIP_RATE_MAX: intEnv("CANCEL_TRIP_RATE_MAX", 20),
-  CREATE_BOOKING_RATE_WINDOW_MS: intEnv("CREATE_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CREATE_BOOKING_RATE_MAX: intEnv("CREATE_BOOKING_RATE_MAX", 20),
-  CANCEL_BOOKING_RATE_WINDOW_MS: intEnv("CANCEL_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CANCEL_BOOKING_RATE_MAX: intEnv("CANCEL_BOOKING_RATE_MAX", 20),
+  CREATE_TRIP_RATE_WINDOW_MS: positiveIntEnv("CREATE_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  CREATE_TRIP_RATE_MAX: positiveIntEnv("CREATE_TRIP_RATE_MAX", 10),
+  CANCEL_TRIP_RATE_WINDOW_MS: positiveIntEnv("CANCEL_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  CANCEL_TRIP_RATE_MAX: positiveIntEnv("CANCEL_TRIP_RATE_MAX", 20),
+  CREATE_BOOKING_RATE_WINDOW_MS: positiveIntEnv("CREATE_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  CREATE_BOOKING_RATE_MAX: positiveIntEnv("CREATE_BOOKING_RATE_MAX", 20),
+  CANCEL_BOOKING_RATE_WINDOW_MS: positiveIntEnv("CANCEL_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  CANCEL_BOOKING_RATE_MAX: positiveIntEnv("CANCEL_BOOKING_RATE_MAX", 20),
 
   LOG_LEVEL:
     process.env.LOG_LEVEL ||

@@ -1,6 +1,6 @@
 # Edem Current Memory
 
-Updated: 2026-08-18
+Updated: 2026-08-19
 
 ## Project
 
@@ -14,7 +14,7 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 
 - Local root `npm run dev` starts frontend on `3010` and backend on `3011`.
 - `VITE_API_TARGET` controls the Vite API/WebSocket proxy target.
-- Production Docker backend listens on `3000` and serves `mini-app/dist`; current compose also publishes backend `3000` and PostgreSQL `5432` on all host interfaces, which requires production firewall/proxy hardening.
+- Production Docker backend listens on `3000` and serves `mini-app/dist`; Compose publishes it only on `127.0.0.1:3000`, while PostgreSQL is available only inside the Docker network.
 - Production requires `DATABASE_URL`, `JWT_SECRET`, `VK_APP_SECRET`, and `CORS_ORIGINS`.
 - `ALLOW_DEV_AUTH` is disabled in production and only supports local/test mock auth.
 
@@ -42,19 +42,19 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - `VKWebAppInit` is fire-and-forget in `mini-app/src/main.tsx`.
 - VKUI receives appearance, insets, adaptivity, platform, and WebView state through `AppConfig`.
 - Session state reacts to browser visibility and VK view hide/restore events.
-- WebSocket auth sends `{ type: "auth", token }` after connecting to `/api/v1/ws`; the token is not placed in the URL. Existing connections are not explicitly closed when the access JWT expires.
+- WebSocket auth sends `{ type: "auth", token }` after connecting to `/api/v1/ws`; the token is not placed in the URL. The server closes authenticated connections when their access JWT expires.
 - WebSocket cleanup guards against stale sockets and reconnects after provider unmount.
 - Swipe settings use `VKWebAppSetSwipeSettings`; raw swipe messages require a parent window and allowed VK origins.
 - VK community messaging is optional. `VK_GROUP_TOKEN` is submitted to VK API in a POST body.
 
 ## Verification
 
-Verified on 2026-08-18 after the current source audit:
+Verified on 2026-08-19 after the current source audit:
 
 - `npm run typecheck` passed for all workspaces.
-- Frontend tests: 8 passed.
-- Contracts tests: 25 passed.
-- Backend tests: 82 passed.
+- Frontend tests: 34 passed.
+- Contracts tests: 28 passed.
+- Backend tests: 99 passed.
 - Production `npm run build` passed.
 - `git diff --check` passed.
 
@@ -62,7 +62,7 @@ Booking and review pagination responses are validated against shared contracts a
 
 Remaining production limitation: rate limiting and WebSocket fan-out are process-local and require Redis/pub-sub for horizontally scaled backend instances. See the production limitations section in `README.md`.
 
-The build still reports a non-blocking large main JavaScript chunk warning. Further vendor/route splitting is a performance follow-up, not a correctness blocker.
+The production frontend passes the enforced initial and per-chunk gzip budgets; route and vendor splitting remain in place.
 
 ## Documentation Rules
 

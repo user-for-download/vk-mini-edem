@@ -31,8 +31,8 @@ export async function createNotification(
     await db.notification.create({
       data: { userId, type, title, body },
     });
-    
-    // TODO: Здесь можно добавить отправку VK Push через VK API
+    // Личные сообщения VK отправляются только в поддерживаемых бизнес-сценариях
+    // (сейчас новая заявка) и не являются общей доставкой каждой DB-записи.
   } catch (error) {
     logger.error({ err: error }, "Failed to create notification");
   }

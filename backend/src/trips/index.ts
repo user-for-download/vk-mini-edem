@@ -167,9 +167,7 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
           },
         },
       },
-      orderBy: {
-        departureAt: "asc",
-      },
+      orderBy: [{ departureAt: "asc" }, { id: "asc" }],
       skip,
       take: limit,
     }),
@@ -513,7 +511,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user")!;
   const body = await getSanitizedBody(c);
-  
+
   const parseResult = updateTripDtoSchema.safeParse(body);
   if (!parseResult.success) {
     return c.json({ message: "Invalid payload", errors: z.formatError(parseResult.error) }, 400);

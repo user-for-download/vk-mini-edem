@@ -25,6 +25,7 @@ interface SeedUser {
   tripsCount: number;
   isVerified: boolean;
   verificationStatus: string; // none, pending, approved, rejected
+  notificationsEnabled?: boolean;
   about?: string;
   car?: SeedCar;
 }
@@ -297,6 +298,7 @@ const users: SeedUser[] = [
     tripsCount: 5,
     isVerified: false,
     verificationStatus: "none",
+    notificationsEnabled: false,
     about: "Спортсмен, иногда с большой сумкой.",
   },
   {
@@ -883,7 +885,7 @@ const trips: SeedTrip[] = [
 const reviews: SeedReview[] = [
   {
     id: "r-1",
-    authorId: "u-3",
+    authorId: "u-15",
     targetUserId: "u-1",
     targetRole: "driver",
     rating: 5,
@@ -974,7 +976,7 @@ const reviews: SeedReview[] = [
   {
     id: "r-10",
     authorId: "u-2",
-    targetUserId: "u-15",
+    targetUserId: "u-4",
     targetRole: "passenger",
     rating: 5,
     text: "Наталья — тихая и аккуратная, рекомендую.",
@@ -1043,27 +1045,96 @@ const reviews: SeedReview[] = [
   },
   {
     id: "r-17",
-    authorId: "u-15",
-    targetUserId: "u-10",
-    targetRole: "driver",
+    authorId: "u-8",
+    targetUserId: "u-21",
+    targetRole: "passenger",
     rating: 5,
-    text: "Виктор держит слово, всё как обещал.",
-    tripRoute: "Москва → Нижний Новгород",
-    tripId: "t-past-4",
+    text: "Ксения — пунктуальный и приятный пассажир.",
+    tripRoute: "Санкт-Петербург → Москва",
+    tripId: "t-past-3",
   },
   {
     id: "r-18",
-    authorId: "u-16",
-    targetUserId: "u-2",
-    targetRole: "driver",
+    authorId: "u-11",
+    targetUserId: "u-22",
+    targetRole: "passenger",
     rating: 5,
-    text: "Марина отвезла с комфортом, спасибо!",
-    tripRoute: "Москва → Ярославль",
-    tripId: "t-past-2",
+    text: "Олег приехал вовремя и аккуратно относился к машине.",
+    tripRoute: "Москва → Казань",
+    tripId: "t-past-5",
   },
 ];
 
+function validateSeedData(): void {
+  const userIds = new Set(users.map((user) => user.id));
+  const tripById = new Map(trips.map((trip) => [trip.id, trip]));
+  const reviewKeys = new Set<string>();
+
+  for (const trip of trips) {
+    if (trip.seatsTotal < 1 || trip.seatsTotal > 4) {
+      throw new Error(`Invalid seatsTotal for seed trip ${trip.id}`);
+    }
+
+    const activeSeats = new Set<number>();
+    const activePassengers = new Set<string>();
+    for (const booking of trip.bookings) {
+      if (!userIds.has(booking.passengerId)) {
+        throw new Error(`Unknown passenger ${booking.passengerId} in ${trip.id}`);
+      }
+      if (booking.seat < 1 || booking.seat > trip.seatsTotal) {
+        throw new Error(`Invalid seat ${booking.seat} in ${trip.id}`);
+      }
+      if (booking.status === "pending" || booking.status === "confirmed") {
+        if (activeSeats.has(booking.seat)) {
+          throw new Error(`Duplicate active seat ${booking.seat} in ${trip.id}`);
+        }
+        if (activePassengers.has(booking.passengerId)) {
+          throw new Error(`Duplicate active passenger ${booking.passengerId} in ${trip.id}`);
+        }
+        activeSeats.add(booking.seat);
+        activePassengers.add(booking.passengerId);
+      }
+    }
+  }
+
+  for (const review of reviews) {
+    const trip = review.tripId ? tripById.get(review.tripId) : undefined;
+    if (!userIds.has(review.authorId) || !userIds.has(review.targetUserId)) {
+      throw new Error(`Unknown user in seed review ${review.id}`);
+    }
+    if (!trip || review.authorId === review.targetUserId) {
+      throw new Error(`Invalid trip or users in seed review ${review.id}`);
+    }
+
+    const confirmedPassengers = new Set(
+      trip.bookings
+        .filter((booking) => booking.status === "confirmed")
+        .map((booking) => booking.passengerId)
+    );
+    const validDirection =
+      review.targetRole === "driver"
+        ? trip.driverId === review.targetUserId && confirmedPassengers.has(review.authorId)
+        : review.authorId === trip.driverId && confirmedPassengers.has(review.targetUserId);
+    if (!validDirection) {
+      throw new Error(`Invalid review direction in seed review ${review.id}`);
+    }
+
+    const key = `${review.authorId}:${review.tripId}:${review.targetUserId}`;
+    if (reviewKeys.has(key)) {
+      throw new Error(`Duplicate seed review ${key}`);
+    }
+    reviewKeys.add(key);
+  }
+}
+
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error(
+      "Refusing to reset a production database. Set ALLOW_PRODUCTION_SEED=true to override."
+    );
+  }
+
+  validateSeedData();
   console.log("Seeding database with rich mock data...");
 
   // Clean old records
@@ -1086,6 +1157,7 @@ async function main() {
         reviewsCount: u.reviewsCount,
         tripsCount: u.tripsCount,
         isVerified: u.isVerified,
+        notificationsEnabled: u.notificationsEnabled ?? true,
         verificationStatus: u.verificationStatus,
         verifiedAt: u.isVerified ? new Date(Date.now() - 60 * dayMs) : null,
         about: u.about,
@@ -1145,6 +1217,21 @@ async function main() {
         text: r.text,
         tripRoute: r.tripRoute,
         tripId: r.tripId,
+      },
+    });
+  }
+
+  const reviewAggregates = await prisma.review.groupBy({
+    by: ["targetUserId"],
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
+  for (const aggregate of reviewAggregates) {
+    await prisma.user.update({
+      where: { id: aggregate.targetUserId },
+      data: {
+        rating: aggregate._avg.rating ?? 5,
+        reviewsCount: aggregate._count._all,
       },
     });
   }

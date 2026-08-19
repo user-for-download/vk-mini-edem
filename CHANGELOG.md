@@ -45,7 +45,7 @@
 ### Verification
 
 - `npm run typecheck` passed for all workspaces.
-- 113 tests passed: 8 frontend, 24 contracts, 81 backend.
+- 161 tests passed: 34 frontend, 28 contracts, 99 backend.
 - `npm run build` passed.
 
 ### Breaking Changes

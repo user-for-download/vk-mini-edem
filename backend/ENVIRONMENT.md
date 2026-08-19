@@ -1,5 +1,17 @@
 # Backend environment variables
 
+## Numeric values
+
+Explicit numeric settings must be positive safe integers. Zero, negative,
+fractional, partially numeric, and out-of-range values stop startup with the
+variable name instead of silently changing runtime behavior. Unset variables use
+the defaults from `src/env.ts`.
+
+This applies to `PORT`/`BACKEND_PORT`, `JWT_ACCESS_TTL_SECONDS`,
+`JWT_REFRESH_TTL_SECONDS`, all `*_RATE_WINDOW_MS` and `*_RATE_MAX` settings, and
+the optional `VK_GROUP_ID`. An unset `VK_GROUP_ID` disables community messaging;
+an explicitly configured value must be positive.
+
 ## Metrics access
 
 `METRICS_TOKEN` is optional in development and test. When it is unset there,

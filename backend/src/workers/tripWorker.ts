@@ -217,14 +217,26 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
 }
 
 let workerInterval: NodeJS.Timeout | null = null;
+let workerRun: Promise<void> | null = null;
+
+function runTripWorkerCycle(): void {
+  if (workerRun) return;
+
+  workerRun = processExpiredTrips().finally(() => {
+    workerRun = null;
+  });
+}
 
 export function startTripWorker() {
+  if (workerInterval) return;
+
   // Run once on startup
-  void processExpiredTrips();
+  runTripWorkerCycle();
 
   workerInterval = setInterval(() => {
-    void processExpiredTrips();
+    runTripWorkerCycle();
   }, CHECK_INTERVAL_MS);
+  workerInterval.unref?.();
 
   logger.info("Trip auto-completion worker started");
 }
