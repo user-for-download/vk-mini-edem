@@ -58,9 +58,9 @@ Verified on 2026-08-18 after the current source audit:
 - Production `npm run build` passed.
 - `git diff --check` passed.
 
-The backend test run logs a known contract-validation warning for booking pagination: test fixtures use seat values above the shared schema maximum, while the endpoint still returns HTTP 200. This is documented as an open defect, not treated as a clean contract result.
+Booking and review pagination responses are validated against shared contracts and fail closed with HTTP 500 on contract drift; current fixtures use valid shared-schema seat limits.
 
-The audit also identified unresolved issues around trip-detail stale data/error states, driver booking pagination, WebSocket/Vite proxy path consistency, date/timezone boundaries, multi-instance WebSocket/rate-limit state, review availability per target, and production Docker exposure/runtime hardening. See the production limitations and audit section in `README.md`.
+Remaining production limitation: rate limiting and WebSocket fan-out are process-local and require Redis/pub-sub for horizontally scaled backend instances. See the production limitations section in `README.md`.
 
 The build still reports a non-blocking large main JavaScript chunk warning. Further vendor/route splitting is a performance follow-up, not a correctness blocker.
 

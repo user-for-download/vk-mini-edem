@@ -61,6 +61,19 @@ export interface VkUserInfo {
 
 export type BridgeActionResult = "success" | "unsupported" | "cancelled" | "failed";
 
+export async function triggerHaptic(
+  style: "light" | "medium" | "heavy" = "light",
+): Promise<boolean> {
+  const method = "VKWebAppTapticImpactOccurred" as Parameters<typeof vkBridge.supportsAsync>[0];
+  if (!(await supports(method))) return false;
+  try {
+    await (bridge.send as (method: string, props: { style: string }) => Promise<unknown>)(method, { style });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function supports(method: Parameters<typeof vkBridge.supportsAsync>[0]): Promise<boolean> {
   try {
     return await bridge.supportsAsync(method);

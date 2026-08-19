@@ -52,6 +52,7 @@ import { BookingRequestRow } from "@/components/BookingRequestRow";
 import { TripPassengerRow } from "@/components/TripPassengerRow";
 import type { DriverBookingAction } from "@edem/contracts";
 import { useConfirm } from "@/providers/ConfirmProvider";
+import { triggerHaptic } from "@/helpers/bridge";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -125,6 +126,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const handleSetBookingStatus = async (bookingId: string, status: DriverBookingAction) => {
     try {
       await updateBookingStatus.mutateAsync({ id: bookingId, status });
+      void triggerHaptic(status === "confirmed" ? "medium" : "light");
       enqueueSnackbar({
         type: "success",
         title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",

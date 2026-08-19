@@ -1,5 +1,5 @@
 // mini-app/src/components/AppTabbar.tsx
-import { type FC, useMemo } from "react";
+import { type FC } from "react";
 import { Tabbar, TabbarItem, Counter } from "@vkontakte/vkui";
 import { Icon28HomeOutline, Icon28ServicesOutline, Icon28UserOutline } from "@vkontakte/icons";
 import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
@@ -19,13 +19,12 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
     enabled: role === "driver",
   });
 
-  const totalPending = useMemo(() => {
-    if (role !== "driver" || !myTrips) return 0;
-    return (myTrips as Array<{ pendingRequestsCount?: number }>).reduce(
-      (sum, trip) => sum + (trip.pendingRequestsCount ?? 0),
-      0
-    );
-  }, [myTrips, role]);
+  const totalPending = role === "driver" && myTrips
+    ? (myTrips as Array<{ pendingRequestsCount?: number }>).reduce(
+        (sum, trip) => sum + (trip.pendingRequestsCount ?? 0),
+        0
+      )
+    : 0;
 
   return (
     <Tabbar>

@@ -1,5 +1,5 @@
 // mini-app/src/modals/EditTripModal/EditTripModal.tsx
-import { type FC, useState, useCallback } from "react";
+import { type FC, useState, useCallback, useEffect, useRef } from "react";
 import {
   Button,
   Box,
@@ -27,6 +27,9 @@ import { TRIP_TAGS } from "@/consts/tags";
 import { TagsScroll } from "@/components/TagsScroll";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useUpdateTripMutation } from "@/queries/useTripsQuery";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { clearDraft, readDraft, writeDraft } from "@/helpers/draftStorage";
+import { formatMoscowDateTime, moscowWallClockToIso } from "@/helpers/moscowTime";
 import {
   type TripFormValues,
   type TripFormErrors,
@@ -41,7 +44,13 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   close,
   trip,
 }) => {
+  const currentUser = useCurrentUser();
+  const draftKey = currentUser ? `edit-trip:${currentUser.id}:${trip.id}` : null;
+  const [initialDraft] = useState(() =>
+    draftKey ? readDraft<{ values: TripFormValues; selectedTags: TripTag[] }>(draftKey) : null
+  );
   const [values, setValues] = useState<TripFormValues>(() => {
+    if (initialDraft) return initialDraft.values;
     // Извлекаем дату и время в ЛОКАЛЬНОМ времени пользователя.
     // Смешение toISOString() (UTC) и toLocaleTimeString() (local) сдвигало
     // дату на день назад при сохранении (например, 01:00 МСК = 22:00 UTC предыдущего дня).
@@ -49,12 +58,9 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     let time = "";
     if (trip.departureAt) {
       try {
-        const d = new Date(trip.departureAt);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        date = `${year}-${month}-${day}`;
-        time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const formatted = formatMoscowDateTime(trip.departureAt);
+        date = formatted?.date ?? "";
+        time = formatted?.time ?? "";
       } catch {
         // fallback
       }
@@ -77,8 +83,11 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const [touched, setTouched] = useState<
     Partial<Record<keyof TripFormValues, boolean>>
   >({});
-  const [selectedTags, setSelectedTags] = useState<TripTag[]>(trip.tags as TripTag[]);
+  const [selectedTags, setSelectedTags] = useState<TripTag[]>(
+    initialDraft?.selectedTags ?? (trip.tags as TripTag[])
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const persistDraftRef = useRef(true);
 
   // Единый объект даты+времени для DateInput; инициализируется из trip.departureAt
   // в ЛОКАЛЬНОМ времени (см. комментарий выше про сдвиг суток из-за UTC).
@@ -92,6 +101,10 @@ export const EditTripModal: FC<EditTripModalProps> = ({
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const updateTrip = useUpdateTripMutation();
+
+  useEffect(() => {
+    if (draftKey && persistDraftRef.current) writeDraft(draftKey, { values, selectedTags });
+  }, [draftKey, selectedTags, values]);
 
   const handleChange = useCallback(
     (field: keyof TripFormValues, value: string | number) => {
@@ -158,9 +171,8 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       return;
     }
 
-    const departureAt = departureDateTime ?? new Date(`${values.date}T${values.time}`);
-
-    if (Number.isNaN(departureAt.getTime())) {
+    const departureAt = moscowWallClockToIso(values.date, values.time);
+    if (!departureAt) {
       setErrors((prev) => ({
         ...prev,
         date: "Некорректная дата или время",
@@ -173,7 +185,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       fromAddress: values.fromAddress.trim(),
       toCity: values.toCity.trim(),
       toAddress: values.toAddress.trim(),
-      departureAt: departureAt.toISOString(),
+      departureAt,
       durationMinutes: Number(values.durationMinutes),
       distanceKm: Number(values.distanceKm.replace(",", ".")),
       price: Number(values.price.replace(/\s/g, "")),
@@ -195,7 +207,9 @@ export const EditTripModal: FC<EditTripModalProps> = ({
           dedupeKey: "edit_trip_success",
         });
 
-                close();
+        persistDraftRef.current = false;
+        if (draftKey) clearDraft(draftKey);
+        close();
       },
       onError: (error) => {
         enqueueSnackbar({
@@ -208,12 +222,12 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     });
   }, [
     values,
-    departureDateTime,
     selectedTags,
     trip.id,
     updateTrip,
     enqueueSnackbar,
     close,
+    draftKey,
   ]);
 
   const showError = (field: keyof TripFormValues): string | undefined =>

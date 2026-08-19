@@ -27,7 +27,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "npm run typecheck && npm run lint --workspace=mini-app",
     "format:check": "node scripts/format-check.mjs",
-    "bundle:check": "node scripts/check-bundle.mjs"
+    "bundle:check": "node scripts/check-bundle.mjs",
+    "load:test": "node scripts/load-test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

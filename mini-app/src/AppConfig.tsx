@@ -48,7 +48,7 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
 
   const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
 
-  const mockPlatform = import.meta.env.VITE_MOCK_PLATFORM;
+  const mockPlatform = import.meta.env.DEV ? import.meta.env.VITE_MOCK_PLATFORM : undefined;
   const platform =
     vk_platform === "desktop_web" || mockPlatform === "vkcom" ? "vkcom" : undefined;
 

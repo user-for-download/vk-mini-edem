@@ -23,6 +23,7 @@ import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
 import { TripError, TripErrors } from "./errors.js";
 import { getTripRange, rangesOverlap } from "../utils/overlap.js";
+import { moscowDateBoundary } from "../utils/moscowTime.js";
 
 type TripWithDriver = Prisma.TripGetPayload<{
   include: { driver: { include: { car: true } } };
@@ -117,8 +118,8 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
   }
 
   if (dateFrom) {
-    const parsedDate = new Date(dateFrom);
-    if (!Number.isNaN(parsedDate.getTime())) {
+    const parsedDate = moscowDateBoundary(dateFrom);
+    if (parsedDate) {
       where.departureAt = {
         ...(where.departureAt as object),
         gte: parsedDate,
@@ -127,9 +128,8 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
   }
 
   if (dateTo) {
-    const parsedDateTo = new Date(dateTo);
-    if (!Number.isNaN(parsedDateTo.getTime())) {
-      parsedDateTo.setHours(23, 59, 59, 999);
+    const parsedDateTo = moscowDateBoundary(dateTo, true);
+    if (parsedDateTo) {
       where.departureAt = {
         ...(where.departureAt as object),
         lte: parsedDateTo,

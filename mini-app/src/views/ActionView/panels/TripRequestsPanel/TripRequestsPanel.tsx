@@ -28,6 +28,7 @@ import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTri
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useConfirm } from "@/providers/ConfirmProvider";
 import { loadModule } from "@/helpers/loadModule";
+import { triggerHaptic } from "@/helpers/bridge";
 
 export interface TripRequestsPanelProps {
   id: string;
@@ -97,6 +98,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
 
     cancelTrip.mutate(trip.id, {
       onSuccess: () => {
+        void triggerHaptic("heavy");
         enqueueSnackbar({
           type: "success",
           title: "Поездка отменена",
@@ -128,6 +130,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
 
     completeTrip.mutate(trip.id, {
       onSuccess: () => {
+        void triggerHaptic("medium");
         enqueueSnackbar({
           type: "success",
           title: "Поездка завершена",

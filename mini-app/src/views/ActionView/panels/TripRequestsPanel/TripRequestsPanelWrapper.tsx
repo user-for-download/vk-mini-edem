@@ -13,6 +13,7 @@ import {
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { DriverBookingAction } from "@edem/contracts";
+import { triggerHaptic } from "@/helpers/bridge";
 
 export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const params = useParams<"tripId">();
@@ -53,6 +54,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const handleSetStatus = useCallback(async (bookingId: string, status: DriverBookingAction) => {
     try {
       await updateBooking.mutateAsync({ id: bookingId, status });
+      void triggerHaptic(status === "confirmed" ? "medium" : "light");
       enqueueSnackbar({
         type: status === "confirmed" ? "success" : "info",
         title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",

@@ -1,5 +1,6 @@
 // mini-app/src/modals/CreateTripModal/validation.ts
 import { MAX_SEATS } from "@edem/contracts";
+import { moscowWallClockToIso } from "@/helpers/moscowTime";
 
 export interface TripFormValues {
   fromCity: string;
@@ -70,29 +71,16 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
   if (!values.date.trim()) {
     errors.date = "Укажите дату поездки";
   } else {
-    const dateValue = new Date(`${values.date}T00:00:00`);
+    const dateValue = moscowWallClockToIso(values.date, "00:00");
 
-    if (Number.isNaN(dateValue.getTime())) {
+    if (!dateValue) {
       errors.date = "Некорректная дата";
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (dateValue < today) {
-        errors.date = "Дата поездки уже прошла";
-      } else if (
-        dateValue.getTime() === today.getTime() &&
-        values.time.trim() &&
-        TIME_REGEX.test(values.time.trim())
-      ) {
-        // Дата сегодняшняя — проверяем, что время ещё в будущем.
-        const [hours, minutes] = values.time.split(":").map(Number);
-        const departureTime = new Date();
-        departureTime.setHours(hours, minutes, 0, 0);
-
-        if (departureTime <= new Date()) {
-          errors.time = "Укажите время в будущем";
-        }
+    } else if (values.time.trim() && TIME_REGEX.test(values.time.trim())) {
+      const departureTime = moscowWallClockToIso(values.date, values.time.trim());
+      if (!departureTime) {
+        errors.date = "Некорректная дата";
+      } else if (Date.parse(departureTime) <= Date.now()) {
+        errors.time = "Укажите время в будущем";
       }
     }
   }

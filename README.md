@@ -207,7 +207,7 @@ LOG_LEVEL=debug
 ## 📡 WebSocket
 
 После авторизации клиент подключается к `/api/v1/ws` и отправляет `{ type: "auth", token }`. Токен не находится в URL. Сервер рассылает события:
-`booking:new`, `booking:status_changed`, `trip:status_changed`, `notification:new`, `pong`/`ping`. Клиент автоматически реконнектится (3с), инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
+`booking:new`, `booking:status_changed`, `trip:status_changed`, `notification:new`, `pong`/`ping`. Клиент автоматически реконнектится с exponential backoff и jitter, инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
 
 Reaper (`startWsReaper`/`stopWsReaper`): каждые 30 с сервер закрывает соединения без pong дольше 60 с; остановка идемпотентна, «зомби»-тики после остановки не чистят соединения (graceful shutdown).
 
@@ -232,12 +232,11 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 
 ### Известные ограничения перед production
 
-- `GET /api/v1/bookings/trip/:tripId` поддерживает cursor pagination на backend, но frontend загружает только первую страницу.
-- `useTripDetailQuery` сохраняет предыдущий результат при смене `tripId`; переход между поездками может кратко показать старые данные, пока новый запрос не завершён.
-- Ошибки загрузки деталей поездки и запроса поездки водителя не имеют отдельного полноценного error/retry состояния и могут отображаться как бесконечная загрузка или пустой список заявок.
-- Даты поиска и редактирования используют разные предположения о timezone: date-only фильтры парсятся на backend через runtime timezone, а UI редактирует даты через browser-local `Date`; для продукта зафиксирован `Europe/Moscow`.
+- `GET /api/v1/bookings/trip/:tripId` и frontend используют cursor pagination; водительский экран подгружает следующие страницы по мере необходимости.
+- Детали поездки и заявки водителя имеют отдельные loading/error/retry состояния; при отсутствии сети приложение явно предупреждает, что сохранённые данные могут быть устаревшими.
+- Даты поездок и date-only фильтры нормализуются через фиксированный `Europe/Moscow`; формы сохраняют только несекретные черновики и очищают их после успешной отправки.
 - Rate limiting и WebSocket fan-out хранят состояние в памяти процесса и не подходят для нескольких backend-инстансов без Redis/pub-sub или ограничения deployment до одного инстанса.
-- `GET /reviews/available-trips` исключает поездку целиком после одного отзыва автора, хотя модель допускает отдельные отзывы водителя каждому подтверждённому пассажиру.
+- Haptic feedback VK Bridge вызывается только после успешных действий и безопасно отключается на неподдерживаемых клиентах.
 
 ### Аудит состояния
 
@@ -247,7 +246,7 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 
 ```bash
 npm run typecheck   # все workspace: успешно
-npm run test        # mini-app 8, backend 82, contracts 25: успешно
+npm run test        # все workspace: успешно
 npm run build       # contracts + backend + production frontend: успешно
 ```
 

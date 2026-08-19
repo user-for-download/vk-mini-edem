@@ -1,5 +1,5 @@
 // mini-app/src/views/ActionView/panels/SearchPanel/SearchPanel.tsx
-import { useCallback, useEffect, useMemo, useState, useRef, type FC } from "react";
+import { useEffect, useMemo, useState, useRef, type FC } from "react";
 import { Box, Button, Caption, DateInput, Flex, Group, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
@@ -69,6 +69,13 @@ function parseSearchQuery(raw: string): SearchTripsFilters {
   };
 }
 
+function toDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
   const currentUser = useCurrentUser();
 
@@ -79,14 +86,6 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
   const [showFilters, setShowFilters] = useState(false);
   const debouncedSearchValue = useDebouncedValue(searchValue, 400);
 
-  // Локальная YYYY-MM-DD (не toISOString — он сдвигает дату на UTC).
-  const toDateString = useCallback((date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }, []);
-
   const filters = useMemo(() => {
     const parsedFilters = parseSearchQuery(debouncedSearchValue);
     const result: SearchTripsFilters = { ...parsedFilters };
@@ -94,7 +93,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
     if (dateFrom) result.dateFrom = toDateString(dateFrom);
     if (dateTo) result.dateTo = toDateString(dateTo);
     return Object.keys(result).length > 0 ? result : undefined;
-  }, [debouncedSearchValue, selectedTags, dateFrom, dateTo, toDateString]);
+  }, [debouncedSearchValue, selectedTags, dateFrom, dateTo]);
 
   const {
     data, isLoading, isError, error, refetch, isFetchingNextPage, hasNextPage, fetchNextPage,

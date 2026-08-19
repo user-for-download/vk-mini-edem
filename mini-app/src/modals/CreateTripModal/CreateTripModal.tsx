@@ -1,5 +1,5 @@
 // mini-app/src/modals/CreateTripModal/CreateTripModal.tsx
-import { type FC, useState, useCallback } from "react";
+import { type FC, useState, useCallback, useEffect, useRef } from "react";
 import {
   Button,
   Box,
@@ -28,6 +28,9 @@ import { TRIP_TAGS } from "@/consts/tags";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { getErrorMessage, getRateLimitMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { clearDraft, readDraft, writeDraft } from "@/helpers/draftStorage";
+import { moscowWallClockToIso } from "@/helpers/moscowTime";
 import {
   type TripFormValues,
   type TripFormErrors,
@@ -43,13 +46,19 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   close,
   onTripCreated,
 }) => {
-  const [values, setValues] = useState<TripFormValues>(initialFormValues);
+  const currentUser = useCurrentUser();
+  const draftKey = currentUser ? `create-trip:${currentUser.id}` : null;
+  const [initialDraft] = useState(() =>
+    draftKey ? readDraft<{ values: TripFormValues; selectedTags: TripTag[] }>(draftKey) : null
+  );
+  const [values, setValues] = useState<TripFormValues>(initialDraft?.values ?? initialFormValues);
   const [errors, setErrors] = useState<TripFormErrors>({});
   const [touched, setTouched] = useState<
     Partial<Record<keyof TripFormValues, boolean>>
   >({});
-  const [selectedTags, setSelectedTags] = useState<TripTag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<TripTag[]>(initialDraft?.selectedTags ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const persistDraftRef = useRef(true);
 
   // Единый объект даты+времени для DateInput; синхронизирован с values.date/time.
   const [departureDateTime, setDepartureDateTime] = useState<Date | null>(() => {
@@ -62,6 +71,10 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const createTrip = useCreateTripMutation();
+
+  useEffect(() => {
+    if (draftKey && persistDraftRef.current) writeDraft(draftKey, { values, selectedTags });
+  }, [draftKey, selectedTags, values]);
 
   const handleChange = useCallback(
     (field: keyof TripFormValues, value: string | number) => {
@@ -134,9 +147,8 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       return;
     }
 
-    const departureAt = departureDateTime ?? new Date(`${values.date}T${values.time}`);
-
-    if (Number.isNaN(departureAt.getTime())) {
+    const departureAt = moscowWallClockToIso(values.date, values.time);
+    if (!departureAt) {
       setErrors((prev) => ({
         ...prev,
         date: "Некорректная дата или время",
@@ -149,7 +161,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       fromAddress: values.fromAddress.trim(),
       toCity: values.toCity.trim(),
       toAddress: values.toAddress.trim(),
-      departureAt: departureAt.toISOString(),
+      departureAt,
       durationMinutes: Number(values.durationMinutes),
       distanceKm: Number(values.distanceKm.replace(",", ".")),
       price: Number(values.price.replace(/\s/g, "")),
@@ -172,6 +184,8 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
           dedupeKey: "create_trip_success",
         });
 
+        persistDraftRef.current = false;
+        if (draftKey) clearDraft(draftKey);
         resetForm();
 
         if (onTripCreated) {
@@ -197,13 +211,13 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
     });
   }, [
     values,
-    departureDateTime,
     selectedTags,
     createTrip,
     enqueueSnackbar,
     close,
     onTripCreated,
     resetForm,
+    draftKey,
   ]);
 
   const showError = (field: keyof TripFormValues): string | undefined =>

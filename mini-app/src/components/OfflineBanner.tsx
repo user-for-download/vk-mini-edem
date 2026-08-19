@@ -30,7 +30,9 @@ export const OfflineBanner: FC<{ isOnline: boolean; wasOffline: boolean }> = ({
       >
         {isReconnected ? <Icon16Done /> : <Icon16ErrorCircle />}
         <Text weight="2">
-          {isReconnected ? "Соединение восстановлено" : "Нет подключения к интернету"}
+          {isReconnected
+            ? "Соединение восстановлено"
+            : "Нет подключения. Показанные данные могут быть устаревшими"}
         </Text>
       </Flex>
     </div>
