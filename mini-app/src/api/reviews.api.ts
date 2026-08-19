@@ -22,7 +22,8 @@ export const reviewsApi = {
   getUserReviews: (
     userId: string,
     cursor?: string,
-    limit = 20
+    limit = 20,
+    signal?: AbortSignal,
   ): Promise<PaginatedReviewsResponse> => {
     const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
@@ -30,7 +31,7 @@ export const reviewsApi = {
 
     return apiClient.request<PaginatedReviewsResponse>(
       `/reviews/user/${userId}?${params.toString()}`,
-      {},
+      { signal },
       paginatedReviewsResponseSchema
     );
   },
@@ -42,11 +43,11 @@ export const reviewsApi = {
     }, reviewSchema);
   },
 
-  getMyReviews: (): Promise<MyReview[]> => {
-    return apiClient.request<MyReview[]>("/reviews/my", {}, myReviewArraySchema);
+  getMyReviews: (signal?: AbortSignal): Promise<MyReview[]> => {
+    return apiClient.request<MyReview[]>("/reviews/my", { signal }, myReviewArraySchema);
   },
 
-  getAvailableTrips: (): Promise<Trip[]> => {
-    return apiClient.request<Trip[]>("/reviews/available-trips", {}, tripArraySchema);
+  getAvailableTrips: (signal?: AbortSignal): Promise<Trip[]> => {
+    return apiClient.request<Trip[]>("/reviews/available-trips", { signal }, tripArraySchema);
   },
 };

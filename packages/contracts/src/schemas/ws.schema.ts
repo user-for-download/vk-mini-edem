@@ -4,6 +4,7 @@ import { z } from "zod";
  * События, которые сервер отправляет клиенту через WebSocket.
  */
 export const wsServerEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("auth:ok") }),
   z.object({ type: z.literal("pong") }),
   z.object({ type: z.literal("ping") }),
   z.object({

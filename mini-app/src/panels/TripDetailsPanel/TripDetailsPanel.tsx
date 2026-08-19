@@ -31,6 +31,7 @@ import { RouteLine } from "@/components/RouteLine";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
 import { getRateLimitMessage } from "@/helpers/errorMessages";
+import { loadModule } from "@/helpers/loadModule";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -279,7 +280,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   };
 
   const handleEditTrip = async () => {
-    const { EditTripModal } = await import("@/modals/EditTripModal");
+    const module = await loadModule(() => import("@/modals/EditTripModal"));
+    if (!module) return;
+    const { EditTripModal } = module;
     modalApi.openCustomModalPage({
       component: EditTripModal,
       additionalProps: { trip },

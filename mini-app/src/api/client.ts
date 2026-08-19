@@ -44,6 +44,11 @@ export class ApiClient {
     this.refreshTokenValue = token;
   }
 
+  setSession(tokens: { accessToken: string; refreshToken: string } | null) {
+    this.token = tokens?.accessToken ?? null;
+    this.refreshTokenValue = tokens?.refreshToken ?? null;
+  }
+
   getToken(): string | null {
     return this.token;
   }
@@ -187,7 +192,13 @@ export class ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 15000);
+    const abortFromCaller = () => controller.abort(options.signal?.reason);
+    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
 
     try {
       return await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -196,12 +207,13 @@ export class ApiClient {
         signal: controller.signal,
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      if (timedOut && error instanceof DOMException && error.name === "AbortError") {
         throw new ApiError("Таймаут запроса", "REQUEST_TIMEOUT", 408);
       }
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      options.signal?.removeEventListener("abort", abortFromCaller);
     }
   }
 

@@ -9,12 +9,12 @@ export interface CarFormDto {
 }
 
 export const usersApi = {
-  getCurrentUser: (): Promise<User> => {
-    return apiClient.request<User>("/users/me", {}, userSchema);
+  getCurrentUser: (signal?: AbortSignal): Promise<User> => {
+    return apiClient.request<User>("/users/me", { signal }, userSchema);
   },
 
-  getUserById: (id: string): Promise<User> => {
-    return apiClient.request<User>(`/users/${id}`, {}, userSchema);
+  getUserById: (id: string, signal?: AbortSignal): Promise<User> => {
+    return apiClient.request<User>(`/users/${id}`, { signal }, userSchema);
   },
 
   updateProfile: (data: Partial<Pick<User, "name" | "about">>): Promise<User> => {

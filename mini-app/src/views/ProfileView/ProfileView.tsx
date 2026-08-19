@@ -11,35 +11,36 @@ import {
 } from "@/consts/panels";
 import { VIEW_PROFILE } from "@/consts/views";
 import type { Role, Trip } from "@/types";
+import { loadLazyModule } from "@/helpers/loadModule";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 const ProfilePanel = lazy(() =>
-  import("@/views/ProfileView/panels/ProfilePanel/ProfilePanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/ProfilePanel/ProfilePanel")).then((m) => ({
     default: m.ProfilePanel,
   }))
 );
 
 const NotificationsPanel = lazy(() =>
-  import("@/views/ProfileView/panels/NotificationsPanel/NotificationsPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/NotificationsPanel/NotificationsPanel")).then((m) => ({
     default: m.NotificationsPanel,
   }))
 );
 const SupportPanel = lazy(() =>
-  import("@/views/ProfileView/panels/SupportPanel/SupportPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/SupportPanel/SupportPanel")).then((m) => ({
     default: m.SupportPanel,
   }))
 );
 const AboutPanel = lazy(() =>
-  import("@/views/ProfileView/panels/AboutPanel/AboutPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/AboutPanel/AboutPanel")).then((m) => ({
     default: m.AboutPanel,
   }))
 );
 const TermsPanel = lazy(() =>
-  import("@/views/ProfileView/panels/AboutPanel/TermsPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/AboutPanel/TermsPanel")).then((m) => ({
     default: m.TermsPanel,
   }))
 );
 const PrivacyPanel = lazy(() =>
-  import("@/views/ProfileView/panels/AboutPanel/PrivacyPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ProfileView/panels/AboutPanel/PrivacyPanel")).then((m) => ({
     default: m.PrivacyPanel,
   }))
 );

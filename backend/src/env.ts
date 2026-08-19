@@ -170,4 +170,10 @@ export const env = {
     (isProduction ? "info" : "debug"),
 
   SENTRY_DSN: process.env.SENTRY_DSN || "",
+
+  /**
+   * Bearer-токен для служебного endpoint /metrics.
+   * В production отсутствие токена не открывает endpoint публично.
+   */
+  METRICS_TOKEN: process.env.METRICS_TOKEN || "",
 };

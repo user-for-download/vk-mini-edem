@@ -110,6 +110,22 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     );
   }
 
+  if (!isOwnTrip) {
+    return (
+      <Panel id={id}>
+        <AppPanelHeader
+          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+        >
+          Управление поездкой
+        </AppPanelHeader>
+        <EmptyState
+          title="Нет доступа к управлению"
+          subtitle="Управлять заявками может только водитель этой поездки"
+        />
+      </Panel>
+    );
+  }
+
   return (
     <TripRequestsPanel
       id={id}

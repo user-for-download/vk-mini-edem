@@ -22,6 +22,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { parseDeepLink } from "@/helpers/deepLink";
 import { useModalApi } from "@/providers/ModalProvider";
+import { loadModule } from "@/helpers/loadModule";
 
 export default function App() {
   const { isOnline, wasOffline } = useOnlineStatus();
@@ -55,7 +56,9 @@ export default function App() {
 
   const openDriverProfile = useCallback(async (driverOrId: User | string) => {
     const driverId = typeof driverOrId === "string" ? driverOrId : driverOrId.id;
-    const { DriverProfileModal } = await import("@/modals/DriverProfileModal/DriverProfileModal");
+    const module = await loadModule(() => import("@/modals/DriverProfileModal/DriverProfileModal"));
+    if (!module) return;
+    const { DriverProfileModal } = module;
     modalApi.openCustomModalCard({
       component: DriverProfileModal,
       additionalProps: { driverId },
@@ -97,7 +100,9 @@ export default function App() {
   };
 
   const openCreateTrip = async () => {
-    const { CreateTripModal } = await import("@/modals/CreateTripModal/CreateTripModal");
+    const module = await loadModule(() => import("@/modals/CreateTripModal/CreateTripModal"));
+    if (!module) return;
+    const { CreateTripModal } = module;
     modalApi.openCustomModalPage({
       component: CreateTripModal,
       additionalProps: { onTripCreated: handleTripCreated },
@@ -106,7 +111,9 @@ export default function App() {
   };
 
   const openSelectReviewTrip = async () => {
-    const { SelectReviewTripModal } = await import("@/modals/SelectReviewTripModal/SelectReviewTripModal");
+    const module = await loadModule(() => import("@/modals/SelectReviewTripModal/SelectReviewTripModal"));
+    if (!module) return;
+    const { SelectReviewTripModal } = module;
     modalApi.openCustomModalPage({
       component: SelectReviewTripModal,
       additionalProps: { onSelectTrip: handleSelectReviewTrip },
@@ -115,7 +122,9 @@ export default function App() {
   };
 
   const openReviewForTrip = async (trip: Trip) => {
-    const { CreateReviewModal } = await import("@/modals/CreateReviewModal/CreateReviewModal");
+    const module = await loadModule(() => import("@/modals/CreateReviewModal/CreateReviewModal"));
+    if (!module) return;
+    const { CreateReviewModal } = module;
     modalApi.openCustomModalCard({
       component: CreateReviewModal,
       additionalProps: { trip },
@@ -127,7 +136,9 @@ export default function App() {
   };
 
   const openCarForm = async () => {
-    const { CarFormModal } = await import("@/modals/CarFormModal/CarFormModal");
+    const module = await loadModule(() => import("@/modals/CarFormModal/CarFormModal"));
+    if (!module) return;
+    const { CarFormModal } = module;
     modalApi.openCustomModalPage({
       component: CarFormModal,
       baseProps: { settlingHeight: 100 },
@@ -135,7 +146,9 @@ export default function App() {
   };
 
   const openEditProfile = async () => {
-    const { EditProfileModal } = await import("@/modals/EditProfileModal/EditProfileModal");
+    const module = await loadModule(() => import("@/modals/EditProfileModal/EditProfileModal"));
+    if (!module) return;
+    const { EditProfileModal } = module;
     modalApi.openCustomModalPage({
       component: EditProfileModal,
       baseProps: { settlingHeight: 100 },

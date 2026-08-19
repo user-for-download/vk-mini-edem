@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { bodyLimit } from "hono/body-limit";
 import { createNodeWebSocket } from "@hono/node-ws";
+import { createHash, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -29,6 +30,36 @@ export { injectWebSocket };
 const allowedOrigins = env.CORS_ORIGINS.split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const sentryOrigin = (() => {
+  if (!env.SENTRY_DSN) return null;
+
+  try {
+    return new URL(env.SENTRY_DSN).origin;
+  } catch {
+    return null;
+  }
+})();
+
+const connectSources = ["'self'", "ws:", "wss:"];
+if (sentryOrigin) connectSources.push(sentryOrigin);
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob:",
+  "worker-src 'self' blob:",
+  `connect-src ${connectSources.join(" ")}`,
+  "manifest-src 'self'",
+  "frame-src 'self' https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru",
+  "frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru https://akashi.vk-portal.net",
+].join("; ");
 
 app.use(
   "*",
@@ -80,10 +111,7 @@ app.use("*", async (c, next) => {
 app.use("*", async (c, next) => {
   await next();
   c.header("X-Content-Type-Options", "nosniff");
-  c.header(
-    "Content-Security-Policy",
-    "frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru https://akashi.vk-portal.net"
-  );
+  c.header("Content-Security-Policy", contentSecurityPolicy);
   c.header("X-XSS-Protection", "0");
   c.header("Referrer-Policy", "strict-origin-when-cross-origin");
   c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -146,10 +174,28 @@ app.get("/health/ready", async (c) => {
 
 /**
  * Метрики сервиса в Prometheus text-формате.
+ * В production endpoint закрыт, даже если токен ошибочно не настроен.
  */
 app.get("/metrics", (c) => {
+  if (!env.METRICS_TOKEN) {
+    if (env.isProduction) return c.notFound();
+  } else {
+    const authorization = c.req.header("Authorization") ?? "";
+    const match = /^Bearer\s+(.+)$/i.exec(authorization);
+
+    if (!match || !tokensEqual(match[1], env.METRICS_TOKEN)) {
+      return c.text("Forbidden", 403);
+    }
+  }
+
   return c.text(metricsSnapshot(), 200, { "Content-Type": "text/plain; charset=utf-8" });
 });
+
+function tokensEqual(provided: string, expected: string): boolean {
+  const providedDigest = createHash("sha256").update(provided).digest();
+  const expectedDigest = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(providedDigest, expectedDigest);
+}
 
 app.route("/api/v1/auth", authRouter);
 app.route("/api/v1/trips", tripsRouter);

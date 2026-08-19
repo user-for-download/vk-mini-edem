@@ -12,7 +12,6 @@ import type {
   CreateBookingDto,
   DriverBookingAction,
 } from "@edem/contracts";
-import type { Booking } from "@/types";
 
 export const BOOKING_KEYS = {
   all: ["bookings"] as const,
@@ -24,10 +23,10 @@ export const BOOKING_KEYS = {
 export function useMyBookingsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: BOOKING_KEYS.my(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       // getUserBookings уже типизирован как PassengerBooking[] (поле scope
       // нужно для разделения активных/истории на главной).
-      return bookingsApi.getUserBookings();
+      return bookingsApi.getUserBookings(signal);
     },
     enabled: options?.enabled ?? true,
     placeholderData: keepPreviousData,
@@ -40,10 +39,7 @@ export function useMyBookingsQuery(options?: { enabled?: boolean }) {
 export function usePassengerHistoryQuery() {
   return useQuery({
     queryKey: BOOKING_KEYS.history(),
-    queryFn: async () => {
-      const res = await bookingsApi.getHistory();
-      return res as unknown as Booking[];
-    },
+    queryFn: ({ signal }) => bookingsApi.getHistory(signal),
     placeholderData: keepPreviousData,
   });
 }
@@ -51,8 +47,8 @@ export function usePassengerHistoryQuery() {
 export function useTripBookingsQuery(tripId: string, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: BOOKING_KEYS.trip(tripId),
-    queryFn: async ({ pageParam }) => {
-      return bookingsApi.getTripBookings(tripId, pageParam);
+    queryFn: async ({ pageParam, signal }) => {
+      return bookingsApi.getTripBookings(tripId, pageParam, 50, signal);
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>

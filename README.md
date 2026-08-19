@@ -68,16 +68,21 @@
 
 ### Запуск проекта (Фронтенд + Бэкенд)
 ```bash
-npm run dev          # или: bun run dev
+npm ci
+cp backend/.env.example backend/.env
+docker compose -f docker-compose.local.yml up -d
+npm run dev
 ```
-Команда параллельно запустит бэкенд на порту 3011 и фронтенд (Vite) на порту 3010. Vite проксирует `/api` и `/ws` на бэкенд. Порты можно изменить через `BACKEND_PORT`, `VITE_PORT` и `VITE_API_TARGET`.
+Команда параллельно запустит бэкенд на порту 3011 и frontend из workspace `mini-app` на порту 3010. Единственная Vite-конфигурация — `mini-app/vite.config.ts`; она проксирует `/api`, включая WebSocket `/api/v1/ws`, на бэкенд. Порты можно изменить через `BACKEND_PORT`, `VITE_PORT` и `VITE_API_TARGET`.
 
-> **Примечание**: `dev:backend` использует `bun run --cwd backend dev`. Если Bun не установлен, запускайте бэкенд отдельно через `npm run dev --workspace=backend` или измените root script.
+Backend читает `backend/.env`; Vite читает `mini-app/.env` и переменные текущего shell. Корневой `.env` предназначен для Docker Compose.
+
+Канонический workflow использует npm workspaces. Bun остаётся опциональным для точечного запуска workspace-команд, но для воспроизводимой установки и CI используйте `npm ci`/`npm run`.
 
 ### Запуск в Docker (бэкенд в контейнере)
 ```bash
 docker compose up -d --build   # сборка и запуск db + backend (:3000)
-docker compose up -d db        # только PostgreSQL (для локального dev)
+docker compose -f docker-compose.local.yml up -d # локальный PostgreSQL (:5433)
 docker compose stop backend    # остановить контейнер бэкенда (оставить БД)
 ```
 Требуется корневой `.env` с переменными `POSTGRES_PASSWORD`, `JWT_SECRET`, `VK_APP_SECRET`, `CORS_ORIGINS` (образец — `.env.example`). Миграции применяются автоматически при старте контейнера. Reseed внутри контейнера:
@@ -87,7 +92,7 @@ docker exec -it vk-mini-edem-backend-1 node --import tsx prisma/seed.ts
 
 ### Установка зависимостей
 ```bash
-npm install
+npm ci
 ```
 
 ### Сборка приложения (включая общий пакет)
@@ -116,10 +121,12 @@ npm run db:seed --workspace=backend
 ```bash
 npm run typecheck        # tsc --noEmit во всех воркспейсах
 npm run test             # Юнит-тесты (Vitest): contracts + backend
-bash run_workflow.sh     # Полный CI-прогон: build contracts → prisma generate/validate → typecheck ×3 → build → тесты
+npm run lint             # typecheck всех воркспейсов + ESLint frontend
+npm run format:check     # базовая проверка текстовых файлов и JSON без перезаписи
+npm run build            # contracts → backend → mini-app
 ```
 
-Тесты backend запускаются на отдельной БД `edem_test` (см. `backend/.env.test`), поэтому рабочая БД не затрагивается. Перед первым запуском тестов: `docker exec vk-mini-edem-db-1 psql -U edem -c "CREATE DATABASE edem_test;"` и `npm run db:test:push --workspace=backend`.
+Тесты backend запускаются на отдельной БД `edem_test` (см. `backend/.env.test`), поэтому рабочая БД не затрагивается. При локальном Compose создайте её через `docker exec vk-mini-edem-db-dev psql -U edem -c "CREATE DATABASE edem_test;"`, затем выполните `npm run db:test:push --workspace=backend`. GitHub Actions поднимает PostgreSQL 16 с готовой `edem_test` автоматически и выполняет те же lint, format, build и test-проверки на Node 22.
 
 ## ⚙️ Настройка окружения
 
@@ -132,7 +139,7 @@ ALLOW_DEV_AUTH=true            # Dev-имитация VK-подписи (тол�
 JWT_SECRET=your-jwt-secret-key-32-chars-long
 VK_APP_SECRET=your-vk-app-secret
 SENTRY_DSN=                    # Sentry DSN (пусто — Sentry выключен)
-CORS_ORIGINS=http://localhost:3000
+CORS_ORIGINS=http://localhost:3010
 BACKEND_PORT=3011
 JWT_ACCESS_TTL_SECONDS=900
 JWT_REFRESH_TTL_SECONDS=2592000
@@ -141,7 +148,7 @@ AUTH_RATE_MAX=20
 LOG_LEVEL=debug
 ```
 
-Для тестов — `backend/.env.test` (аналогично, но `DATABASE_URL` указывает на `edem_test`). Шаблон `.env.example` отслеживается в git; `backend/.env.test` — локальный файл, в git не коммитится (в `.gitignore` для него есть исключение `!backend/.env.test`).
+Для тестов — `backend/.env.test` с `DATABASE_URL`, указывающим на `edem_test`. Файл отслеживается в git и содержит только локальные тестовые значения; реальные секреты в него добавлять нельзя. Корневой `.env.example` предназначен для Docker Compose, а `backend/.env.example` — для локального backend.
 
 ## 🔌 API
 
@@ -189,7 +196,7 @@ LOG_LEVEL=debug
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
 - **Статусы брони**: только `pending → confirmed|declined`; отменённые, отклонённые и подтверждённые брони нельзя воскресить через водительский endpoint.
 - **Отзывы**: Serializable-транзакция с одним ретраем при P2034; разрешены только направления пассажир → водитель и водитель → подтверждённый пассажир.
-- **Валидация**: Zod-схемы на входе backend и проверка ответов frontend; runtime-проверки некоторых paginated-ответов backend пока только логируют contract drift и не прерывают ответ. Это открытый дефект, см. аудит ниже.
+- **Валидация**: Zod-схемы проверяют входы backend, критичные paginated-ответы fail closed при contract drift, а frontend валидирует API и WebSocket payloads.
 - **Приватность**: публичные профили не содержат госномер, публичные поездки не раскрывают точные адреса встречи.
 - **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
@@ -211,16 +218,16 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 ## 🛠 Технологии
 
 - **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, Sentry
-- **Backend**: Hono, Bun/Node.js, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
+- **Backend**: Hono, Node.js (Bun опционально), Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
 
 ## 🚀 Деплой (Production)
 
-Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) должен проксировать на порт 3000. Текущий `docker-compose.yml` также публикует backend на `0.0.0.0:3000` и PostgreSQL на `0.0.0.0:5432`; перед production-развёртыванием доступ к этим портам нужно ограничить firewall/прокси или убрать host port mapping для DB.
+Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) должен проксировать на `127.0.0.1:3000`: production Compose публикует backend только на loopback, а PostgreSQL наружу не публикует. Если proxy работает в отдельном контейнере, подключите его к общей Docker-сети вместо host port.
 
 ```
-Пользователь → VK (WebView/iframe) → https://<your-domain> → Traefik (443) → 0.0.0.0:3000 (backend)
+Пользователь → VK (WebView/iframe) → https://<your-domain> → Traefik (443) → 127.0.0.1:3000 (backend)
 ```
 
 ### Известные ограничения перед production
@@ -229,11 +236,8 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 - `useTripDetailQuery` сохраняет предыдущий результат при смене `tripId`; переход между поездками может кратко показать старые данные, пока новый запрос не завершён.
 - Ошибки загрузки деталей поездки и запроса поездки водителя не имеют отдельного полноценного error/retry состояния и могут отображаться как бесконечная загрузка или пустой список заявок.
 - Даты поиска и редактирования используют разные предположения о timezone: date-only фильтры парсятся на backend через runtime timezone, а UI редактирует даты через browser-local `Date`; для продукта зафиксирован `Europe/Moscow`.
-- WebSocket авторизуется при подключении, но expiry access token не планирует закрытие уже открытого соединения.
-- WebSocket proxy в Vite настроен для `/ws`, тогда как клиент при относительном API URL подключается к `/api/v1/ws`; локальный realtime-сценарий требует проверки/исправления маршрута.
 - Rate limiting и WebSocket fan-out хранят состояние в памяти процесса и не подходят для нескольких backend-инстансов без Redis/pub-sub или ограничения deployment до одного инстанса.
 - `GET /reviews/available-trips` исключает поездку целиком после одного отзыва автора, хотя модель допускает отдельные отзывы водителя каждому подтверждённому пассажиру.
-- Production image запускается от root, а dependency installation в Docker допускает `npm install` без lockfile; production pipeline должен перейти на фиксированный lockfile и непривилегированного пользователя.
 
 ### Аудит состояния
 
@@ -247,7 +251,7 @@ npm run test        # mini-app 8, backend 82, contracts 25: успешно
 npm run build       # contracts + backend + production frontend: успешно
 ```
 
-В backend-тестах уже воспроизводится contract drift: fixture для pagination использует `seatsTotal`/`seat` больше ограничения shared schema, endpoint отвечает `200` и пишет `bookings_pagination_response_validation_failed` вместо controlled error. Это требует исправления схемы/fixture и выбора fail-closed поведения.
+Paginated endpoints проверяют ответы shared Zod-схемами и возвращают controlled `500` при contract drift; интеграционные fixture используют общий лимит мест.
 
 ### Требования VK Mini Apps
 

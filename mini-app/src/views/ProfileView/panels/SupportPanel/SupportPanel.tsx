@@ -10,7 +10,7 @@ import {
   Spacing,
   Text,
 } from "@vkontakte/vkui";
-import { bridge } from "@/helpers/bridge";
+import { openExternalUrl } from "@/helpers/bridge";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 
 export interface SupportPanelProps {
@@ -58,23 +58,6 @@ const FAQ_ITEMS = [
       "Мы используем данные профиля ВКонтакте и дополнительные проверки для водителей. Подтвержденный профиль повышает доверие к пользователю.",
   },
 ];
-
-function openExternalUrl(url: string) {
-  try {
-    if (bridge.isWebView()) {
-      // VKWebAppOpenUrl отсутствует в типизированном перечне методов vk-bridge
-      void (bridge.send as (method: string, props?: unknown) => Promise<unknown>)(
-        "VKWebAppOpenUrl",
-        { url }
-      );
-      return;
-    }
-  } catch {
-    // ignore
-  }
-
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 /**
  * Помощь и поддержка:

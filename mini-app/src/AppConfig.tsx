@@ -15,6 +15,7 @@ import { GlobalWsListener } from "@/components/GlobalWsListener";
 import { ModalProvider } from "@/providers/ModalProvider";
 import { SnackbarProvider } from "@/providers/SnackbarProvider";
 import { ConfirmProvider } from "@/providers/ConfirmProvider";
+import { ModuleLoadErrorListener } from "@/components/ModuleLoadErrorListener";
 
 import { ApiError } from "@/api/client";
 
@@ -47,10 +48,9 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
 
   const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
 
-  // В dev launch-параметры приходят из mock-bridge, а не из URL:
-  // платформа мока — desktop_web, поэтому рендерим vkcom-интерфейс.
+  const mockPlatform = import.meta.env.VITE_MOCK_PLATFORM;
   const platform =
-    vk_platform === "desktop_web" || import.meta.env.DEV ? "vkcom" : undefined;
+    vk_platform === "desktop_web" || mockPlatform === "vkcom" ? "vkcom" : undefined;
 
   return (
     <ConfigProvider
@@ -67,6 +67,7 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
             <ErrorBoundary>
               <AppRoot mode="full" safeAreaInsets={vkBridgeInsets}>
                 <SnackbarProvider>
+                  <ModuleLoadErrorListener />
                   <ConfirmProvider>
                     <ModalProvider>
                       <AuthGate>

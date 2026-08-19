@@ -21,8 +21,8 @@ export const TRIP_KEYS = {
 export function useInfiniteTripsQuery(filters?: SearchTripsFilters) {
   return useInfiniteQuery({
     queryKey: [...TRIP_KEYS.lists(), "infinite", filters],
-    queryFn: async ({ pageParam = 1 }) => {
-      const res = await tripsApi.getTrips({ ...filters, page: pageParam as number, limit: 20 });
+    queryFn: async ({ pageParam = 1, signal }) => {
+      const res = await tripsApi.getTrips({ ...filters, page: pageParam as number, limit: 20 }, signal);
       return res;
     },
     initialPageParam: 1,
@@ -46,8 +46,8 @@ export function useUpdateTripMutation() {
 export function useTripsQuery(filters?: SearchTripsFilters) {
   return useQuery({
     queryKey: TRIP_KEYS.list(filters),
-    queryFn: async () => {
-      return tripsApi.getTrips(filters);
+    queryFn: async ({ signal }) => {
+      return tripsApi.getTrips(filters, signal);
     },
     staleTime: 60_000,
     placeholderData: keepPreviousData,
@@ -57,10 +57,10 @@ export function useTripsQuery(filters?: SearchTripsFilters) {
 export function useMyTripsQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: TRIP_KEYS.my(),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       // Лимит 50 (максимум бэкенда): список нужен целиком для бейджа
       // заявок в таббаре и выбора активной поездки на главной.
-      const res = await tripsApi.getMyTrips({ limit: 50 });
+      const res = await tripsApi.getMyTrips({ limit: 50 }, signal);
       return res.items;
     },
     enabled: options?.enabled ?? true,
@@ -74,12 +74,12 @@ export function useInfiniteMyTripsQuery(options?: {
 }) {
   return useInfiniteQuery({
     queryKey: [...TRIP_KEYS.my(), "infinite", options?.status],
-    queryFn: async ({ pageParam = 1 }) => {
+    queryFn: async ({ pageParam = 1, signal }) => {
       const res = await tripsApi.getMyTrips({
         page: pageParam as number,
         limit: 20,
         status: options?.status,
-      });
+      }, signal);
       return res;
     },
     initialPageParam: 1,
@@ -93,8 +93,8 @@ export function useInfiniteMyTripsQuery(options?: {
 export function useTripDetailQuery(id: string) {
   return useQuery({
     queryKey: TRIP_KEYS.detail(id),
-    queryFn: async () => {
-      return tripsApi.getTripById(id);
+    queryFn: async ({ signal }) => {
+      return tripsApi.getTripById(id, signal);
     },
     enabled: Boolean(id),
   });

@@ -59,6 +59,27 @@ export interface VkUserInfo {
   photo?: string;
 }
 
+export type BridgeActionResult = "success" | "unsupported" | "cancelled" | "failed";
+
+async function supports(method: Parameters<typeof vkBridge.supportsAsync>[0]): Promise<boolean> {
+  try {
+    return await bridge.supportsAsync(method);
+  } catch {
+    return false;
+  }
+}
+
+function isCancelledBridgeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const data = "error_data" in error ? error.error_data : null;
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      "error_reason" in data &&
+      String(data.error_reason).toLowerCase().includes("cancel"),
+  );
+}
+
 export async function getVkUserInfo(): Promise<VkUserInfo | null> {
   try {
     const data = (await bridge.send(
@@ -89,20 +110,40 @@ export async function getVkUserInfo(): Promise<VkUserInfo | null> {
  * Вызывается только в продакшене (в dev пропускаем), результат не критичен.
  * В качестве key используем VK ID пользователя (из VKWebAppGetUserInfo).
  */
-export async function requestVkMessagesPermission(groupId: number): Promise<boolean> {
+export async function requestVkMessagesPermission(groupId: number): Promise<BridgeActionResult> {
   if (import.meta.env.DEV) {
-    return false;
+    return "unsupported";
   }
   try {
+    if (!(await supports("VKWebAppAllowMessagesFromGroup"))) {
+      return "unsupported";
+    }
     const userInfo = await getVkUserInfo();
+    if (!userInfo) return "failed";
     const data = (await bridge.send("VKWebAppAllowMessagesFromGroup", {
       group_id: groupId,
-      key: userInfo ? String(userInfo.id) : "",
+      key: String(userInfo.id),
     })) as { result?: boolean } | null;
-    return data?.result === true;
-  } catch {
-    return false;
+    return data?.result === true ? "success" : "cancelled";
+  } catch (error) {
+    return isCancelledBridgeError(error) ? "cancelled" : "failed";
   }
 }
 
+export async function openExternalUrl(url: string): Promise<void> {
+  const openUrlMethod = "VKWebAppOpenUrl" as Parameters<typeof vkBridge.supportsAsync>[0];
+  if (bridge.isWebView() && (await supports(openUrlMethod))) {
+    try {
+      await (bridge.send as (method: string, props: { url: string }) => Promise<unknown>)(
+        "VKWebAppOpenUrl",
+        { url },
+      );
+      return;
+    } catch {
+      // Continue to the browser fallback.
+    }
+  }
 
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.assign(url);
+}

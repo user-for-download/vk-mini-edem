@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf-8")
@@ -9,11 +9,12 @@ const pkg = JSON.parse(
   version?: string;
 };
 
-// Таргет прокси для /api (включая /api/v1/ws). Прод-бэкенд слушает 3000, dev — свой порт
-// (например 3011). Задаётся через ENV, чтобы не хардкодить окружение.
-const apiTarget = process.env.VITE_API_TARGET ?? "http://127.0.0.1:3011";
+export default defineConfig(({ mode }) => {
+  // Vite загружает значения для клиентского кода, но config должен прочитать их
+  // явно. Переменные процесса имеют приоритет над mini-app/.env-файлами.
+  const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
+  const apiTarget = env.VITE_API_TARGET ?? "http://127.0.0.1:3011";
 
-export default defineConfig(() => {
   return {
     // Относительные пути ассетов: приложение может открываться с подпапкой
     // или хешем в URL (VK Mini App, reverse proxy). Абсолютные /assets/... сломаются.
@@ -40,7 +41,7 @@ export default defineConfig(() => {
       __APP_VERSION__: JSON.stringify(pkg.version ?? "0.1.0"),
     },
     build: {
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 400,
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -76,8 +77,8 @@ export default defineConfig(() => {
       // Доступ через туннель/домен — иначе Vite блокирует запросы
       // с незнакомых Host-заголовков. Хосты задаются через ENV
       // (VITE_ALLOWED_HOSTS="a.fun,b.fun"), чтобы не попадать в паблик.
-      allowedHosts: process.env.VITE_ALLOWED_HOSTS
-        ? process.env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim())
+      allowedHosts: env.VITE_ALLOWED_HOSTS
+        ? env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim()).filter(Boolean)
         : undefined,
       proxy: {
         "/api": {
@@ -86,8 +87,8 @@ export default defineConfig(() => {
           changeOrigin: true,
         },
       },
-      hmr: process.env.DISABLE_HMR !== "true",
-      watch: process.env.DISABLE_HMR === "true" ? null : {},
+      hmr: env.DISABLE_HMR !== "true",
+      watch: env.DISABLE_HMR === "true" ? null : {},
     },
   };
 });

@@ -2,7 +2,7 @@
 import { type FC } from "react";
 import { Button, Caption, Spacing, Text } from "@vkontakte/vkui";
 import { TripCard } from "@/components/TripCard";
-import type { Booking, Trip } from "@/types";
+import type { PassengerBooking, Trip } from "@/types";
 
 function isPast(date?: string): boolean {
   if (!date) {
@@ -19,7 +19,7 @@ function isPast(date?: string): boolean {
  * Используется на экранах «Мои поездки» (активные + история) и «История поездок» —
  * чтобы статус одной и той же брони отображался одинаково везде.
  */
-function getStatusData(booking: Booking): { label: string; color: string } {
+function getStatusData(booking: PassengerBooking): { label: string; color: string } {
   const trip = booking.trip as Trip & {
     status?: "active" | "cancelled" | "completed";
     departureAt?: string;
@@ -96,7 +96,7 @@ function getStatusData(booking: Booking): { label: string; color: string } {
  * комментарий и кнопка отзыва — в теле карточки, без отдельного футера.
  */
 export const PassengerTripCard: FC<{
-  booking: Booking;
+  booking: PassengerBooking;
   onOpen?: (trip: Trip) => void;
   onOpenReview?: (trip: Trip) => void;
 }> = ({ booking, onOpen, onOpenReview }) => {

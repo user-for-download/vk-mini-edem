@@ -9,9 +9,13 @@ import {
   SimpleCell,
   Switch,
   Box,
+  Button,
+  Banner,
 } from "@vkontakte/vkui";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { usersApi } from "@/api/users.api";
+import { requestVkMessagesPermission } from "@/helpers/bridge";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 
 export interface NotificationsPanelProps {
   id: string;
@@ -26,6 +30,7 @@ interface NotificationSettings {
 }
 
 const STORAGE_KEY = "edem_notification_settings";
+const VK_GROUP_ID = Number(import.meta.env.VITE_VK_GROUP_ID || 0);
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   disableAll: false,
@@ -90,6 +95,28 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
   const [settings, setSettings] = useState<NotificationSettings>(loadSettings);
   const [showSaved, setShowSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRequestingVkPermission, setIsRequestingVkPermission] = useState(false);
+  const { enqueue } = useSnackbar();
+
+  const requestVkPermission = async () => {
+    if (VK_GROUP_ID <= 0 || isRequestingVkPermission) return;
+    setIsRequestingVkPermission(true);
+    const result = await requestVkMessagesPermission(VK_GROUP_ID);
+    setIsRequestingVkPermission(false);
+
+    enqueue({
+      type: result === "success" ? "success" : result === "failed" ? "error" : "info",
+      title:
+        result === "success"
+          ? "Сообщения VK включены"
+          : result === "unsupported"
+            ? "Функция недоступна в этом клиенте"
+            : result === "cancelled"
+              ? "Разрешение не предоставлено"
+              : "Не удалось включить сообщения",
+      dedupeKey: `vk_messages_${result}`,
+    });
+  };
 
   useEffect(() => {
     if (!showSaved) {
@@ -147,6 +174,17 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
       </AppPanelHeader>
 
       <Group>
+        {VK_GROUP_ID > 0 ? (
+          <Banner
+            title="Уведомления в сообщениях VK"
+            subtitle="Разрешите сообществу сообщать о заявках и изменениях поездки. Запрос появится только после нажатия."
+            actions={
+              <Button loading={isRequestingVkPermission} onClick={() => void requestVkPermission()}>
+                Разрешить
+              </Button>
+            }
+          />
+        ) : null}
         <SimpleCell
           Component="label"
           subtitle="Отключить все уведомления в приложении"

@@ -3,14 +3,7 @@ import { type FC, type PropsWithChildren, useEffect } from "react";
 import { ScreenSpinner, Placeholder, Button, Panel, View } from "@vkontakte/vkui";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiClient } from "@/api/client";
-import { bridge, requestVkMessagesPermission } from "@/helpers/bridge";
-
-/**
- * ID сообщества ВК, от имени которого отправляются сообщения.
- * Задаётся через VITE_VK_GROUP_ID в .env (prod). Если не задан —
- * разрешение не запрашиваем, бэкенд тихо пропустит отправку.
- */
-const VK_GROUP_ID = Number(import.meta.env.VITE_VK_GROUP_ID || 0);
+import { bridge } from "@/helpers/bridge";
 
 /**
  * Обёртка, которая запускает авторизацию при первом рендере
@@ -63,23 +56,6 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
       }
     });
   }, []);
-
-  /**
-   * После успешной авторизации запрашиваем разрешение на сообщения
-   * от имени сообщества (нужно для VK API messages.send). В dev пропускаем.
-   * Результат не критичен: если пользователь отказал — бэкенд просто
-   * не сможет отправить сообщение, приложение продолжит работать.
-   */
-  useEffect(() => {
-    if (status !== "authenticated" || VK_GROUP_ID <= 0) {
-      return;
-    }
-    void requestVkMessagesPermission(VK_GROUP_ID).then((granted) => {
-      if (!granted) {
-        console.info("[Bridge] Messages from group not allowed");
-      }
-    });
-  }, [status]);
 
   useEffect(() => {
     const handleVisibility = () => {

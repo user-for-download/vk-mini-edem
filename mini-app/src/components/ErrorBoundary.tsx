@@ -1,6 +1,5 @@
 import React from 'react';
 import * as Sentry from '@sentry/react';
-import { Button, Flex, Spacing } from '@vkontakte/vkui';
 
 export class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -32,23 +31,15 @@ export class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Flex direction="column" align="center" justify="center" style={{ textAlign: 'center', minHeight: '100vh' }}>
-          <Spacing size={24} />
-          <div>
-            <Spacing size={8} />
+        <main className="RootError" role="alert">
+          <div className="RootError__content">
             <h1>Что-то пошло не так</h1>
-            <Spacing size={24} />
             <p>К сожалению, произошла непредвиденная ошибка.</p>
-            <Spacing size={16} />
-            <Button
-              size="m"
-              mode="primary"
-              onClick={() => window.location.reload()}
-            >
+            <button type="button" onClick={() => window.location.reload()}>
               Перезагрузить страницу
-            </Button>
+            </button>
           </div>
-        </Flex>
+        </main>
       );
     }
 

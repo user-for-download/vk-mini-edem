@@ -3,6 +3,7 @@ import type { WSContext } from "hono/ws";
 import { wsManager, startWsReaper, stopWsReaper } from "../src/services/wsManager.js";
 import { wsConnectionLimitHits } from "../src/metrics.js";
 import { app } from "../src/app.js";
+import { env } from "../src/env.js";
 
 /**
  * Юнит-тесты WebSocketManager: лимит соединений на пользователя,
@@ -112,7 +113,18 @@ describe("WebSocketManager", () => {
 });
 
 describe("GET /metrics", () => {
+  const originalMetricsToken = env.METRICS_TOKEN;
+  const originalIsProduction = env.isProduction;
+
+  afterEach(() => {
+    env.METRICS_TOKEN = originalMetricsToken;
+    env.isProduction = originalIsProduction;
+  });
+
   it("exposes Prometheus-format metrics", async () => {
+    env.METRICS_TOKEN = "";
+    env.isProduction = false;
+
     const res = await app.request("/metrics");
     expect(res.status).toBe(200);
 
@@ -121,5 +133,41 @@ describe("GET /metrics", () => {
     expect(body).toContain("# TYPE ws_connections gauge");
     expect(body).toContain("# TYPE http_requests_total counter");
     expect(body).toContain("ws_connection_limit_hits_total ");
+  });
+
+  it("requires the configured bearer token", async () => {
+    env.METRICS_TOKEN = "metrics-test-token";
+
+    const missing = await app.request("/metrics");
+    const incorrect = await app.request("/metrics", {
+      headers: { Authorization: "Bearer wrong-token" },
+    });
+    const authorized = await app.request("/metrics", {
+      headers: { Authorization: "Bearer metrics-test-token" },
+    });
+
+    expect(missing.status).toBe(403);
+    expect(incorrect.status).toBe(403);
+    expect(authorized.status).toBe(200);
+  });
+
+  it("hides metrics in production when no token is configured", async () => {
+    env.METRICS_TOKEN = "";
+    env.isProduction = true;
+
+    const res = await app.request("/metrics");
+
+    expect(res.status).toBe(404);
+  });
+
+  it("adds a production-ready CSP without blocking VK framing", async () => {
+    const res = await app.request("/health/live");
+    const csp = res.headers.get("Content-Security-Policy");
+
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("connect-src 'self' ws: wss:");
+    expect(csp).toContain("img-src 'self' data: blob: https:");
+    expect(csp).toContain("frame-ancestors 'self' https://vk.com");
+    expect(csp).toContain("object-src 'none'");
   });
 });

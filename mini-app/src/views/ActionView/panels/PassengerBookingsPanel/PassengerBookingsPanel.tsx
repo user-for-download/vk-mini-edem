@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useMyBookingsQuery } from "@/queries/useBookingsQuery";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import type { PassengerBooking, PassengerBookingScope } from "@/types";
+import type { PassengerBookingScope } from "@/types";
 
 export interface PassengerBookingsPanelProps {
   id: string;
@@ -48,7 +48,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
   const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
 
   const visibleBookings = useMemo(() => {
-    const bookings = ((data as unknown as PassengerBooking[]) ?? []).filter(
+    const bookings = (data ?? []).filter(
       (booking) => booking.scope === tab
     );
 

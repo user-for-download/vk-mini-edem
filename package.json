@@ -9,9 +9,10 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"vite --port=${VITE_PORT:-3010} --host=0.0.0.0\"",
-    "dev:backend": "BACKEND_PORT=${BACKEND_PORT:-3011} bun run --cwd backend dev",
-    "build": "npm run build:contracts && npm run build --workspace=backend && vite build",
+    "dev": "VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "BACKEND_PORT=${BACKEND_PORT:-3011} npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=mini-app",
+    "build": "npm run build:contracts && npm run build --workspace=backend && npm run build --workspace=mini-app",
     "start": "node backend/dist/src/index.js",
     "build:contracts": "npm run build --workspace=packages/contracts",
     "db:push": "npm run db:push --workspace=backend",
@@ -24,7 +25,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "npm run typecheck && npm run lint --workspace=mini-app",
+    "format:check": "node scripts/format-check.mjs",
+    "bundle:check": "node scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

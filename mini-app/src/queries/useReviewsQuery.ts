@@ -3,7 +3,6 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tansta
 import { reviewsApi } from "../api/reviews.api";
 import { USER_KEYS } from "./useUsersQuery";
 import type { CreateReviewDto } from "@edem/contracts";
-import type { Trip } from "@/types";
 
 export const REVIEW_KEYS = {
   all: ["reviews"] as const,
@@ -20,7 +19,7 @@ export const REVIEW_KEYS = {
 export function useMyReviewsQuery() {
   return useQuery({
     queryKey: REVIEW_KEYS.my(),
-    queryFn: () => reviewsApi.getMyReviews(),
+    queryFn: ({ signal }) => reviewsApi.getMyReviews(signal),
   });
 }
 
@@ -31,8 +30,8 @@ export function useMyReviewsQuery() {
 export function useUserReviewsQuery(userId: string) {
   return useQuery({
     queryKey: REVIEW_KEYS.user(userId),
-    queryFn: async () => {
-      const res = await reviewsApi.getUserReviews(userId);
+    queryFn: async ({ signal }) => {
+      const res = await reviewsApi.getUserReviews(userId, undefined, 20, signal);
       return res.items;
     },
     enabled: Boolean(userId),
@@ -46,8 +45,8 @@ export function useUserReviewsQuery(userId: string) {
 export function useUserReviewsInfiniteQuery(userId: string, limit = 20) {
   return useInfiniteQuery({
     queryKey: REVIEW_KEYS.userPaginated(userId, limit),
-    queryFn: ({ pageParam }) =>
-      reviewsApi.getUserReviews(userId, pageParam as string | undefined, limit),
+    queryFn: ({ pageParam, signal }) =>
+      reviewsApi.getUserReviews(userId, pageParam as string | undefined, limit, signal),
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasMore ? lastPage.pagination.nextCursor : undefined,
     initialPageParam: undefined as string | undefined,
@@ -62,10 +61,7 @@ export function useUserReviewsInfiniteQuery(userId: string, limit = 20) {
 export function useAvailableReviewTripsQuery() {
   return useQuery({
     queryKey: REVIEW_KEYS.availableTrips(),
-    queryFn: async () => {
-      const res = await reviewsApi.getAvailableTrips();
-      return res as unknown as Trip[];
-    },
+    queryFn: ({ signal }) => reviewsApi.getAvailableTrips(signal),
   });
 }
 

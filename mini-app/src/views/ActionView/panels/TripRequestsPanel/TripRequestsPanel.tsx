@@ -27,6 +27,7 @@ import { useModalApi } from "@/providers/ModalProvider";
 import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTripsQuery";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useConfirm } from "@/providers/ConfirmProvider";
+import { loadModule } from "@/helpers/loadModule";
 
 export interface TripRequestsPanelProps {
   id: string;
@@ -74,7 +75,9 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
 
   const handleEditTrip = async () => {
     if (!trip) return;
-    const { EditTripModal } = await import("@/modals/EditTripModal");
+    const module = await loadModule(() => import("@/modals/EditTripModal"));
+    if (!module) return;
+    const { EditTripModal } = module;
     modalApi.openCustomModalPage({
       component: EditTripModal,
       additionalProps: { trip },

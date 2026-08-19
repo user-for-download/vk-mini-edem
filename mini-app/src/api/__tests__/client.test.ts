@@ -223,4 +223,20 @@ describe("ApiClient refresh synchronization", () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it("propagates caller cancellation without converting it to a timeout", async () => {
+    vi.spyOn(global, "fetch").mockImplementation((_, init) => {
+      return new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    });
+    const controller = new AbortController();
+
+    const request = client.request("/trips", { signal: controller.signal });
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+  });
 });

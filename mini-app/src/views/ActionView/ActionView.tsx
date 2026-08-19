@@ -11,36 +11,37 @@ import {
 } from "@/consts/panels";
 import { VIEW_ACTION } from "@/consts/views";
 import type { Role, Trip, User } from "@/types";
+import { loadLazyModule } from "@/helpers/loadModule";
 import { ViewErrorBoundary } from "@/components/ViewErrorBoundary";
 const SearchPanel = lazy(() =>
-  import("@/views/ActionView/panels/SearchPanel/SearchPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ActionView/panels/SearchPanel/SearchPanel")).then((m) => ({
     default: m.SearchPanel,
   }))
 );
 
 const TripsManagePanel = lazy(() =>
-  import("@/views/ActionView/panels/TripsManagePanel/TripsManagePanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ActionView/panels/TripsManagePanel/TripsManagePanel")).then((m) => ({
     default: m.TripsManagePanel,
   }))
 );
 
 const TripRequestsPanelWrapper = lazy(() =>
-  import("@/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper").then((m) => ({
+  loadLazyModule(() => import("@/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper")).then((m) => ({
     default: m.TripRequestsPanelWrapper,
   }))
 );
 const PassengerBookingsPanel = lazy(() =>
-  import("@/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ActionView/panels/PassengerBookingsPanel/PassengerBookingsPanel")).then((m) => ({
     default: m.PassengerBookingsPanel,
   }))
 );
 const PassengerHistoryPanel = lazy(() =>
-  import("@/views/ActionView/panels/PassengerHistoryPanel/PassengerHistoryPanel").then((m) => ({
+  loadLazyModule(() => import("@/views/ActionView/panels/PassengerHistoryPanel/PassengerHistoryPanel")).then((m) => ({
     default: m.PassengerHistoryPanel,
   }))
 );
 const TripDetailsPanelWrapper = lazy(() =>
-  import("@/panels/TripDetailsPanel/TripDetailsPanelWrapper").then((m) => ({
+  loadLazyModule(() => import("@/panels/TripDetailsPanel/TripDetailsPanelWrapper")).then((m) => ({
     default: m.TripDetailsPanelWrapper,
   }))
 );

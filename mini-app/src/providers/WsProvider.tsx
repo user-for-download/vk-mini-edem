@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { apiClient } from "../api/client";
-import type { WsClientEvent, WsServerEvent } from "@edem/contracts";
+import { wsServerEventSchema, type WsClientEvent, type WsServerEvent } from "@edem/contracts";
+import { useAuthStore } from "../store/useAuthStore";
 
 interface WsContextValue {
   isConnected: boolean;
@@ -27,22 +28,49 @@ function getWsUrl(): string {
   return `${protocol}//${window.location.host}${apiUrl}/ws`;
 }
 
-// Константы вместо magic numbers.
-const WS_RECONNECT_DELAY_MS = 3_000;
+const WS_RECONNECT_BASE_DELAY_MS = 1_000;
+const WS_RECONNECT_MAX_DELAY_MS = 30_000;
 
 export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WsServerEvent | null>(null);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const disposedRef = useRef(false);
+  const accessToken = useAuthStore((state) => state.session?.accessToken ?? null);
 
   // connect вызывается сам из себя (reconnect в onclose), а самоссылка
   // в инициализаторе useCallback запрещена (react-hooks/immutability).
   // Храним актуальную ссылку в рефе — identity connect стабильна (deps []),
   // поэтому эффект ниже отрабатывает один раз.
   const connectRef = useRef<() => void>(() => {});
+
+  const scheduleReconnectRef = useRef<() => void>(() => {});
+
+  const scheduleReconnect = useCallback(() => {
+    if (
+      disposedRef.current ||
+      reconnectTimeoutRef.current ||
+      !navigator.onLine ||
+      document.visibilityState === "hidden"
+    ) {
+      return;
+    }
+
+    const attempt = reconnectAttemptRef.current++;
+    const baseDelay = Math.min(
+      WS_RECONNECT_BASE_DELAY_MS * 2 ** attempt,
+      WS_RECONNECT_MAX_DELAY_MS,
+    );
+    const delay = Math.round(baseDelay * (0.75 + Math.random() * 0.5));
+
+    reconnectTimeoutRef.current = window.setTimeout(() => {
+      reconnectTimeoutRef.current = null;
+      if (!disposedRef.current) connectRef.current();
+    }, delay);
+  }, []);
 
   const connect = useCallback(() => {
     if (disposedRef.current) return;
@@ -54,7 +82,7 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     // переподключиться: после завершения нас разбудит onTokenUpdate.
     if (apiClient.isRefreshing()) return;
 
-    const token = apiClient.getToken();
+    const token = useAuthStore.getState().session?.accessToken;
     if (!token) return; // Wait until token is available
 
     // Токен передаём только в auth-сообщении, чтобы не светить его в URL
@@ -63,7 +91,6 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setIsConnected(true);
       ws.send(JSON.stringify({ type: "auth", token }));
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current);
@@ -73,7 +100,17 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     ws.onmessage = (event) => {
       try {
-        const parsed = JSON.parse(event.data) as WsServerEvent;
+        const result = wsServerEventSchema.safeParse(JSON.parse(event.data));
+        if (!result.success) {
+          console.warn("Ignored invalid WS message", result.error);
+          return;
+        }
+        const parsed = result.data;
+        if (parsed.type === "auth:ok") {
+          reconnectAttemptRef.current = 0;
+          setIsConnected(true);
+          return;
+        }
         // Отвечаем на серверный ping для поддержания keep-alive.
         // Сервер (wsManager.ts) шлёт {type:"ping"} каждые 30 сек и ждёт
         // {type:"pong"} в течение 60 сек (PONG_TIMEOUT_MS). Без ответа
@@ -109,26 +146,17 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         if (refreshResult === "success") {
           if (!disposedRef.current) connectRef.current();
         } else if (refreshResult === "transient-failure") {
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            if (!disposedRef.current) connectRef.current();
-          }, WS_RECONNECT_DELAY_MS);
+          scheduleReconnectRef.current();
         }
         return;
       }
 
       // Обычный реконнект при обрыве сети
-      reconnectTimeoutRef.current = window.setTimeout(
-        () => {
-          reconnectTimeoutRef.current = null;
-          if (!disposedRef.current) connectRef.current();
-        },
-        WS_RECONNECT_DELAY_MS
-      );
+      scheduleReconnectRef.current();
     };
 
     ws.onerror = () => {
-      // Browser handles the error details. 
+      // Browser handles the error details.
       // `onclose` will be called right after `onerror`.
     };
   }, []);
@@ -152,6 +180,10 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   useEffect(() => {
     connectRef.current = connect;
   }, [connect]);
+
+  useEffect(() => {
+    scheduleReconnectRef.current = scheduleReconnect;
+  }, [scheduleReconnect]);
 
   // Токен обновился (успешный refresh где-то в приложении) — если соединение
   // закрыто и reconnect не запланирован, пробуем переподключиться сразу.
@@ -184,24 +216,28 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     setIsConnected(false);
   }, []);
 
-  // Poll for token existence since we don't have a reactive token hook here yet
   useEffect(() => {
     disposedRef.current = false;
-    const interval = setInterval(() => {
-      const token = apiClient.getToken();
-      if (token && !wsRef.current && !reconnectTimeoutRef.current) {
-        connect();
-      } else if (!token && wsRef.current) {
-        disconnect();
+    if (accessToken) {
+      connect();
+    }
+
+    const resume = () => {
+      if (accessToken && navigator.onLine && document.visibilityState !== "hidden") {
+        reconnectAttemptRef.current = 0;
+        connectRef.current();
       }
-    }, 1000);
-    
+    };
+    window.addEventListener("online", resume);
+    document.addEventListener("visibilitychange", resume);
+
     return () => {
       disposedRef.current = true;
-      clearInterval(interval);
+      window.removeEventListener("online", resume);
+      document.removeEventListener("visibilitychange", resume);
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [accessToken, connect, disconnect]);
 
   const send = useCallback((event: WsClientEvent) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

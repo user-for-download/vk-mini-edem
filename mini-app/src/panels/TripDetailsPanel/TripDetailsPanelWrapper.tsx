@@ -7,6 +7,7 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { useTripDetailQuery } from "@/queries/useTripsQuery";
 import { useModalApi } from "@/providers/ModalProvider";
+import { loadModule } from "@/helpers/loadModule";
 
 export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const params = useParams<"tripId">();
@@ -73,7 +74,9 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     if (!trip) {
       return;
     }
-    const { DriverProfileModal } = await import("@/modals/DriverProfileModal/DriverProfileModal");
+    const module = await loadModule(() => import("@/modals/DriverProfileModal/DriverProfileModal"));
+    if (!module) return;
+    const { DriverProfileModal } = module;
     modalApi.openCustomModalCard({
       component: DriverProfileModal,
       additionalProps: { driverId: trip.driver.id },

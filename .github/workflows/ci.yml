@@ -64,20 +64,17 @@ jobs:
       - name: Push Prisma schema to DB
         run: npm run --workspace backend db:push
 
-      - name: Typecheck contracts
-        run: npm run --workspace "@edem/contracts" typecheck
+      - name: Lint and typecheck
+        run: npm run lint
 
-      - name: Typecheck backend
-        run: npm run --workspace backend typecheck
+      - name: Check formatting
+        run: npm run format:check
 
-      - name: Typecheck mini-app
-        run: npm run --workspace mini-app typecheck
+      - name: Build
+        run: npm run build
 
-      - name: Lint mini-app
-        run: npm run --workspace mini-app lint
-
-      - name: Build mini-app
-        run: npm run --workspace mini-app build
+      - name: Check bundle budget
+        run: npm run bundle:check
 
       - name: Contract tests
         run: npm run --workspace "@edem/contracts" test

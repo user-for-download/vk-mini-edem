@@ -5,23 +5,23 @@ import { z } from "zod";
 import type {
   Booking,
   CreateBookingDto,
+  PassengerBooking,
   UpdateBookingStatusDto,
   PaginatedBookingsResponse,
 } from "@edem/contracts";
-import type { PassengerBooking, Booking as AppBooking } from "@/types";
 
 const passengerBookingArraySchema = z.array(passengerBookingSchema);
 
 export const bookingsApi = {
-  getUserBookings: (): Promise<PassengerBooking[]> => {
-    return apiClient.request<PassengerBooking[]>("/bookings/my", {}, passengerBookingArraySchema);
+  getUserBookings: (signal?: AbortSignal): Promise<PassengerBooking[]> => {
+    return apiClient.request<PassengerBooking[]>("/bookings/my", { signal }, passengerBookingArraySchema);
   },
 
   /**
    * История поездок пассажира.
    */
-  getHistory: (): Promise<AppBooking[]> => {
-    return apiClient.request<AppBooking[]>("/bookings/history", {}, passengerBookingArraySchema);
+  getHistory: (signal?: AbortSignal): Promise<PassengerBooking[]> => {
+    return apiClient.request<PassengerBooking[]>("/bookings/history", { signal }, passengerBookingArraySchema);
   },
 
   /**
@@ -34,7 +34,8 @@ export const bookingsApi = {
   getTripBookings: (
     tripId: string,
     cursor?: string,
-    limit = 50
+    limit = 50,
+    signal?: AbortSignal,
   ): Promise<PaginatedBookingsResponse> => {
     const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
@@ -42,7 +43,7 @@ export const bookingsApi = {
 
     return apiClient.request<PaginatedBookingsResponse>(
       `/bookings/trip/${tripId}?${params.toString()}`,
-      {},
+      { signal },
       paginatedBookingsResponseSchema
     );
   },

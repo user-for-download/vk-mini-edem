@@ -114,8 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         const response = await authApi.loginWithVk(payload);
 
-        apiClient.setToken(response.accessToken);
-        apiClient.setRefreshToken(response.refreshToken);
+        apiClient.setSession(response);
 
         set({
           status: "authenticated",
@@ -128,8 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       } catch (error) {
         console.error("[Auth] Bootstrap failed:", error);
-        apiClient.setToken(null);
-        apiClient.setRefreshToken(null);
+        apiClient.setSession(null);
 
         set({
           status: "unauthenticated",
@@ -163,8 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Единая точка refresh — apiClient.tryRefresh() (single-flight):
         // тот же путь, что и при 401/WS-сбое. Ротация токенов происходит
         // один раз; store обновляется через onTokenUpdate (AuthGate).
-        apiClient.setToken(state.session.accessToken);
-        apiClient.setRefreshToken(state.session.refreshToken);
+        apiClient.setSession(state.session);
 
         const refreshResult = await apiClient.tryRefresh();
 
@@ -217,8 +214,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // In-flight refresh не должен воскресить сессию после логаута.
     apiClient.invalidatePendingRefresh();
-    apiClient.setToken(null);
-    apiClient.setRefreshToken(null);
+    apiClient.setSession(null);
 
     set({
       status: "unauthenticated",

@@ -10,6 +10,8 @@ export interface SnackbarItem {
   title: string;
   subtitle?: string;
   dedupeKey?: string;
+  actionLabel?: string;
+  onActionClick?: () => void;
 }
 
 interface SnackbarApi {
@@ -60,6 +62,8 @@ export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
         subtitle: item.subtitle,
         before: icon,
         duration: 4000,
+        action: item.actionLabel,
+        onActionClick: item.onActionClick,
         placement: "top",
         slotProps: {
           root: {

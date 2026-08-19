@@ -44,6 +44,8 @@ export function createWsHandler(upgradeWebSocket: any) {
           // пользователем идемпотентна и возвращает true).
           if (!ok) {
             wsManager.close(connId, 4401, "Already authenticated as another user");
+          } else {
+            ws.send(JSON.stringify({ type: "auth:ok" }));
           }
         } catch {
           logger.warn({ connId }, "ws_auth_failed");

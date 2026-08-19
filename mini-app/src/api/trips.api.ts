@@ -25,7 +25,7 @@ export type MyTrip = Trip & {
 };
 
 export const tripsApi = {
-  getTrips: (filters?: SearchTripsFilters): Promise<PaginatedTripsResponse> => {
+  getTrips: (filters?: SearchTripsFilters, signal?: AbortSignal): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
 
     if (filters?.q) query.set("q", filters.q);
@@ -44,7 +44,7 @@ export const tripsApi = {
 
     return apiClient.request<PaginatedTripsResponse>(
       `/trips${queryString}`,
-      {},
+      { signal },
       paginatedTripsResponseSchema
     );
   },
@@ -64,7 +64,7 @@ export const tripsApi = {
     page?: number;
     limit?: number;
     status?: "active" | "archive";
-  }): Promise<PaginatedTripsResponse> => {
+  }, signal?: AbortSignal): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
     if (options?.page) query.set("page", options.page.toString());
     if (options?.limit) query.set("limit", options.limit.toString());
@@ -72,13 +72,13 @@ export const tripsApi = {
     const queryString = query.toString() ? `?${query.toString()}` : "";
     return apiClient.request<PaginatedTripsResponse>(
       `/trips/my${queryString}`,
-      {},
+      { signal },
       paginatedTripsResponseSchema
     );
   },
 
-  getTripById: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}`, {}, tripSchema);
+  getTripById: (id: string, signal?: AbortSignal): Promise<Trip> => {
+    return apiClient.request<Trip>(`/trips/${id}`, { signal }, tripSchema);
   },
 
   createTrip: (data: CreateTripDto): Promise<Trip> => {
