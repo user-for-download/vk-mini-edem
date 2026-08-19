@@ -10,6 +10,12 @@ const pkg = JSON.parse(
 };
 
 export default defineConfig(({ mode }) => {
+  // Разрешение production/development-условий в экспортах пакетов (React и др.)
+  // зависит от process.env.NODE_ENV, а не от mode Vite. Амбиентный NODE_ENV=test
+  // из CI заставлял собирать development-сборку React. Фиксируем его для продакшн-сборок.
+  if (mode === "production" && process.env.NODE_ENV !== "production") {
+    process.env.NODE_ENV = "production";
+  }
   // Vite загружает значения для клиентского кода, но config должен прочитать их
   // явно. Переменные процесса имеют приоритет над mini-app/.env-файлами.
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
