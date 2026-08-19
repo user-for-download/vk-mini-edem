@@ -2,10 +2,11 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Epic, SplitCol, SplitLayout } from "@vkontakte/vkui";
 import {
   useActiveVkuiLocation,
+  useFirstPageCheck,
   useRouteNavigator,
   usePopout,
 } from "@vkontakte/vk-mini-apps-router";
@@ -16,7 +17,7 @@ import { AppTabbar } from "@/components/AppTabbar";
 import { HomeView } from "@/views/HomeView/HomeView";
 import { ActionView } from "@/views/ActionView/ActionView";
 import { ProfileView } from "@/views/ProfileView/ProfileView";
-import { useSwipeBackSync } from "@/hooks/useSwipeBackSync";
+import { SwipeBackSync } from "@/hooks/useSwipeBackSync";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { parseDeepLink } from "@/helpers/deepLink";
@@ -41,10 +42,16 @@ export default function App() {
     }
   }, [role]);
 
-  const { view: activeView = VIEW_HOME } = useActiveVkuiLocation();
+  const {
+    view: activeView = VIEW_HOME,
+    modal,
+    hasOverlay,
+  } = useActiveVkuiLocation();
+  const isFirstPage = useFirstPageCheck();
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
   const modalApi = useModalApi();
+  const deepLinkHandledRef = useRef(false);
 
   const openDriverProfile = useCallback(async (driverOrId: User | string) => {
     const driverId = typeof driverOrId === "string" ? driverOrId : driverOrId.id;
@@ -56,15 +63,18 @@ export default function App() {
   }, [modalApi]);
 
   useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+
     const deepLink = parseDeepLink();
 
     if (deepLink.tripId) {
-      routeNavigator.push(`/trips/${deepLink.tripId}`);
+      void routeNavigator.replace(`/trips/${encodeURIComponent(deepLink.tripId)}`);
       return;
     }
 
     if (deepLink.openHistory) {
-      routeNavigator.push("/bookings/history");
+      void routeNavigator.replace("/bookings/history");
       return;
     }
 
@@ -74,8 +84,6 @@ export default function App() {
       });
     }
   }, [routeNavigator, openDriverProfile]);
-
-  useSwipeBackSync();
 
   const goToSearch = () => {
     setRole("passenger");
@@ -137,6 +145,7 @@ export default function App() {
   return (
     <>
       <OfflineBanner isOnline={isOnline} wasOffline={wasOffline} />
+      {!isFirstPage && !modal && !hasOverlay ? <SwipeBackSync /> : null}
       <SplitLayout center>
         <SplitCol autoSpaced stretchedOnMobile maxWidth="720px">
           <Epic

@@ -11,6 +11,22 @@ import { ApiClient } from "../client";
 describe("ApiClient refresh synchronization", () => {
   let client: ApiClient;
 
+  const validUser = {
+    id: "user-1",
+    name: "Test User",
+    avatar: "https://example.com/avatar.png",
+    rating: 5,
+    reviewsCount: 0,
+    tripsCount: 0,
+  };
+
+  const validRefreshResponse = {
+    accessToken: "new-access",
+    refreshToken: "new-refresh",
+    expiresIn: 900,
+    user: validUser,
+  };
+
   beforeEach(() => {
     client = new ApiClient();
   });
@@ -29,7 +45,7 @@ describe("ApiClient refresh synchronization", () => {
   it("emits refreshStart when tryRefresh is called", async () => {
     const listener = vi.fn();
     client.onRefreshStart(listener);
-    mockFetchResolved({ accessToken: "new-access", refreshToken: "new-refresh" });
+    mockFetchResolved(validRefreshResponse);
 
     client.setRefreshToken("old-refresh");
 
@@ -59,7 +75,7 @@ describe("ApiClient refresh synchronization", () => {
 
     resolveFetch({
       ok: true,
-      json: async () => ({ accessToken: "x", refreshToken: "y" }),
+      json: async () => validRefreshResponse,
     } as Response);
 
     await promise;
@@ -75,7 +91,7 @@ describe("ApiClient refresh synchronization", () => {
           setTimeout(() => {
             resolve({
               ok: true,
-              json: async () => ({ accessToken: "x", refreshToken: "y" }),
+              json: async () => validRefreshResponse,
             } as Response);
           }, 10);
         })
@@ -89,16 +105,16 @@ describe("ApiClient refresh synchronization", () => {
       client.tryRefresh(),
     ]);
 
-    expect(r1).toBe(true);
-    expect(r2).toBe(true);
-    expect(r3).toBe(true);
+    expect(r1).toBe("success");
+    expect(r2).toBe("success");
+    expect(r3).toBe("success");
     expect(fetchCount).toBe(1);
   });
 
   it("emits refreshEnd only once with success=true", async () => {
     const listener = vi.fn();
     client.onRefreshEnd(listener);
-    mockFetchResolved({ accessToken: "a", refreshToken: "b" });
+    mockFetchResolved(validRefreshResponse);
 
     client.setRefreshToken("old");
 
@@ -106,25 +122,68 @@ describe("ApiClient refresh synchronization", () => {
 
     // refreshEnd — один раз (только инициатор), со значением success.
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith(true);
+    expect(listener).toHaveBeenCalledWith("success");
   });
 
-  it("emits refreshEnd with success=false on failed refresh", async () => {
+  it("emits a permanent rejection and expires the session on 401", async () => {
     const listener = vi.fn();
+    const expiredListener = vi.fn();
     client.onRefreshEnd(listener);
+    client.onSessionExpired(expiredListener);
     vi.spyOn(global, "fetch").mockResolvedValue({ ok: false, status: 401 } as Response);
 
     client.setRefreshToken("dead");
 
-    await client.tryRefresh();
+    const result = await client.tryRefresh();
 
-    expect(listener).toHaveBeenCalledWith(false);
+    expect(result).toBe("permanent-rejection");
+    expect(listener).toHaveBeenCalledWith("permanent-rejection");
+    expect(expiredListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the session recoverable on network failure", async () => {
+    const expiredListener = vi.fn();
+    client.onSessionExpired(expiredListener);
+    vi.spyOn(global, "fetch").mockRejectedValue(new TypeError("Network error"));
+
+    client.setRefreshToken("valid-token");
+
+    await expect(client.tryRefresh()).resolves.toBe("transient-failure");
+    expect(expiredListener).not.toHaveBeenCalled();
+  });
+
+  it("treats server and rate-limit failures as transient", async () => {
+    vi.spyOn(global, "fetch")
+      .mockResolvedValueOnce({ ok: false, status: 503 } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 429 } as Response);
+
+    client.setRefreshToken("valid-token");
+
+    await expect(client.tryRefresh()).resolves.toBe("transient-failure");
+    await expect(client.tryRefresh()).resolves.toBe("transient-failure");
+  });
+
+  it("rejects malformed successful refresh responses without mutating tokens", async () => {
+    const tokenListener = vi.fn();
+    client.onTokenUpdate(tokenListener);
+    mockFetchResolved({ accessToken: "new-access", refreshToken: "new-refresh" });
+
+    client.setToken("old-access");
+    client.setRefreshToken("old-refresh");
+
+    await expect(client.tryRefresh()).resolves.toBe("transient-failure");
+    expect(client.getToken()).toBe("old-access");
+    expect(tokenListener).not.toHaveBeenCalled();
   });
 
   it("calls onTokenUpdate with new tokens after successful refresh", async () => {
     const listener = vi.fn();
     client.onTokenUpdate(listener);
-    mockFetchResolved({ accessToken: "new-access-token", refreshToken: "new-refresh-token" });
+    mockFetchResolved({
+      ...validRefreshResponse,
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
+    });
 
     client.setRefreshToken("old");
     await client.tryRefresh();
@@ -132,6 +191,7 @@ describe("ApiClient refresh synchronization", () => {
     expect(listener).toHaveBeenCalledWith({
       accessToken: "new-access-token",
       refreshToken: "new-refresh-token",
+      expiresIn: 900,
     });
   });
 
@@ -142,7 +202,7 @@ describe("ApiClient refresh synchronization", () => {
     const normal = vi.fn();
     client.onRefreshStart(throwing);
     client.onRefreshStart(normal);
-    mockFetchResolved({ accessToken: "a", refreshToken: "b" });
+    mockFetchResolved(validRefreshResponse);
 
     client.setRefreshToken("old");
 
@@ -156,7 +216,7 @@ describe("ApiClient refresh synchronization", () => {
     const listener = vi.fn();
     const unsubscribe = client.onRefreshStart(listener);
     unsubscribe();
-    mockFetchResolved({ accessToken: "a", refreshToken: "b" });
+    mockFetchResolved(validRefreshResponse);
 
     client.setRefreshToken("old");
     await client.tryRefresh();

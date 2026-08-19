@@ -11,7 +11,7 @@ const pkg = JSON.parse(
 
 // Таргет прокси для /api (включая /api/v1/ws). Прод-бэкенд слушает 3000, dev — свой порт
 // (например 3011). Задаётся через ENV, чтобы не хардкодить окружение.
-const apiTarget = process.env.VITE_API_TARGET ?? "http://127.0.0.1:3000";
+const apiTarget = process.env.VITE_API_TARGET ?? "http://127.0.0.1:3011";
 
 export default defineConfig(() => {
   return {

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { apiClient } from "../api/client";
-import { useAuthStore } from "../store/useAuthStore";
 import type { WsClientEvent, WsServerEvent } from "@edem/contracts";
 
 interface WsContextValue {
@@ -105,13 +104,15 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
 
         // apiClient.tryRefresh() сам обеспечивает single-flight.
-        const refreshed = await apiClient.tryRefresh();
+        const refreshResult = await apiClient.tryRefresh();
 
-        if (refreshed) {
+        if (refreshResult === "success") {
           if (!disposedRef.current) connectRef.current();
-        } else {
-          // Refresh не удался — сессия мертва, полный логаут.
-          useAuthStore.getState().clearSession("WS Auth failed");
+        } else if (refreshResult === "transient-failure") {
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            if (!disposedRef.current) connectRef.current();
+          }, WS_RECONNECT_DELAY_MS);
         }
         return;
       }
@@ -133,8 +134,8 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   useEffect(() => {
-    const unsubscribeRefreshEnd = apiClient.onRefreshEnd((success) => {
-      if (!success || disposedRef.current || wsRef.current || reconnectTimeoutRef.current) return;
+    const unsubscribeRefreshEnd = apiClient.onRefreshEnd((result) => {
+      if (result !== "success" || disposedRef.current || wsRef.current || reconnectTimeoutRef.current) return;
 
       // ApiClient emits refreshEnd immediately before clearing refreshPromise.
       // Reconnect on the next task so connect() observes isRefreshing() === false.

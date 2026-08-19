@@ -166,14 +166,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         apiClient.setToken(state.session.accessToken);
         apiClient.setRefreshToken(state.session.refreshToken);
 
-        const refreshed = await apiClient.tryRefresh();
+        const refreshResult = await apiClient.tryRefresh();
 
-        if (!refreshed) {
+        if (refreshResult === "permanent-rejection") {
           await get().clearSession("Refresh failed");
+        } else if (refreshResult === "transient-failure") {
+          set({ status: "authenticated" });
         }
       } catch (error) {
         console.error("[Auth] Refresh failed:", error);
-        await get().clearSession("Refresh failed");
+        set({ status: "authenticated" });
       }
     })().finally(() => {
       refreshPromise = null;

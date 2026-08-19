@@ -1,4 +1,5 @@
 import type { ZodType } from "zod";
+import { authResponseSchema } from "@edem/contracts";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
@@ -21,17 +22,19 @@ export interface TokenUpdate {
   expiresIn: number;
 }
 
+export type RefreshResult = "success" | "permanent-rejection" | "transient-failure";
+
 type TokenUpdateListener = (tokens: TokenUpdate) => void;
 
 export class ApiClient {
   private token: string | null = null;
   private refreshTokenValue: string | null = null;
-  private refreshPromise: Promise<boolean> | null = null;
+  private refreshPromise: Promise<RefreshResult> | null = null;
   private refreshGeneration = 0;
   private tokenListeners: Set<TokenUpdateListener> = new Set();
   private sessionExpiredListeners: Set<() => void> = new Set();
   private refreshStartListeners: Set<() => void> = new Set();
-  private refreshEndListeners: Set<(success: boolean) => void> = new Set();
+  private refreshEndListeners: Set<(result: RefreshResult) => void> = new Set();
 
   setToken(token: string | null) {
     this.token = token;
@@ -94,7 +97,7 @@ export class ApiClient {
    * Подписка на завершение refresh (успешного или нет).
    * Вызывается ОДИН раз на refresh — только у инициатора.
    */
-  onRefreshEnd(listener: (success: boolean) => void): () => void {
+  onRefreshEnd(listener: (result: RefreshResult) => void): () => void {
     this.refreshEndListeners.add(listener);
     return () => {
       this.refreshEndListeners.delete(listener);
@@ -111,10 +114,10 @@ export class ApiClient {
     });
   }
 
-  private emitRefreshEnd(success: boolean): void {
+  private emitRefreshEnd(result: RefreshResult): void {
     this.refreshEndListeners.forEach((listener) => {
       try {
-        listener(success);
+        listener(result);
       } catch (err) {
         console.error("[ApiClient] refreshEnd listener error:", err);
       }
@@ -138,8 +141,8 @@ export class ApiClient {
       !endpoint.startsWith("/auth/") &&
       this.refreshTokenValue
     ) {
-      const refreshed = await this.tryRefresh();
-      if (refreshed) {
+      const refreshResult = await this.tryRefresh();
+      if (refreshResult === "success") {
         // Повторяем исходный запрос с новым токеном
         const retryResponse = await this.doFetch(endpoint, options);
         if (!retryResponse.ok) {
@@ -208,7 +211,7 @@ export class ApiClient {
    * параллельных 401 refresh произошёл только один раз.
    * Публичный — вызывается из WsProvider при закрытии соединения с кодом 1008/4401.
    */
-  async tryRefresh(): Promise<boolean> {
+  async tryRefresh(): Promise<RefreshResult> {
     // Паттерн «одного промиса»: при нескольких параллельных 401 refresh
     // произойдёт только один раз. Start/End уведомляем только у инициатора.
     const isNewRefresh = !this.refreshPromise;
@@ -220,11 +223,11 @@ export class ApiClient {
     const promise = this.refreshPromise!;
 
     try {
-      const success = await promise;
+      const result = await promise;
       if (isNewRefresh) {
-        this.emitRefreshEnd(success);
+        this.emitRefreshEnd(result);
       }
-      return success;
+      return result;
     } finally {
       if (isNewRefresh) {
         this.refreshPromise = null;
@@ -232,9 +235,9 @@ export class ApiClient {
     }
   }
 
-  private async performRefresh(): Promise<boolean> {
+  private async performRefresh(): Promise<RefreshResult> {
     if (!this.refreshTokenValue) {
-      return false;
+      return "permanent-rejection";
     }
 
     const generationAtStart = this.refreshGeneration;
@@ -253,31 +256,41 @@ export class ApiClient {
         if (!response.ok) {
           // 401 — refresh-токен отозван или истёк безвозвратно:
           // уведомляем подписчиков, чтобы сбросить сессию.
-          if (response.status === 401) {
+          if (response.status === 400 || response.status === 401 || response.status === 403) {
             this.emitSessionExpired();
+            return "permanent-rejection";
           }
-          return false;
+          return "transient-failure";
         }
 
-        const data = await response.json();
+        const parsed = authResponseSchema.safeParse(await response.json());
+        if (!parsed.success) {
+          console.error("[ApiClient] Invalid refresh response:", parsed.error);
+          return "transient-failure";
+        }
+        const data = parsed.data;
 
         // Сессия была очищена, пока шёл запрос (invalidatePendingRefresh) —
         // не применяем токены и не воскрешаем сессию.
         if (this.refreshGeneration !== generationAtStart) {
-          return false;
+          return "transient-failure";
         }
 
         this.token = data.accessToken;
         this.refreshTokenValue = data.refreshToken;
 
         // Уведомляем подписчиков (Zustand-стор), чтобы сессия не рассинхронизировалась.
-        this.emitTokenUpdate(data);
-        return true;
+        this.emitTokenUpdate({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn,
+        });
+        return "success";
       } finally {
         clearTimeout(timeoutId);
       }
     } catch {
-      return false;
+      return "transient-failure";
     }
   }
 }
