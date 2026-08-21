@@ -163,7 +163,14 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   useEffect(() => {
     const unsubscribeRefreshEnd = apiClient.onRefreshEnd((result) => {
-      if (result !== "success" || disposedRef.current || wsRef.current || reconnectTimeoutRef.current) return;
+      if (result === "permanent-rejection" || disposedRef.current || wsRef.current || reconnectTimeoutRef.current) return;
+
+      // Refresh не удался (сеть/5xx) — планируем реконнект с backoff,
+      // иначе WS-канал останется мёртвым до следующего online/visibility.
+      if (result === "transient-failure") {
+        scheduleReconnectRef.current();
+        return;
+      }
 
       // ApiClient emits refreshEnd immediately before clearing refreshPromise.
       // Reconnect on the next task so connect() observes isRefreshing() === false.

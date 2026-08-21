@@ -31,8 +31,10 @@ jobs:
       VK_APP_SECRET: ci-vk-secret
       ALLOW_DEV_AUTH: "true"
       LOG_LEVEL: silent
-      AUTH_RATE_WINDOW_MS: "900000"
-      AUTH_RATE_MAX: "1000"
+      VK_AUTH_RATE_WINDOW_MS: "900000"
+      VK_AUTH_RATE_MAX: "1000"
+      REFRESH_RATE_WINDOW_MS: "900000"
+      REFRESH_RATE_MAX: "1000"
 
     steps:
       - name: Checkout

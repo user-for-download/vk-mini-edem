@@ -101,8 +101,39 @@ export async function verifyAccessToken(token: string): Promise<string> {
 }
 
 /**
+ * Ошибка: refresh-токен уже отозван (ротирован или logout).
+ *
+ * Обработчик сам решает реакцию: /refresh трактует как reuse и отзывает
+ * всю семью токенов, /logout — игнорирует (повторный логаут безопасен).
+ */
+export class RefreshTokenRevokedError extends Error {
+  constructor(public readonly userId: string) {
+    super("Refresh token revoked");
+    this.name = "RefreshTokenRevokedError";
+  }
+}
+
+/**
+ * Отзыв всех активных refresh-токенов пользователя (token family revocation).
+ *
+ * Вызывается при обнаружении повторного использования уже отозванного токена —
+ * это признак кражи: обнуляем всю цепочку, чтобы украденные токены не могли
+ * быть использованы.
+ */
+export async function revokeAllActiveTokens(userId: string): Promise<number> {
+  const result = await db.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
+}
+
+/**
  * Проверяет refresh-токен: подпись, наличие записи в БД,
  * отсутствие отзыва и срок действия. Возвращает userId и jti.
+ *
+ * Если токен уже отозван — бросает RefreshTokenRevokedError (с userId),
+ * чтобы вызывающий код мог применить политику reuse-детекции.
  */
 export async function verifyRefreshToken(
   token: string
@@ -134,8 +165,12 @@ export async function verifyRefreshToken(
     where: { tokenHash },
   });
 
-  if (!dbToken || dbToken.revokedAt || dbToken.expiresAt < new Date()) {
+  if (!dbToken || dbToken.expiresAt < new Date()) {
     throw new Error("Token revoked or expired");
+  }
+
+  if (dbToken.revokedAt) {
+    throw new RefreshTokenRevokedError(dbToken.userId);
   }
 
   return { userId: payload.sub, jti: payload.jti };
@@ -144,6 +179,12 @@ export async function verifyRefreshToken(
 /**
  * Атомарная ротация refresh-токена:
  * отзывает старый и создаёт новую запись в БД в одной транзакции.
+ *
+ * Отзыв выполняется одним UPDATE c предикатом `revokedAt IS NULL`. Под Read
+ * Committed конкурирующий UPDATE после ожидания блокировки строки перечитывает
+ * её свежую версию (EvalPlanQual) и видит `revokedAt` — поэтому из двух
+ * параллельных ротаций одного токена ровно одна получит count === 1, а вторая
+ * count === 0 и упадёт с "Token already used". Двойная выдача невозможна.
  */
 export async function rotateRefreshToken(
   oldJti: string,
@@ -152,17 +193,14 @@ export async function rotateRefreshToken(
   const oldHash = hashToken(oldJti);
 
   return db.$transaction(async (tx) => {
-    const existing = await tx.refreshToken.findUnique({
-      where: { tokenHash: oldHash },
-    });
-    if (!existing || existing.revokedAt) {
-      throw new Error("Token already used");
-    }
-
-    await tx.refreshToken.update({
-      where: { id: existing.id },
+    const revoked = await tx.refreshToken.updateMany({
+      where: { tokenHash: oldHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+
+    if (revoked.count !== 1) {
+      throw new Error("Token already used");
+    }
 
     const newJti = randomUUID();
     const exp = Math.floor(Date.now() / 1000) + env.JWT_REFRESH_TTL_SECONDS;

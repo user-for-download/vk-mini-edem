@@ -16,7 +16,7 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 
 export default function () {
-  const tripsRes = http.get(`${BASE_URL}/api/trips?limit=20`);
+  const tripsRes = http.get(`${BASE_URL}/api/v1/trips?limit=20`);
   check(tripsRes, {
     "trips status 200": (r) => r.status === 200,
     "trips < 500ms": (r) => r.timings.duration < 500,

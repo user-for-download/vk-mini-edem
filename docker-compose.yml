@@ -37,6 +37,10 @@ services:
       ALLOW_DEV_AUTH: "false"
       APP_VERSION: ${APP_VERSION:-0.1.0}
       # Rate limits (дефолты совпадают с backend/src/env.ts)
+      VK_AUTH_RATE_WINDOW_MS: ${VK_AUTH_RATE_WINDOW_MS:-300000}
+      VK_AUTH_RATE_MAX: ${VK_AUTH_RATE_MAX:-5}
+      REFRESH_RATE_WINDOW_MS: ${REFRESH_RATE_WINDOW_MS:-600000}
+      REFRESH_RATE_MAX: ${REFRESH_RATE_MAX:-10}
       PUBLIC_READ_RATE_WINDOW_MS: ${PUBLIC_READ_RATE_WINDOW_MS:-60000}
       PUBLIC_READ_RATE_MAX: ${PUBLIC_READ_RATE_MAX:-100}
       MUTATION_RATE_WINDOW_MS: ${MUTATION_RATE_WINDOW_MS:-60000}
@@ -53,7 +57,9 @@ services:
       # произвольным forwarding headers от прямых клиентов.
       TRUST_PROXY: "false"
     ports:
-      - "3000:3000"
+      # Публикуем только на loopback: наружу смотрит внешний reverse proxy
+      # (Traefik/nginx), прямой доступ к backend в обход TLS исключён.
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health/ready', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
       interval: 10s

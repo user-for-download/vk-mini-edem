@@ -44,8 +44,10 @@ const envMocks = vi.hoisted(() => ({
   CORS_ORIGINS: "",
   JWT_ACCESS_TTL_SECONDS: 900,
   JWT_REFRESH_TTL_SECONDS: 2592000,
-  AUTH_RATE_WINDOW_MS: 900000,
-  AUTH_RATE_MAX: 20,
+  VK_AUTH_RATE_WINDOW_MS: 300000,
+  VK_AUTH_RATE_MAX: 5,
+  REFRESH_RATE_WINDOW_MS: 600000,
+  REFRESH_RATE_MAX: 10,
 }));
 
 vi.mock("../../src/env.js", () => ({ env: envMocks }));

@@ -154,10 +154,12 @@ export const env = {
   TRUST_PROXY: boolEnv("TRUST_PROXY", false),
 
   /**
-   * Rate limit для auth.
+   * Rate limit для auth (раздельные лимитеры на каждый endpoint).
    */
-  AUTH_RATE_WINDOW_MS: positiveIntEnv("AUTH_RATE_WINDOW_MS", 15 * 60 * 1000),
-  AUTH_RATE_MAX: positiveIntEnv("AUTH_RATE_MAX", 20),
+  VK_AUTH_RATE_WINDOW_MS: positiveIntEnv("VK_AUTH_RATE_WINDOW_MS", 5 * 60 * 1000),
+  VK_AUTH_RATE_MAX: positiveIntEnv("VK_AUTH_RATE_MAX", 5),
+  REFRESH_RATE_WINDOW_MS: positiveIntEnv("REFRESH_RATE_WINDOW_MS", 10 * 60 * 1000),
+  REFRESH_RATE_MAX: positiveIntEnv("REFRESH_RATE_MAX", 10),
 
   /**
    * Rate limits (IP-based).

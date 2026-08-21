@@ -1,6 +1,6 @@
 # Edem Current Memory
 
-Updated: 2026-08-19
+Updated: 2026-08-21
 
 ## Project
 
@@ -12,7 +12,7 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 
 ## Runtime
 
-- Local root `npm run dev` starts frontend on `3010` and backend on `3011`.
+- Local root `npm run dev` builds `packages/contracts` first, then starts frontend on `3010` and backend on `3011`.
 - `VITE_API_TARGET` controls the Vite API/WebSocket proxy target.
 - Production Docker backend listens on `3000` and serves `mini-app/dist`; Compose publishes it only on `127.0.0.1:3000`, while PostgreSQL is available only inside the Docker network.
 - Production requires `DATABASE_URL`, `JWT_SECRET`, `VK_APP_SECRET`, and `CORS_ORIGINS`.
@@ -24,7 +24,9 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - Backend verifies the `sign` HMAC and rejects stale `vk_ts` values older than five minutes.
 - Client-provided `firstName`, `lastName`, and `photo` are not trusted identity data.
 - JWT access tokens are kept in the in-memory frontend API client.
-- Refresh tokens are rotated and stored hashed in PostgreSQL.
+- Refresh tokens are rotated and stored hashed in PostgreSQL. Rotation revokes the old token with a single atomic UPDATE (`revokedAt IS NULL` predicate), so exactly one concurrent rotation succeeds.
+- Refresh token reuse detection: presenting an already-rotated token to `/auth/refresh` revokes ALL active tokens of that user (token family revocation). A repeated `/logout` with an old token does not revoke the family.
+- Auth rate limits are configurable: `VK_AUTH_RATE_WINDOW_MS`/`VK_AUTH_RATE_MAX` (default 5/5min) and `REFRESH_RATE_WINDOW_MS`/`REFRESH_RATE_MAX` (default 10/10min). The old `AUTH_RATE_*` variables were removed.
 
 ## Business Invariants
 
@@ -49,14 +51,13 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 
 ## Verification
 
-Verified on 2026-08-19 after the current source audit:
+Verified on 2026-08-21 after the refresh-token rotation hardening:
 
 - `npm run typecheck` passed for all workspaces.
 - Frontend tests: 34 passed.
 - Contracts tests: 28 passed.
-- Backend tests: 99 passed.
-- Production `npm run build` passed.
-- `git diff --check` passed.
+- Backend tests: 102 passed (incl. new `refresh-rotation` integration suite: concurrent rotation race, reuse family revocation, double-logout safety).
+- `npm run format:check` and `npm run lint` passed.
 
 Booking and review pagination responses are validated against shared contracts and fail closed with HTTP 500 on contract drift; current fixtures use valid shared-schema seat limits.
 

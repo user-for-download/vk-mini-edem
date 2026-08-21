@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "npm run build:contracts && VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "BACKEND_PORT=${BACKEND_PORT:-3011} npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=mini-app",
     "build": "npm run build:contracts && npm run build --workspace=backend && npm run build --workspace=mini-app",

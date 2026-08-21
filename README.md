@@ -143,8 +143,10 @@ CORS_ORIGINS=http://localhost:3010
 BACKEND_PORT=3011
 JWT_ACCESS_TTL_SECONDS=900
 JWT_REFRESH_TTL_SECONDS=2592000
-AUTH_RATE_WINDOW_MS=900000
-AUTH_RATE_MAX=20
+VK_AUTH_RATE_WINDOW_MS=300000
+VK_AUTH_RATE_MAX=5
+REFRESH_RATE_WINDOW_MS=600000
+REFRESH_RATE_MAX=10
 LOG_LEVEL=debug
 ```
 
@@ -161,8 +163,8 @@ LOG_LEVEL=debug
 
 | Метод | Путь | Описание |
 |---|---|---|
-| POST | `/api/v1/auth/vk` | Вход через VK (5 req/5 мин) |
-| POST | `/api/v1/auth/refresh` | Ротация refresh-токена (10 req/10 мин) |
+| POST | `/api/v1/auth/vk` | Вход через VK (дефолт 5 req/5 мин, `VK_AUTH_RATE_*`) |
+| POST | `/api/v1/auth/refresh` | Ротация refresh-токена; reuse → отзыв всех токенов (дефолт 10 req/10 мин, `REFRESH_RATE_*`) |
 | POST | `/api/v1/auth/logout` | Отзыв refresh-токена |
 | GET | `/api/v1/trips` | Список активных поездок (пагинация `{items, pagination}`) |
 | GET | `/api/v1/trips/my?status=active\|archive` | Поездки текущего водителя (фильтр по статусу) |
@@ -196,7 +198,7 @@ LOG_LEVEL=debug
 ## 🔒 Безопасность
 
 - **Sanitization**: все мутации проходят через `getSanitizedBody` (isomorphic-dompurify, без HTML-тегов) — защита от XSS.
-- **Refresh-токены**: хранятся в БД хэшированными (SHA-256), одноразовые — при каждом `/refresh` старый отзывается, выдаётся новый (`rotateRefreshToken`, атомарная транзакция).
+- **Refresh-токены**: хранятся в БД хэшированными (SHA-256), одноразовые — при каждом `/refresh` старый отзывается, выдаётся новый (`rotateRefreshToken`, атомарный UPDATE с предикатом `revokedAt IS NULL` — из параллельных ротаций одного токена succeeds ровно одна). **Reuse detection**: предъявление уже ротированного токена отзывает ВСЕ активные токены пользователя (token family revocation); повторный `/logout` тем же токеном семью не отзывает.
 - **Rate limiting**: раздельные лимитеры для `/auth/vk`, `/auth/refresh`, чтения и мутаций.
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
 - **Статусы брони**: только `pending → confirmed|declined`; отменённые, отклонённые и подтверждённые брони нельзя воскресить через водительский endpoint.

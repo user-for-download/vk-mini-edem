@@ -4,6 +4,7 @@ import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
 import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../env.js";
+import { logger } from "../logger.js";
 import { DEFAULT_AVATAR_URL } from "../constants.js";
 import { serializeUser } from "../serializers/index.js";
 
@@ -13,6 +14,8 @@ import {
   signRefreshToken,
   verifyRefreshToken,
   rotateRefreshToken,
+  revokeAllActiveTokens,
+  RefreshTokenRevokedError,
   hashToken,
 } from "./tokens.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
@@ -20,14 +23,14 @@ import { createRateLimiter } from "../middleware/rateLimit.js";
 export const authRouter = new Hono();
 
 const vkAuthLimiter = createRateLimiter({
-  windowMs: 5 * 60 * 1000,
-  max: 5,
+  windowMs: env.VK_AUTH_RATE_WINDOW_MS,
+  max: env.VK_AUTH_RATE_MAX,
   keyPrefix: "auth-vk",
 });
 
 const refreshLimiter = createRateLimiter({
-  windowMs: 10 * 60 * 1000,
-  max: 10,
+  windowMs: env.REFRESH_RATE_WINDOW_MS,
+  max: env.REFRESH_RATE_MAX,
   keyPrefix: "auth-refresh",
 });
 
@@ -157,7 +160,17 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       expiresIn: env.JWT_ACCESS_TTL_SECONDS,
       user: serializeUser(user),
     });
-  } catch {
+  } catch (error) {
+    // Reuse detection: предъявление уже отозванного (ротированного) токена —
+    // признак кражи. Отзываем ВСЕ активные токены пользователя, чтобы
+    // украденная цепочка не могла быть использована (OAuth 2.0 BCP).
+    if (error instanceof RefreshTokenRevokedError) {
+      const revokedCount = await revokeAllActiveTokens(error.userId);
+      logger.warn(
+        { userId: error.userId, revokedCount },
+        "[Auth] Refresh token reuse detected — all active tokens revoked"
+      );
+    }
     return c.json({ message: "Invalid refresh token" }, 401);
   }
 });
