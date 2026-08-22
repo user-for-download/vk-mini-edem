@@ -32,6 +32,8 @@ export const createTripDtoSchema = baseTripSchema.refine(
 export type CreateTripDto = z.infer<typeof createTripDtoSchema>;
 
 export const tripFiltersDtoSchema = z.object({
+  // Полнотекстовый поиск по городам/адресам (backend: trips GET /).
+  q: z.string().max(100).optional(),
   fromCity: z.string().optional(),
   toCity: z.string().optional(),
   dateFrom: z.string().optional(),

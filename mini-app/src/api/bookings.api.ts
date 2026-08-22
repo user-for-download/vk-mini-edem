@@ -42,7 +42,7 @@ export const bookingsApi = {
     params.set("limit", String(limit));
 
     return apiClient.request<PaginatedBookingsResponse>(
-      `/bookings/trip/${tripId}?${params.toString()}`,
+      `/bookings/trip/${encodeURIComponent(tripId)}?${params.toString()}`,
       { signal },
       paginatedBookingsResponseSchema
     );
@@ -59,7 +59,7 @@ export const bookingsApi = {
     id: string,
     data: UpdateBookingStatusDto
   ): Promise<Booking> => {
-    return apiClient.request<Booking>(`/bookings/${id}/status`, {
+    return apiClient.request<Booking>(`/bookings/${encodeURIComponent(id)}/status`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }, bookingSchema);
@@ -70,7 +70,7 @@ export const bookingsApi = {
    */
   cancelBooking: (id: string): Promise<{ success: boolean }> => {
     return apiClient.request<{ success: boolean }>(
-      `/bookings/${id}/cancel`,
+      `/bookings/${encodeURIComponent(id)}/cancel`,
       {
         method: "PATCH",
       }

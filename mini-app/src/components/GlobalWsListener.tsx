@@ -17,6 +17,9 @@ export const GlobalWsListener: React.FC = () => {
   useWsEvent("booking:new", ({ bookingId, tripId }) => {
     queryClient.invalidateQueries({ queryKey: ["trips", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "trip", tripId] });
+    // Новая бронь меняет seatsAvailable — обновляем и публичные списки.
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.lists() });
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
     enqueueSnackbar({
       type: "info",
       title: "Новая заявка на поездку",
@@ -30,6 +33,8 @@ export const GlobalWsListener: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ["bookings", "trip", tripId] });
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
+    // Подтверждение/отклонение брони меняет занятость мест в публичных списках.
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.lists() });
 
     if (status === "confirmed") {
       enqueueSnackbar({
@@ -51,6 +56,8 @@ export const GlobalWsListener: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ["bookings", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "history"] });
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
+    // Отменённая/завершённая поездка должна исчезнуть из публичного поиска.
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.lists() });
 
     if (status === "cancelled") {
       enqueueSnackbar({

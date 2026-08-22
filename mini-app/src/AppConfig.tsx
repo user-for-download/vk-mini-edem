@@ -23,11 +23,21 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        if (error instanceof ApiError && error.status && error.status >= 400 && error.status < 500) {
-          return false;
-        }
-        if (error instanceof Error && error.message.startsWith("HTTP error 4")) {
-          return false;
+        if (error instanceof ApiError) {
+          // Детерминированные ошибки — ретрай бессмыслен.
+          if (error.code === "INVALID_RESPONSE") {
+            return false;
+          }
+          // 4xx не ретраим, КРОМЕ 408 (таймаут запроса) — это транзитентный
+          // сетевой сбой, самый ретрай-подходящий класс ошибок.
+          if (
+            error.status &&
+            error.status >= 400 &&
+            error.status < 500 &&
+            error.status !== 408
+          ) {
+            return false;
+          }
         }
         return failureCount < 3;
       },

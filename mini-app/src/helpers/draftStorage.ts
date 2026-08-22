@@ -1,9 +1,23 @@
 const DRAFT_PREFIX = "edem:draft:";
 
-export function readDraft<T>(key: string): T | null {
+/**
+ * Читает черновик из localStorage.
+ *
+ * `validate` — опциональный type guard формы. Повреждённый или устаревший
+ * черновик (другая версия схемы, ручная правка) вернёт null вместо
+ * частично заполненного объекта, на котором рендер упал бы с
+ * `undefined.length` / `undefined.trim()`.
+ */
+export function readDraft<T>(key: string, validate?: (value: unknown) => value is T): T | null {
   try {
     const raw = window.localStorage.getItem(`${DRAFT_PREFIX}${key}`);
-    return raw ? (JSON.parse(raw) as T) : null;
+    if (!raw) return null;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (validate) {
+      return validate(parsed) ? parsed : null;
+    }
+    return parsed as T;
   } catch {
     return null;
   }

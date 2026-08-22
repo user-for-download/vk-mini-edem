@@ -33,8 +33,10 @@ import { formatMoscowDateTime, moscowWallClockToIso } from "@/helpers/moscowTime
 import {
   type TripFormValues,
   type TripFormErrors,
+  type TripFormDraft,
   validateTripForm,
   isFormValid,
+  isTripFormDraft,
 } from "./CreateTripModal/validation";
 
 export type EditTripModalProps = CustomModalProps<OpenModalPageProps, { trip: Trip }>;
@@ -47,7 +49,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const currentUser = useCurrentUser();
   const draftKey = currentUser ? `edit-trip:${currentUser.id}:${trip.id}` : null;
   const [initialDraft] = useState(() =>
-    draftKey ? readDraft<{ values: TripFormValues; selectedTags: TripTag[] }>(draftKey) : null
+    draftKey ? readDraft<TripFormDraft>(draftKey, isTripFormDraft) : null
   );
   const [values, setValues] = useState<TripFormValues>(() => {
     if (initialDraft) return initialDraft.values;
@@ -108,17 +110,16 @@ export const EditTripModal: FC<EditTripModalProps> = ({
 
   const handleChange = useCallback(
     (field: keyof TripFormValues, value: string | number) => {
-      setValues((prev) => {
-        const next = { ...prev, [field]: value };
+      // Вычисляем next вне setState-апдейтера: вызов setErrors внутри
+      // апдейтера — антипаттерн (StrictMode вызывает апдейтеры дважды).
+      const next = { ...values, [field]: value };
+      setValues(next);
 
-        if (touched[field]) {
-          setErrors(validateTripForm(next));
-        }
-
-        return next;
-      });
+      if (touched[field]) {
+        setErrors(validateTripForm(next));
+      }
     },
-    [touched]
+    [touched, values]
   );
 
   const handleBlur = useCallback(
@@ -370,7 +371,6 @@ export const EditTripModal: FC<EditTripModalProps> = ({
               value={departureDateTime}
               onChange={handleDateTimeChange}
               enableTime
-              disablePast
               size="m"
               placeholder="Выберите дату и время"
               aria-invalid={!!(showError("date") || showError("time"))}

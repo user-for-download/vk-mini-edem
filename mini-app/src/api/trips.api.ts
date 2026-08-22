@@ -9,13 +9,8 @@ import {
   type PaginatedTripsResponse,
 } from "@edem/contracts";
 
-export type SearchTripsFilters = TripFiltersDto & {
-  q?: string;
-  tags?: string[];
-  dateTo?: string;
-  page?: number;
-  limit?: number;
-};
+// Все поля поиска (включая q) описаны в общем контракте tripFiltersDtoSchema.
+export type SearchTripsFilters = TripFiltersDto;
 
 export type UpdateTripDto = Partial<CreateTripDto>;
 
@@ -51,7 +46,7 @@ export const tripsApi = {
 
   updateTrip: (id: string, data: UpdateTripDto): Promise<Trip> => {
     return apiClient.request<Trip>(
-      `/trips/${id}`,
+      `/trips/${encodeURIComponent(id)}`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -78,7 +73,7 @@ export const tripsApi = {
   },
 
   getTripById: (id: string, signal?: AbortSignal): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}`, { signal }, tripSchema);
+    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}`, { signal }, tripSchema);
   },
 
   createTrip: (data: CreateTripDto): Promise<Trip> => {
@@ -89,13 +84,13 @@ export const tripsApi = {
   },
 
   cancelTrip: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}/cancel`, {
+    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}/cancel`, {
       method: "PATCH",
     }, tripSchema);
   },
 
   completeTrip: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${id}/complete`, {
+    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}/complete`, {
       method: "PATCH",
     }, tripSchema);
   },

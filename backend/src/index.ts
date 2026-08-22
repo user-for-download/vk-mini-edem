@@ -53,6 +53,16 @@ async function shutdown(signal: string): Promise<void> {
     }
     process.exit(0);
   });
+  // close() ждёт завершения keep-alive соединений; idle-сокеты закрываем
+  // сразу, чтобы shutdown не висел до forced-exit таймаута.
+  // ServerType — union (http.Server | Http2Server | ...), метод есть только
+  // на http.Server (Node ≥ 18.2), поэтому вызываем с runtime-проверкой.
+  const closeIdleConnections = (
+    server as { closeIdleConnections?: () => void }
+  ).closeIdleConnections;
+  if (typeof closeIdleConnections === "function") {
+    closeIdleConnections.call(server);
+  }
   setTimeout(() => {
     logger.error({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "Forced shutdown after timeout");
     process.exit(1);

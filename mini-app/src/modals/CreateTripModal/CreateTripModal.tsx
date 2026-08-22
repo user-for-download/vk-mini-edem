@@ -34,9 +34,11 @@ import { moscowWallClockToIso } from "@/helpers/moscowTime";
 import {
   type TripFormValues,
   type TripFormErrors,
+  type TripFormDraft,
   initialFormValues,
   validateTripForm,
   isFormValid,
+  isTripFormDraft,
 } from "./validation";
 
 export type CreateTripModalProps = CustomModalProps<OpenModalPageProps, { onTripCreated: () => void }>;
@@ -49,7 +51,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   const currentUser = useCurrentUser();
   const draftKey = currentUser ? `create-trip:${currentUser.id}` : null;
   const [initialDraft] = useState(() =>
-    draftKey ? readDraft<{ values: TripFormValues; selectedTags: TripTag[] }>(draftKey) : null
+    draftKey ? readDraft<TripFormDraft>(draftKey, isTripFormDraft) : null
   );
   const [values, setValues] = useState<TripFormValues>(initialDraft?.values ?? initialFormValues);
   const [errors, setErrors] = useState<TripFormErrors>({});
@@ -360,7 +362,6 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               value={departureDateTime}
               onChange={handleDateTimeChange}
               enableTime
-              disablePast
               size="m"
               placeholder="Выберите дату и время"
               aria-invalid={!!(showError("date") || showError("time"))}

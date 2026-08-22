@@ -77,7 +77,7 @@ npm run dev
 
 Backend читает `backend/.env`; Vite читает `mini-app/.env` и переменные текущего shell. Корневой `.env` предназначен для Docker Compose.
 
-Канонический workflow использует npm workspaces. Bun остаётся опциональным для точечного запуска workspace-команд, но для воспроизводимой установки и CI используйте `npm ci`/`npm run`.
+Канонический workflow использует npm workspaces (`npm ci`/`npm run`); lockfile — `package-lock.json`. Bun не поддерживается (bun.lock удалён, чтобы избежать дрейфа версий).
 
 ### Запуск в Docker (бэкенд в контейнере)
 ```bash
@@ -214,7 +214,7 @@ LOG_LEVEL=debug
 ## 📡 WebSocket
 
 После авторизации клиент подключается к `/api/v1/ws` и отправляет `{ type: "auth", token }`. Токен не находится в URL. Сервер рассылает события:
-`booking:new`, `booking:status_changed`, `trip:status_changed`, `notification:new`, `pong`/`ping`. Клиент автоматически реконнектится с exponential backoff и jitter, инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
+`booking:new`, `booking:status_changed`, `trip:status_changed`, `trip:details_changed`, `notification:new`, а также `ping` (keep-alive, клиент отвечает `pong`). Клиент автоматически реконнектится с exponential backoff и jitter, инвалидирует затронутые TanStack Query-запросы и показывает snackbar-уведомления.
 
 Reaper (`startWsReaper`/`stopWsReaper`): каждые 30 с сервер закрывает соединения без pong дольше 60 с; остановка идемпотентна, «зомби»-тики после остановки не чистят соединения (graceful shutdown).
 
@@ -225,7 +225,7 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 ## 🛠 Технологии
 
 - **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite, Sentry
-- **Backend**: Hono, Node.js (Bun опционально), Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
+- **Backend**: Hono, Node.js 22, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
 

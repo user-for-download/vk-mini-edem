@@ -143,5 +143,8 @@ model Review {
 
   @@index([targetUserId, createdAt(sort: Desc)])
   @@index([authorId, tripId])
-  @@unique([authorId, tripId, targetUserId], name: "unique_review_per_trip")
+  // Имя индекса — дефолтное Prisma (Review_authorId_tripId_targetUserId_key):
+  // миграция 20260811174647 переименовала unique_review_per_trip в него,
+  // поэтому явный name здесь вызывал бы дрейф schema/migrations.
+  @@unique([authorId, tripId, targetUserId])
 }

@@ -150,7 +150,9 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
   if (maxPrice) {
     const parsedMaxPrice = Number.parseInt(maxPrice, 10);
 
-    if (Number.isNaN(parsedMaxPrice)) {
+    // Контракт (tripFiltersDtoSchema) требует positive int: ноль и
+    // отрицательные значения — невалидный фильтр, а не «пустая выдача».
+    if (Number.isNaN(parsedMaxPrice) || parsedMaxPrice < 1) {
       return c.json({ message: "Invalid maxPrice" }, 400);
     }
 

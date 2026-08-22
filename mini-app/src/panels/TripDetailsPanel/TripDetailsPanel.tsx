@@ -132,7 +132,11 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
         dedupeKey: `booking_status_${bookingId}`,
       });
-      queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
+      // Инвалидируем детали ПОЕЗДКИ (trip.id), а не панели (id):
+      // seatsAvailable/myBooking должны обновиться после решения водителя.
+      if (trip) {
+        queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(trip.id) });
+      }
     } catch (error) {
       enqueueSnackbar({
         type: "error",
@@ -158,7 +162,10 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           title: "Бронь отменена",
           dedupeKey: `cancel_booking_${bookingId}`,
         });
-        queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(id) });
+        // trip.id, а не id панели — см. handleSetBookingStatus.
+        if (trip) {
+          queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(trip.id) });
+        }
       },
       onError: (error) => {
         enqueueSnackbar({

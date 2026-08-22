@@ -14,7 +14,7 @@ export const usersApi = {
   },
 
   getUserById: (id: string, signal?: AbortSignal): Promise<User> => {
-    return apiClient.request<User>(`/users/${id}`, { signal }, userSchema);
+    return apiClient.request<User>(`/users/${encodeURIComponent(id)}`, { signal }, userSchema);
   },
 
   updateProfile: (data: Partial<Pick<User, "name" | "about">>): Promise<User> => {

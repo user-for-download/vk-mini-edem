@@ -9,7 +9,9 @@ services:
       POSTGRES_PASSWORD: edem_local
       POSTGRES_DB: edem
     ports:
-      - "5433:5432"
+      # Только loopback: dev-БД с известными креденшалами не должна быть
+      # доступна из LAN/публичной сети.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
     healthcheck:

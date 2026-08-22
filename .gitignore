@@ -9,6 +9,8 @@ coverage/
 !.env.example
 backend/.env
 !backend/.env.test
+# Канонический lockfile — package-lock.json (npm ci в CI/Docker).
+bun.lock
 *.db
 *.db-journal
 .opencode/

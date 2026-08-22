@@ -2,10 +2,14 @@ import { z } from "zod";
 
 /**
  * События, которые сервер отправляет клиенту через WebSocket.
+ *
+ * Держите в синхроне с backend/src/services/wsManager.ts и
+ * backend/src/ws/index.ts: сервер шлёт auth:ok, ping (keep-alive)
+ * и бизнес-события. Серверных `pong`/`error` не существует —
+ * клиент отвечает на ping сам, ошибки доставляются кодом закрытия.
  */
 export const wsServerEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("auth:ok") }),
-  z.object({ type: z.literal("pong") }),
   z.object({ type: z.literal("ping") }),
   z.object({
     type: z.literal("booking:new"),
@@ -27,16 +31,15 @@ export const wsServerEventSchema = z.discriminatedUnion("type", [
     type: z.literal("notification:new"),
     payload: z.object({ id: z.string() }),
   }),
-  z.object({
-    type: z.literal("error"),
-    payload: z.object({ code: z.string(), message: z.string() }),
-  }),
 ]);
 
 export type WsServerEvent = z.infer<typeof wsServerEventSchema>;
 
 /**
  * Сообщения от клиента к серверу.
+ *
+ * Сервер принимает только auth и pong (ответ на keep-alive ping).
+ * Клиентский ping не поддерживается — keep-alive инициирует сервер.
  */
 export const wsClientMessageSchema = z.discriminatedUnion("type", [
   z.object({
@@ -49,7 +52,3 @@ export const wsClientMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type WsClientMessage = z.infer<typeof wsClientMessageSchema>;
-
-export const wsPingSchema = z.object({
-  type: z.literal("ping"),
-});

@@ -45,19 +45,21 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - VKUI receives appearance, insets, adaptivity, platform, and WebView state through `AppConfig`.
 - Session state reacts to browser visibility and VK view hide/restore events.
 - WebSocket auth sends `{ type: "auth", token }` after connecting to `/api/v1/ws`; the token is not placed in the URL. The server closes authenticated connections when their access JWT expires.
+- WebSocket contract (`packages/contracts`) matches the implementation: server sends `auth:ok`, `ping` (keep-alive), and business events; client sends only `auth` and `pong`. Dead `pong`/`error` server events, `wsPingSchema`, and a client `ping` variant were removed.
 - WebSocket cleanup guards against stale sockets and reconnects after provider unmount.
 - Swipe settings use `VKWebAppSetSwipeSettings`; raw swipe messages require a parent window and allowed VK origins.
 - VK community messaging is optional. `VK_GROUP_TOKEN` is submitted to VK API in a POST body.
 
 ## Verification
 
-Verified on 2026-08-21 after the refresh-token rotation hardening:
+Verified on 2026-08-21 after the refresh-token rotation hardening and the low-severity audit remediation:
 
 - `npm run typecheck` passed for all workspaces.
 - Frontend tests: 34 passed.
 - Contracts tests: 28 passed.
 - Backend tests: 102 passed (incl. new `refresh-rotation` integration suite: concurrent rotation race, reuse family revocation, double-logout safety).
-- `npm run format:check` and `npm run lint` passed.
+- `npm run format:check`, `npm run lint`, `npm run bundle:check` passed.
+- Production `npm run build` passed; Docker image builds on `node:22-alpine` (matches CI Node 22 and `engines: >=22`).
 
 Booking and review pagination responses are validated against shared contracts and fail closed with HTTP 500 on contract drift; current fixtures use valid shared-schema seat limits.
 

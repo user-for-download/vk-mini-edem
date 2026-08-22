@@ -119,7 +119,6 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           ws.send(JSON.stringify({ type: "pong" }));
           return;
         }
-        if (parsed.type === "pong") return; // Игнорируем ответ сервера на наш pong
         setLastMessage(parsed);
       } catch (err) {
         console.error("Failed to parse WS message", err);

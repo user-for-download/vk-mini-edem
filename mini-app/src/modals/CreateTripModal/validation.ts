@@ -1,5 +1,5 @@
 // mini-app/src/modals/CreateTripModal/validation.ts
-import { MAX_SEATS } from "@edem/contracts";
+import { MAX_SEATS, type TripTag } from "@edem/contracts";
 import { moscowWallClockToIso } from "@/helpers/moscowTime";
 
 export interface TripFormValues {
@@ -150,4 +150,48 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
 
 export function isFormValid(errors: TripFormErrors): boolean {
   return Object.keys(errors).length === 0;
+}
+
+export interface TripFormDraft {
+  values: TripFormValues;
+  selectedTags: TripTag[];
+}
+
+const STRING_VALUE_FIELDS = [
+  "fromCity",
+  "fromAddress",
+  "toCity",
+  "toAddress",
+  "date",
+  "time",
+  "durationMinutes",
+  "distanceKm",
+  "price",
+  "comment",
+] as const;
+
+function isTripFormValues(value: unknown): value is TripFormValues {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+
+  return (
+    STRING_VALUE_FIELDS.every((field) => typeof record[field] === "string") &&
+    typeof record.seats === "number"
+  );
+}
+
+/**
+ * Type guard черновика формы поездки для readDraft.
+ * Повреждённый/устаревший черновик (нет полей, неверные типы) отбрасывается,
+ * чтобы рендер не падал на undefined.length / undefined.trim().
+ */
+export function isTripFormDraft(value: unknown): value is TripFormDraft {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+
+  return (
+    isTripFormValues(record.values) &&
+    Array.isArray(record.selectedTags) &&
+    record.selectedTags.every((tag) => typeof tag === "string")
+  );
 }

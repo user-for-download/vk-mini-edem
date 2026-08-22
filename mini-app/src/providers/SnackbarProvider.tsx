@@ -45,6 +45,14 @@ export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
         if (last !== undefined && now - last < DEDUPE_WINDOW_MS) {
           return;
         }
+        // Ключи содержат несвязанные id (booking/trip) — без очистки Map
+        // росла бы бесконечно в долгоживущей WebView-сессии. Выкидываем
+        // протухшие записи (они уже не влияют на дедупликацию).
+        for (const [key, at] of lastDedupeAt.current) {
+          if (now - at >= DEDUPE_WINDOW_MS) {
+            lastDedupeAt.current.delete(key);
+          }
+        }
         lastDedupeAt.current.set(item.dedupeKey, now);
       }
 

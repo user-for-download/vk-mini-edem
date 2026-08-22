@@ -81,23 +81,35 @@ app.use(
 
 /**
  * Структурированный access-log.
+ *
+ * Метрика и лог пишутся в finally: запросы, завершившиеся необработанной
+ * ошибкой (onError), тоже должны попадать в access-log и http_requests_total.
+ * Для таких запросов финальный статус ещё не установлен (onError сработает
+ * после middleware), поэтому пишем флаг errored, а саму ошибку логирует onError.
  */
 app.use("*", async (c, next) => {
   const startedAt = Date.now();
+  let errored = false;
 
-  await next();
+  try {
+    await next();
+  } catch (error) {
+    errored = true;
+    throw error;
+  } finally {
+    httpRequestsTotal.inc();
 
-  httpRequestsTotal.inc();
-
-  logger.info(
-    {
-      method: c.req.method,
-      path: c.req.path,
-      status: c.res.status,
-      durationMs: Date.now() - startedAt,
-    },
-    "http_request"
-  );
+    logger.info(
+      {
+        method: c.req.method,
+        path: c.req.path,
+        status: errored ? undefined : c.res.status,
+        errored,
+        durationMs: Date.now() - startedAt,
+      },
+      "http_request"
+    );
+  }
 });
 
 /**

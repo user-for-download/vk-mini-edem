@@ -36,7 +36,7 @@ export const notificationsApi = {
 
   markRead: (id: string): Promise<Notification> => {
     return apiClient.request<Notification>(
-      `/notifications/${id}/read`,
+      `/notifications/${encodeURIComponent(id)}/read`,
       { method: "PATCH" },
       notificationSchema
     );

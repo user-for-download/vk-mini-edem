@@ -30,7 +30,7 @@ export const reviewsApi = {
     params.set("limit", String(limit));
 
     return apiClient.request<PaginatedReviewsResponse>(
-      `/reviews/user/${userId}?${params.toString()}`,
+      `/reviews/user/${encodeURIComponent(userId)}?${params.toString()}`,
       { signal },
       paginatedReviewsResponseSchema
     );

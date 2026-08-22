@@ -1,5 +1,6 @@
 # ─── Stage 1: Build ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+# Node 22 — совпадает с CI (.github/workflows/ci.yml) и engines в package.json.
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -20,7 +21,7 @@ RUN cd backend && npx prisma generate && npm run build
 RUN cd mini-app && npm run build
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production

@@ -198,7 +198,14 @@ export class ApiClient {
       controller.abort();
     }, 15000);
     const abortFromCaller = () => controller.abort(options.signal?.reason);
-    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    // Если сигнал вызывающего уже отменён ДО старта запроса, событие "abort"
+    // больше не сработает — слушатель был бы no-op и запрос ушёл бы в сеть.
+    // Пробрасываем отмену сразу.
+    if (options.signal?.aborted) {
+      controller.abort(options.signal.reason);
+    } else {
+      options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    }
 
     try {
       return await fetch(`${API_BASE_URL}${endpoint}`, {

@@ -958,6 +958,18 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
       );
     }
 
+    // Unique-конфликт partial-индексов (active_seat_booking /
+    // active_passenger_booking) — 409, как и в POST /bookings.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.BOOKING_CONFLICT, message: "Booking conflict" },
+        409
+      );
+    }
+
     // Serializable: параллельное изменение брони/поездки — клиент
     // получает 409 и может повторить запрос с актуальными данными.
     if (
