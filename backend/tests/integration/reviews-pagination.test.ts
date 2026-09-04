@@ -6,11 +6,15 @@ import { db } from "../../src/db.js";
  * Cursor-based пагинация GET /reviews/user/:userId.
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 describe("GET /reviews/user/:userId — cursor pagination", () => {
   let targetUserId: string;
-  let authorId: string;
+  // F14 partial unique index (authorId, targetUserId) WHERE tripId IS NULL:
+  // каждому NULL-trip отзыву — свой автор, иначе второй INSERT → P2002.
+  // targetUserId общий, чтобы пагинационные ассёрты (25 items) держались.
+  let authorIds: string[];
   // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
   let vkSeq = 1_500_000;
 
@@ -24,14 +28,18 @@ describe("GET /reviews/user/:userId — cursor pagination", () => {
     });
     targetUserId = targetUser.id;
 
-    const author = await db.user.create({
-      data: {
-        name: `Author-${Date.now()}`,
-        vkUserId: ++vkSeq,
-        avatar: "https://i.pravatar.cc/200?img=2",
-      },
-    });
-    authorId = author.id;
+    // 25 distinct authors — см. комментарий к authorIds выше.
+    authorIds = [];
+    for (let i = 0; i < 25; i++) {
+      const author = await db.user.create({
+        data: {
+          name: `Author-${Date.now()}-${i}`,
+          vkUserId: ++vkSeq,
+          avatar: "https://i.pravatar.cc/200?img=2",
+        },
+      });
+      authorIds.push(author.id);
+    }
 
     // 25 опубликованных отзывов с убывающими createdAt (сортировка по
     // createdAt desc). Статус — явно "published": публичный список
@@ -39,7 +47,7 @@ describe("GET /reviews/user/:userId — cursor pagination", () => {
     for (let i = 0; i < 25; i++) {
       await db.review.create({
         data: {
-          authorId,
+          authorId: authorIds[i],
           targetUserId,
           targetRole: "driver",
           rating: (i % 5) + 1,
@@ -54,7 +62,9 @@ describe("GET /reviews/user/:userId — cursor pagination", () => {
 
   afterEach(async () => {
     await db.review.deleteMany({ where: { targetUserId } });
-    await db.user.deleteMany({ where: { id: { in: [targetUserId, authorId] } } });
+    await db.user.deleteMany({
+      where: { id: { in: [targetUserId, ...authorIds] } },
+    });
   });
 
   it("returns first page with default limit (20) and DESC order", async () => {

@@ -1,8 +1,8 @@
 generator client {
-  provider              = "prisma-client"
+  provider               = "prisma-client"
   // Prisma 7: генерация в src (компилируется tsc в dist), gitignore'd.
-  output                = "../src/generated/prisma"
-  moduleFormat          = "esm"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
   generatedFileExtension = "ts"
   importFileExtension    = "ts"
 }
@@ -14,35 +14,35 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  vkUserId     Int?      @unique
-  name         String
-  avatar       String
-  rating       Float     @default(5.0)
-  reviewsCount Int       @default(0)
-  tripsCount   Int       @default(0)
-  isVerified   Boolean   @default(true)
-  notificationsEnabled Boolean @default(true)
+  id                   String    @id @default(uuid())
+  vkUserId             Int?      @unique
+  name                 String
+  avatar               String
+  rating               Float     @default(5.0)
+  reviewsCount         Int       @default(0)
+  tripsCount           Int       @default(0)
+  isVerified           Boolean   @default(true)
+  notificationsEnabled Boolean   @default(true)
   verifiedAt           DateTime?
   bannedAt             DateTime?
   // Причина бана (обязательна при бане через админку: 1..500 символов).
   // null для старых банов, выставленных до этого поля (UI показывает «Причина не указана»).
   banReason            String?
-  about        String?
+  about                String?
   // Версия онбординга (слайдов), показанного пользователю; null — ещё не показан.
   // Админка может сбросить (PATCH /admin/users/:id/onboarding-reset).
-  onboardingVersion String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  onboardingVersion    String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  car          Car?
-  driverTrips  Trip[]    @relation("DriverTrips")
-  bookings     Booking[] @relation("PassengerBookings")
-  reviewsGiven Review[]  @relation("AuthorReviews")
-  reviewsRecv  Review[]  @relation("TargetReviews")
+  car           Car?
+  driverTrips   Trip[]         @relation("DriverTrips")
+  bookings      Booking[]      @relation("PassengerBookings")
+  reviewsGiven  Review[]       @relation("AuthorReviews")
+  reviewsRecv   Review[]       @relation("TargetReviews")
   notifications Notification[]
   refreshTokens RefreshToken[]
-  feedbacks    Feedback[]
+  feedbacks     Feedback[]
 }
 
 model RefreshToken {
@@ -53,7 +53,7 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -61,13 +61,13 @@ model RefreshToken {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  type      String   // booking_created, booking_confirmed, trip_cancelled
+  type      String // booking_created, booking_confirmed, trip_cancelled
   title     String
   body      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead, createdAt(sort: Desc)])
 }
@@ -80,11 +80,11 @@ model Car {
   plate     String
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Trip {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   driverId        String
   fromCity        String
   fromAddress     String
@@ -96,23 +96,27 @@ model Trip {
   // и для автодополнения в форме создания.
   fromCityId      String?
   toCityId        String?
-  fromCityRef     City?     @relation("TripFromCity", fields: [fromCityId], references: [id], onDelete: SetNull)
-  toCityRef       City?     @relation("TripToCity", fields: [toCityId], references: [id], onDelete: SetNull)
+  fromCityRef     City?    @relation("TripFromCity", fields: [fromCityId], references: [id], onDelete: SetNull)
+  toCityRef       City?    @relation("TripToCity", fields: [toCityId], references: [id], onDelete: SetNull)
   departureAt     DateTime
   durationMinutes Int
   distanceKm      Float
+  // DB-уровень: CHECK Trip_price_positive (price > 0),
+  // Trip_seatsTotal_range (1..MAX_SEATS = 3),
+  // Trip_seatsAvailable_nonnegative (>= 0).
+  // Prisma CHECK не выражает — см. миграцию *compress_seats_to_max3.
   price           Int
   seatsTotal      Int
   seatsAvailable  Int
-  tags            String[]  @default([])
+  tags            String[] @default([])
   comment         String?
-  status          String    @default("active") // active, cancelled, completed
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  status          String   @default("active") // active, cancelled, completed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  driver          User      @relation("DriverTrips", fields: [driverId], references: [id])
-  bookings        Booking[]
-  reviews         Review[]
+  driver   User      @relation("DriverTrips", fields: [driverId], references: [id])
+  bookings Booking[]
+  reviews  Review[]
 
   @@index([status, departureAt(sort: Asc)])
   @@index([driverId, status])
@@ -137,11 +141,15 @@ model City {
   // создаёт индекс автоматически. db:push и migrate deploy оба
   // гарантируют UNIQUE INDEX, что критично для проверки дубликатов
   // (P2002) в POST /admin/cities.
-  nameNormalized String @unique
-  // Счётчик поездок с этим городом (для отображения в админке и
-  // предотвращения удаления используемого города). Денормализация
-  // ради O(1) проверки «можно ли удалить» и быстрого отображения
-  // в UI; инкрементируется при создании/редактировании поездки.
+  nameNormalized String   @unique
+  // Счётчик НЕ отменённых поездок с этим городом (для отображения в
+  // админке и предотвращения удаления используемого города).
+  // Денормализация ради O(1) проверки «можно ли удалить» и быстрого
+  // отображения в UI. Меняется только через cities/counters.ts (F17):
+  // инкремент при создании поездки, guarded-декремент при отмене
+  // (tripsCount > 0), пересчёт — POST /admin/cities/
+  // recompute-trips-count. DB: CHECK City_tripsCount_nonnegative
+  // (миграция *city_tripscount_guard).
   tripsCount     Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -156,13 +164,14 @@ model Booking {
   id          String   @id @default(uuid())
   tripId      String
   passengerId String
+  // DB CHECK Booking_seat_positive (seat >= 1) — см. миграцию *compress_seats_to_max3.
   seat        Int
   status      String   @default("pending") // pending, confirmed, declined, cancelled
   comment     String?
   createdAt   DateTime @default(now())
 
-  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  passenger   User     @relation("PassengerBookings", fields: [passengerId], references: [id])
+  trip      Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  passenger User @relation("PassengerBookings", fields: [passengerId], references: [id])
 
   @@index([tripId, status])
   @@index([passengerId, status])
@@ -176,36 +185,50 @@ model Booking {
 // - active_seat_booking (tripId, seat) WHERE status IN ('pending', 'confirmed')
 // - active_passenger_booking (tripId, passengerId) WHERE status IN ('pending', 'confirmed')
 // См. prisma/migrations/*_booking_unique_indexes/migration.sql
+// (F15: предикат намеренно исключает declined/cancelled — отклонённая бронь
+// освобождает слот, повторная подача на то же место разрешена; pre-check'и
+// POST /bookings обязаны использовать тот же предикат через
+// ACTIVE_BOOKING_STATUSES. Миграция *_booking_resubmit_after_decline
+// идемпотентно фиксирует оба индекса.)
 
 model Review {
   id           String   @id @default(uuid())
   authorId     String
   targetUserId String
-  targetRole   String   // passenger, driver
+  targetRole   String // passenger, driver
+  // DB CHECK Review_rating_range (1..5, как контракт review.schema) —
+  // см. миграцию *compress_seats_to_max3.
   rating       Int
   text         String
   tripRoute    String
   status       String   @default("pending") // pending, published, rejected
   createdAt    DateTime @default(now())
 
-  tripId       String?
-  trip         Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  tripId String?
+  trip   Trip?   @relation(fields: [tripId], references: [id], onDelete: SetNull)
 
-  author       User     @relation("AuthorReviews", fields: [authorId], references: [id])
-  targetUser   User     @relation("TargetReviews", fields: [targetUserId], references: [id])
+  author     User @relation("AuthorReviews", fields: [authorId], references: [id])
+  targetUser User @relation("TargetReviews", fields: [targetUserId], references: [id])
 
-  @@index([targetUserId, createdAt(sort: Desc)])
-  @@index([targetUserId, status])
-  @@index([authorId, tripId])
   // Имя индекса — дефолтное Prisma (Review_authorId_tripId_targetUserId_key):
   // миграция 20260811174647 переименовала unique_review_per_trip в него,
   // поэтому явный name здесь вызывал бы дрейф schema/migrations.
   @@unique([authorId, tripId, targetUserId])
+  // NULL-safety (F14): PostgreSQL в unique-индексе считает NULL «разными»,
+  // поэтому полный индекс выше не ловит дубли (authorId, targetUserId) при
+  // tripId IS NULL (legacy-отзывы, удалённая поездка — FK onDelete: SetNull).
+  // Partial-индекс (authorId, targetUserId) WHERE tripId IS NULL создаётся
+  // SQL-миграцией (Prisma не поддерживает `where` в @@unique — как и
+  // partial-индексы Booking выше):
+  // prisma/migrations/*_review_unique_null_trip/migration.sql.
+  @@index([targetUserId, createdAt(sort: Desc)])
+  @@index([targetUserId, status])
+  @@index([authorId, tripId])
 }
 
 // Обращения пользователей в поддержку (Профиль → Помощь и поддержка).
 model Feedback {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   subject   String
   text      String
@@ -214,9 +237,9 @@ model Feedback {
   // ответа сохраняем исходное время (аудит «когда был дан ответ»).
   reply     String?
   repliedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt(sort: Desc)])
   @@index([repliedAt])
