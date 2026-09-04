@@ -68,6 +68,7 @@ export const HomePanel: FC<HomePanelProps> = ({
     data: myBookings,
     isLoading: myBookingsLoading,
     isError: myBookingsError,
+    error: myBookingsFetchError,
     refetch: refetchMyBookings,
   } = useMyBookingsQuery({
     enabled: role === "passenger",
@@ -215,7 +216,7 @@ export const HomePanel: FC<HomePanelProps> = ({
                   <Button
                     size="m"
                     mode="primary"
-                    onClick={() => refetchMyTrips()}
+                    onClick={() => { void refetchMyTrips(); }}
                   >
                     Попробовать снова
                   </Button>
@@ -250,7 +251,22 @@ export const HomePanel: FC<HomePanelProps> = ({
           {myBookingsError && (
             <EmptyState
               title="Не удалось загрузить бронирование"
-              subtitle="Проверьте соединение и попробуйте позже"
+              subtitle={
+                myBookingsFetchError instanceof Error
+                  ? myBookingsFetchError.message
+                  : "Проверьте соединение и попробуйте позже"
+              }
+              action={
+                <Box padding="system">
+                  <Button
+                    size="m"
+                    mode="primary"
+                    onClick={() => { void refetchMyBookings(); }}
+                  >
+                    Попробовать снова
+                  </Button>
+                </Box>
+              }
             />
           )}
 
@@ -300,7 +316,7 @@ export const HomePanel: FC<HomePanelProps> = ({
             subtitle="Попробуйте обновить список позже"
             action={
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={() => refetchTrips()}>
+                <Button size="m" mode="primary" onClick={() => { void refetchTrips(); }}>
                   Попробовать снова
                 </Button>
               </Box>

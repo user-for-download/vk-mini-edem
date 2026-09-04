@@ -30,7 +30,7 @@ import { getErrorMessage, getRateLimitMessage } from "@/helpers/errorMessages";
 import { useCreateTripMutation } from "@/queries/useTripsQuery";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { clearDraft, readDraft, writeDraft } from "@/helpers/draftStorage";
-import { moscowWallClockToIso } from "@/helpers/moscowTime";
+import { formatMoscowDateTime, moscowWallClockToIso } from "@/helpers/moscowTime";
 import { CityPickerField } from "@/components/CityPickerField/CityPickerField";
 import {
   type TripFormValues,
@@ -62,12 +62,18 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   const [selectedTags, setSelectedTags] = useState<TripTag[]>(initialDraft?.selectedTags ?? []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const persistDraftRef = useRef(true);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isSubmittingRef = useRef(false);
 
-  // Единый объект даты+времени для DateInput; синхронизирован с values.date/time.
+  // Единый объект даты+времени для DateInput; values.date/time — это
+  // московские wall-clock поля, поэтому начальный момент строим через
+  // moscowWallClockToIso (Europe/Moscow), а не через new Date("...T..."),
+  // который парсится в локальном часовом поясе устройства.
   const [departureDateTime, setDepartureDateTime] = useState<Date | null>(() => {
     if (values.date && values.time) {
-      const dt = new Date(`${values.date}T${values.time}`);
-      return Number.isNaN(dt.getTime()) ? null : dt;
+      const iso = moscowWallClockToIso(values.date, values.time);
+      return iso ? new Date(iso) : null;
     }
     return null;
   });
@@ -96,17 +102,20 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   const handleDateTimeChange = useCallback((date: Date | null) => {
     setDepartureDateTime(date);
 
-    if (date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
+    // DateInput отдаёт абсолютный момент (Date); wall-clock поля извлекаем
+    // в московском времени (Europe/Moscow, см. formatMoscowDateTime), а не
+    // локальными геттерами — иначе у пользователей вне МСК дата/время
+    // сдвинутся, и departureAt сохранит неверный момент.
+    const moscow =
+      date && !Number.isNaN(date.getTime())
+        ? formatMoscowDateTime(date.toISOString())
+        : null;
 
+    if (moscow) {
       setValues((prev) => ({
         ...prev,
-        date: `${year}-${month}-${day}`,
-        time: `${hours}:${minutes}`,
+        date: moscow.date,
+        time: moscow.time,
       }));
     } else {
       setValues((prev) => ({ ...prev, date: "", time: "" }));
@@ -129,6 +138,8 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
   }, []);
 
   const handlePublish = useCallback(() => {
+    if (isSubmittingRef.current) return;
+
     const allTouched: Partial<Record<keyof TripFormValues, boolean>> = {};
 
     (Object.keys(values) as (keyof TripFormValues)[]).forEach((key) => {
@@ -175,10 +186,12 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
       comment: values.comment.trim() ? values.comment.trim() : undefined,
     };
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     createTrip.mutate(payload, {
       onSettled: () => {
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
       },
       onSuccess: () => {
@@ -353,6 +366,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               value={departureDateTime}
               onChange={handleDateTimeChange}
               enableTime
+              disablePast
               size="m"
               placeholder="Выберите дату и время"
               aria-invalid={!!(showError("date") || showError("time"))}

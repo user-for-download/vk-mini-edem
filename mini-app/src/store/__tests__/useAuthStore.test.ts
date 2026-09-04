@@ -9,7 +9,7 @@ vi.mock("@/api/auth.api", () => ({
   },
 }));
 
-import { ApiError } from "@/api/client";
+import { ApiError, apiClient } from "@/api/client";
 import { authApi } from "@/api/auth.api";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { AuthResponse } from "@edem/contracts";
@@ -161,6 +161,103 @@ describe("useAuthStore.bootstrap", () => {
     expect(state.banReason).toBeNull();
     expect(state.user).toBeNull();
     expect(state.session).toBeNull();
+  });
+});
+
+describe("useAuthStore.refreshSession", () => {
+  const authenticatedSession = {
+    accessToken: "access-old",
+    refreshToken: "refresh-old",
+    expiresAt: Date.now() + 60_000,
+  };
+
+  function seedAuthenticated() {
+    useAuthStore.setState({
+      status: "authenticated",
+      user: validUser,
+      session: { ...authenticatedSession },
+      banReason: null,
+    });
+  }
+
+  beforeEach(() => {
+    resetStore();
+    seedAuthenticated();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    apiClient.setSession(null);
+    apiClient.invalidatePendingRefresh();
+    resetStore();
+  });
+
+  it("транзиентный сбой (сеть/5xx) НЕ разлогинивает: user/session сохранены", async () => {
+    // Arrange — tryRefresh сообщает о транзиентной проблеме (сеть легла).
+    vi.spyOn(apiClient, "tryRefresh").mockResolvedValue("transient-failure");
+
+    // Act
+    await useAuthStore.getState().refreshSession();
+
+    // Assert — сессия на месте, пользователь не выкинут на экран логина.
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("authenticated");
+    expect(state.user).toEqual(validUser);
+    expect(state.session?.accessToken).toBe("access-old");
+    expect(state.session?.refreshToken).toBe("refresh-old");
+  });
+
+  it("транзиентный сбой из initializing возвращает authenticated (повторный запрос восстановится)", async () => {
+    // Arrange — возврат из фона: handleBackgroundState выставил initializing.
+    useAuthStore.setState({ status: "initializing" });
+    vi.spyOn(apiClient, "tryRefresh").mockResolvedValue("transient-failure");
+
+    // Act
+    await useAuthStore.getState().refreshSession();
+
+    // Assert — спиннер снят, но логаута нет; следующий запрос повторит refresh.
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("authenticated");
+    expect(state.session?.refreshToken).toBe("refresh-old");
+  });
+
+  it("реальный 401 (permanent-rejection) разлогинивает: сессия сброшена", async () => {
+    // Arrange — refresh-токен отозван/ротирован, бэкенд ответил 401.
+    vi.spyOn(apiClient, "tryRefresh").mockResolvedValue("permanent-rejection");
+
+    // Act
+    await useAuthStore.getState().refreshSession();
+
+    // Assert — явный логаут: пользователь увидит экран авторизации.
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("unauthenticated");
+    expect(state.user).toBeNull();
+    expect(state.session).toBeNull();
+  });
+
+  it("успешный refresh обновляет session стора без подписки AuthGate", async () => {
+    // Arrange — настоящий tryRefresh: fetch отвечает свежими токенами.
+    // Подписки AuthGate здесь нет — стор обновляется сам (локальный onTokenUpdate).
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        accessToken: "access-new",
+        refreshToken: "refresh-new",
+        expiresIn: 900,
+        user: validUser,
+      }),
+    } as Response);
+
+    // Act
+    await useAuthStore.getState().refreshSession();
+
+    // Assert — токены ротированы, статус активный.
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("authenticated");
+    expect(state.session?.accessToken).toBe("access-new");
+    expect(state.session?.refreshToken).toBe("refresh-new");
+    expect(state.user).toEqual(validUser);
   });
 });
 

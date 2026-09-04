@@ -53,6 +53,8 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     data: availableReviewTrips,
     isLoading: availableReviewTripsLoading,
     isError: availableReviewTripsError,
+    error: availableReviewTripsFetchError,
+    refetch: refetchAvailableReviewTrips,
   } = useAvailableReviewTripsQuery();
 
   if (!currentUser) {
@@ -135,8 +137,24 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         )}
 
         {availableReviewTripsError && (
-          <SimpleCell before={<Icon24StarsOutline />} subtitle="Не удалось загрузить список поездок">
-            Ошибка загрузки
+          <SimpleCell
+            before={<Icon24StarsOutline />}
+            subtitle={
+              availableReviewTripsFetchError instanceof Error
+                ? availableReviewTripsFetchError.message
+                : "Проверьте соединение и попробуйте позже"
+            }
+            after={
+              <Button
+                size="s"
+                mode="tertiary"
+                onClick={() => { void refetchAvailableReviewTrips(); }}
+              >
+                Попробовать снова
+              </Button>
+            }
+          >
+            Не удалось загрузить поездки
           </SimpleCell>
         )}
 

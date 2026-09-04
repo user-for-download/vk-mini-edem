@@ -1,4 +1,4 @@
-import { type FC, useState } from "react";
+import { type FC, useState, useRef } from "react";
 import {
   Button,
   Caption,
@@ -35,6 +35,9 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isSubmittingRef = useRef(false);
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
 
@@ -64,6 +67,8 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
   );
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
+
     const model = values.model.trim();
     const color = values.color.trim();
     const plate = values.plate.trim();
@@ -83,6 +88,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -115,6 +121,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
         dedupeKey: "car_form_error",
       });
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

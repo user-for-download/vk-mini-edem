@@ -73,13 +73,17 @@ export default function App() {
 
     const deepLink = parseDeepLink();
 
+    // Deep-link — точка входа в приложение: кладём маршрут поверх стартового
+    // "/", чтобы «Назад» с первой открытой страницы вело на главную,
+    // а не закрывало мини-апп / не показывало пустой экран.
+    // Обычная навигация внутри приложения не затрагивается.
     if (deepLink.tripId) {
-      void routeNavigator.replace(`/trips/${encodeURIComponent(deepLink.tripId)}`);
+      void routeNavigator.push(`/trips/${encodeURIComponent(deepLink.tripId)}`);
       return;
     }
 
     if (deepLink.openHistory) {
-      void routeNavigator.replace("/bookings/history");
+      void routeNavigator.push("/bookings/history");
       return;
     }
 

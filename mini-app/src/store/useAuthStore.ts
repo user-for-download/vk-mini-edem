@@ -238,21 +238,56 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         console.log("[Auth] Refreshing session...");
 
-        // Единая точка refresh — apiClient.tryRefresh() (single-flight):
-        // тот же путь, что и при 401/WS-сбое. Ротация токенов происходит
-        // один раз; store обновляется через onTokenUpdate (AuthGate).
-        apiClient.setSession(state.session);
+        // Локальная подписка на обновлённые токены: стор обновляет session
+        // сам и не зависит от подписки AuthGate (её может не быть, если гейт
+        // размонтирован). Подписка одноразовая — снимается в finally ниже.
+        // Дублирующее обновление из AuthGate идемпотентно (те же значения).
+        const unsubscribe = apiClient.onTokenUpdate((tokens) => {
+          if (get().status === "unauthenticated" || get().status === "error") {
+            return;
+          }
+          set({
+            status: "authenticated",
+            session: {
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
+              expiresAt: Date.now() + tokens.expiresIn * 1000,
+            },
+          });
+        });
 
-        const refreshResult = await apiClient.tryRefresh();
+        try {
+          // Единая точка refresh — apiClient.tryRefresh() (single-flight):
+          // тот же путь, что и при 401/WS-сбое. Ротация токенов происходит
+          // один раз.
+          apiClient.setSession(state.session);
 
-        if (refreshResult === "permanent-rejection") {
-          await get().clearSession("Refresh failed");
-        } else if (refreshResult === "transient-failure") {
-          set({ status: "authenticated" });
+          const refreshResult = await apiClient.tryRefresh();
+
+          if (refreshResult === "permanent-rejection") {
+            // Бан (403 FORBIDDEN) идёт тем же путём: onBanned уже выставил
+            // status="banned" — не затираем плашку бана логаутом.
+            if (get().status === "banned") {
+              return;
+            }
+            await get().clearSession("Refresh failed");
+          } else if (refreshResult === "transient-failure") {
+            // Транзиентный сбой (сеть/5xx/невалидный ответ): сессию НЕ
+            // сбрасываем — следующий запрос повторит refresh и восстановится.
+            // Возвращаем только активный статус; user/session не трогаем.
+            if (get().status !== "banned") {
+              set({ status: "authenticated" });
+            }
+          }
+          // success: session уже обновлена через onTokenUpdate выше.
+        } finally {
+          unsubscribe();
         }
       } catch (error) {
         console.error("[Auth] Refresh failed:", error);
-        set({ status: "authenticated" });
+        if (get().status !== "banned") {
+          set({ status: "authenticated" });
+        }
       }
     })().finally(() => {
       refreshPromise = null;

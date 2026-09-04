@@ -63,9 +63,11 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   );
   const [values, setValues] = useState<TripFormValues>(() => {
     if (initialDraft) return initialDraft.values;
-    // Извлекаем дату и время в ЛОКАЛЬНОМ времени пользователя.
-    // Смешение toISOString() (UTC) и toLocaleTimeString() (local) сдвигало
-    // дату на день назад при сохранении (например, 01:00 МСК = 22:00 UTC предыдущего дня).
+    // Дату и время извлекаем в МОСКОВСКОМ времени (Europe/Moscow) через
+    // formatMoscowDateTime — это тот же часовой пояс, в котором
+    // moscowWallClockToIso строит departureAt при сохранении.
+    // Старый код смешивал toISOString() (UTC) и toLocaleTimeString() (local),
+    // сдвигая дату на день назад (например, 01:00 МСК = 22:00 UTC предыдущего дня).
     let date = "";
     let time = "";
     if (trip.departureAt) {
@@ -111,16 +113,21 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const persistDraftRef = useRef(true);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isPublishingRef = useRef(false);
+  const isDeletingRef = useRef(false);
   // Черновик пишем только после первого изменения пользователя: запись при
   // монтировании загрязняла localStorage неизменёнными данными поездки.
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Единый объект даты+времени для DateInput; инициализируется из trip.departureAt
-  // в ЛОКАЛЬНОМ времени (см. комментарий выше про сдвиг суток из-за UTC).
+  // Единый объект даты+времени для DateInput: values.date/time — московские
+  // wall-clock поля, поэтому момент строим через moscowWallClockToIso
+  // (Europe/Moscow), а не через new Date("...T...") в локальном поясе устройства.
   const [departureDateTime, setDepartureDateTime] = useState<Date | null>(() => {
     if (values.date && values.time) {
-      const dt = new Date(`${values.date}T${values.time}`);
-      return Number.isNaN(dt.getTime()) ? null : dt;
+      const iso = moscowWallClockToIso(values.date, values.time);
+      return iso ? new Date(iso) : null;
     }
     return null;
   });
@@ -139,9 +146,12 @@ export const EditTripModal: FC<EditTripModalProps> = ({
 
   const handleDelete = useCallback(() => {
     if (!canDelete) return;
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
     setIsCancelling(true);
     cancelTrip.mutate(trip.id, {
       onSettled: () => {
+        isDeletingRef.current = false;
         setIsCancelling(false);
       },
       onSuccess: () => {
@@ -203,17 +213,20 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     setDepartureDateTime(date);
     setHasChanges(true);
 
-    if (date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
+    // DateInput отдаёт абсолютный момент (Date); wall-clock поля извлекаем
+    // в московском времени (Europe/Moscow, см. formatMoscowDateTime), а не
+    // локальными геттерами — иначе у пользователей вне МСК дата/время
+    // сдвинутся, и departureAt сохранит неверный момент.
+    const moscow =
+      date && !Number.isNaN(date.getTime())
+        ? formatMoscowDateTime(date.toISOString())
+        : null;
 
+    if (moscow) {
       setValues((prev) => ({
         ...prev,
-        date: `${year}-${month}-${day}`,
-        time: `${hours}:${minutes}`,
+        date: moscow.date,
+        time: moscow.time,
       }));
     } else {
       setValues((prev) => ({ ...prev, date: "", time: "" }));
@@ -221,6 +234,8 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   }, []);
 
   const handlePublish = useCallback(() => {
+    if (isPublishingRef.current) return;
+
     const allTouched: Partial<Record<keyof TripFormValues, boolean>> = {};
 
     (Object.keys(values) as (keyof TripFormValues)[]).forEach((key) => {
@@ -270,10 +285,12 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       comment: values.comment.trim() ? values.comment.trim() : undefined,
     };
 
+    isPublishingRef.current = true;
     setIsSubmitting(true);
 
     updateTrip.mutate({ id: trip.id, data: payload }, {
       onSettled: () => {
+        isPublishingRef.current = false;
         setIsSubmitting(false);
       },
       onSuccess: () => {
@@ -438,6 +455,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
               value={departureDateTime}
               onChange={handleDateTimeChange}
               enableTime
+              disablePast
               size="m"
               placeholder="Выберите дату и время"
               aria-invalid={!!(showError("date") || showError("time"))}

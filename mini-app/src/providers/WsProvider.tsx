@@ -2,11 +2,17 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { apiClient } from "../api/client";
 import { wsServerEventSchema, type WsClientEvent, type WsServerEvent } from "@edem/contracts";
 import { useAuthStore } from "../store/useAuthStore";
+import { WS_SEND_QUEUE_MAX, drainOutbox, enqueueOutbox } from "./wsSendQueue";
 
 interface WsContextValue {
   isConnected: boolean;
   send: (event: WsClientEvent) => void;
   lastMessage: WsServerEvent | null;
+  /**
+   * Счётчик успешных переподключений (auth:ok после предыдущего разрыва).
+   * Слушатели (GlobalWsListener) делают resync fetch при его изменении.
+   */
+  resyncSeq: number;
 }
 
 const WsContext = createContext<WsContextValue | null>(null);
@@ -34,8 +40,15 @@ const WS_RECONNECT_MAX_DELAY_MS = 30_000;
 export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WsServerEvent | null>(null);
+  const [resyncSeq, setResyncSeq] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
+  // Исходящие сообщения, вызванные через send() при закрытом сокете.
+  // Отправляются FIFO-порядком при следующем auth:ok (см. wsSendQueue).
+  const outboxRef = useRef<WsClientEvent[]>([]);
+  // Был ли хотя бы один успешный auth:ok — отличаем первый коннект
+  // (resync не нужен, запросы и так свежие) от переподключения.
+  const hasAuthedRef = useRef(false);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptRef = useRef(0);
   const disposedRef = useRef(false);
@@ -109,6 +122,30 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         if (parsed.type === "auth:ok") {
           reconnectAttemptRef.current = 0;
           setIsConnected(true);
+          // Очередь накопленных send() — строго в порядке вызова.
+          // Сокет только что аутентифицирован и открыт; если отправка
+          // упадёт (гонка с onclose), остаток возвращается в очередь.
+          const { events } = drainOutbox(outboxRef.current);
+          outboxRef.current = [];
+          for (let i = 0; i < events.length; i++) {
+            try {
+              ws.send(JSON.stringify(events[i]));
+            } catch {
+              const rest = events.slice(i);
+              const requeued = [...rest, ...outboxRef.current].slice(-WS_SEND_QUEUE_MAX);
+              if (rest.length + outboxRef.current.length > WS_SEND_QUEUE_MAX) {
+                console.warn("[WsProvider] send queue full on flush — dropped oldest message");
+              }
+              outboxRef.current = requeued;
+              break;
+            }
+          }
+          // Переподключение после разрыва: данные могли устареть —
+          // уведомляем слушателей, чтобы они сделали resync fetch.
+          if (hasAuthedRef.current) {
+            setResyncSeq((seq) => seq + 1);
+          }
+          hasAuthedRef.current = true;
           return;
         }
         // Отвечаем на серверный ping для поддержания keep-alive.
@@ -246,12 +283,27 @@ export const WsProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, [accessToken, connect, disconnect]);
 
   const send = useCallback((event: WsClientEvent) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(event));
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(event));
+        return;
+      } catch {
+        // Сокет умер между проверкой и отправкой — кладём в очередь ниже.
+      }
+    }
+    // Офлайн/закрыт: копим для отправки при reconnect (FIFO, с cap).
+    const result = enqueueOutbox(outboxRef.current, event);
+    outboxRef.current = result.queue;
+    if (result.dropped) {
+      console.warn("[WsProvider] send queue full — dropped oldest message");
     }
   }, []);
 
-  const value = useMemo(() => ({ isConnected, send, lastMessage }), [isConnected, send, lastMessage]);
+  const value = useMemo(
+    () => ({ isConnected, send, lastMessage, resyncSeq }),
+    [isConnected, send, lastMessage, resyncSeq],
+  );
 
   return <WsContext.Provider value={value}>{children}</WsContext.Provider>;
 };

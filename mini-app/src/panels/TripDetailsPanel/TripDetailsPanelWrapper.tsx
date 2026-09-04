@@ -85,6 +85,7 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   return (
     <TripDetailsPanel
+      key={trip.id}
       id={id}
       trip={trip}
       onBack={() => routeNavigator.back()}

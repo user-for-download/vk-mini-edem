@@ -1,5 +1,5 @@
 // mini-app/src/modals/FeedbackModal/FeedbackModal.tsx
-import { type FC, useState } from "react";
+import { type FC, useState, useRef } from "react";
 import {
   Button,
   Caption,
@@ -54,12 +54,17 @@ export const FeedbackModal: FC<FeedbackModalProps> = ({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isSubmittingRef = useRef(false);
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const createFeedback = useCreateFeedbackMutation();
   const invalidateMyFeedbacks = useInvalidateMyFeedbacks();
 
   const handleSubmit = () => {
+    if (isSubmittingRef.current) return;
+
     const trimmedSubject = subject.trim();
     const trimmedText = text.trim();
 
@@ -73,6 +78,7 @@ export const FeedbackModal: FC<FeedbackModalProps> = ({
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -80,6 +86,7 @@ export const FeedbackModal: FC<FeedbackModalProps> = ({
       { subject: trimmedSubject, text: trimmedText },
       {
         onSettled: () => {
+          isSubmittingRef.current = false;
           setIsSubmitting(false);
         },
         onSuccess: () => {

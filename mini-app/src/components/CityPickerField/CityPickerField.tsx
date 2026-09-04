@@ -13,8 +13,10 @@
 //  - в `EditTripModal` поле `disabled` целиком + helperText «не меняется».
 import { type FC, useMemo } from "react";
 import {
+  Button,
   CustomSelect,
   CustomSelectOption,
+  Flex,
   FormItem,
 } from "@vkontakte/vkui";
 import { Icon20LocationMapOutline } from "@vkontakte/icons";
@@ -76,7 +78,18 @@ export const CityPickerField: FC<CityPickerFieldProps> = ({
   id,
   excludeCityId,
 }) => {
-  const { data: cities = [], isFetching } = useAllCitiesQuery();
+  const {
+    data: cities = [],
+    isFetching,
+    isError: isCitiesError,
+    error: citiesError,
+    refetch: refetchCities,
+  } = useAllCitiesQuery();
+
+  // Справочник не загрузился и кэша нет: CustomSelect покажет пустой
+  // список (тупик без обратной связи), поэтому ниже в `bottom`
+  // выводим ошибку с кнопкой повтора — повторный запрос через `refetch`.
+  const isCitiesLoadFailed = isCitiesError && cities.length === 0;
 
   const options: CityOption[] = useMemo(() => {
     const list = excludeCityId
@@ -108,6 +121,18 @@ export const CityPickerField: FC<CityPickerFieldProps> = ({
           <span role="alert" style={{ color: "var(--vkui--color_text_negative)", fontSize: 13 }}>
             {error}
           </span>
+        ) : isCitiesLoadFailed ? (
+          <Flex direction="column" gap={4} align="start">
+            {/* eslint-disable-next-line react/forbid-dom-props */}
+            <span role="alert" style={{ color: "var(--vkui--color_text_negative)", fontSize: 13 }}>
+              {citiesError instanceof Error
+                ? `Не удалось загрузить справочник: ${citiesError.message}`
+                : "Не удалось загрузить справочник городов. Проверьте соединение."}
+            </span>
+            <Button size="s" mode="tertiary" onClick={() => { void refetchCities(); }}>
+              Попробовать снова
+            </Button>
+          </Flex>
         ) : helperText ? (
           // eslint-disable-next-line react/forbid-dom-props
           <span style={{ color: "var(--vkui--color_text_secondary)", fontSize: 13 }}>

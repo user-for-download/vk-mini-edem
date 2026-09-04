@@ -12,7 +12,7 @@ import {
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
-import type { Trip } from "@/types";
+import type { Trip, User } from "@/types";
 import type { MyReview } from "@/api/reviews.api";
 import { TripCard } from "@/components/TripCard";
 import { TripCardSkeleton } from "@/components/Skeleton/TripCardSkeleton";
@@ -20,7 +20,20 @@ import { EmptyState } from "@/components/EmptyState";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAvailableReviewTripsQuery, useMyReviewsQuery } from "@/queries/useReviewsQuery";
 
-export type SelectReviewTripModalProps = CustomModalProps<OpenModalPageProps, { onSelectTrip: (trip: Trip) => void }>;
+export type SelectReviewTripModalProps = CustomModalProps<
+  OpenModalPageProps,
+  {
+    onSelectTrip: (trip: Trip, target?: User | null) => void;
+    /**
+     * Пассажирский контекст preselect: когда пикер поездок открыт из
+     * контекста конкретного пассажира (например, из его профиля), выбор
+     * поездки пробрасывает этот target дальше — в CreateReviewModal,
+     * где пассажир окажется предвыбранным. Без контекста — undefined,
+     * поведение прежнее (существующие `(trip) => void` хендлеры совместимы).
+     */
+    target?: User | null;
+  }
+>;
 
 /**
  * Множество уже оставленных отзывов, ключ — `tripId:target`.
@@ -75,6 +88,7 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
   modalProps,
   close,
   onSelectTrip,
+  target,
 }) => {
   const {
     data: reviewableTrips = [],
@@ -84,7 +98,7 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
     refetch,
   } = useAvailableReviewTripsQuery();
 
-  const { data: myReviews = [] } = useMyReviewsQuery();
+  const { data: myReviews = [], refetch: refetchMyReviews } = useMyReviewsQuery();
 
   const currentUser = useCurrentUser();
 
@@ -129,7 +143,17 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
           }
           action={
             <Box padding="system">
-              <Button size="m" mode="primary" onClick={() => refetch()}>
+              {/* Повтор дергает оба запроса: список поездок и уже
+                  оставленные отзывы (фильтр видимости), чтобы контент
+                  полностью восстановился после успеха. */}
+              <Button
+                size="m"
+                mode="primary"
+                onClick={() => {
+                  void refetch();
+                  void refetchMyReviews();
+                }}
+              >
                 Попробовать снова
               </Button>
             </Box>
@@ -152,7 +176,7 @@ export const SelectReviewTripModal: FC<SelectReviewTripModalProps> = ({
                 <TripCard
                   key={trip.id}
                   trip={trip}
-                  onOpen={onSelectTrip}
+                  onOpen={(selected) => onSelectTrip(selected, target ?? undefined)}
                   hideSeats
                 />
               ))}

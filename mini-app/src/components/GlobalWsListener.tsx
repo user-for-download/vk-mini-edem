@@ -1,12 +1,34 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useWs } from "@/providers/WsProvider";
 import { useWsEvent } from "@/providers/useWsEvent";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { TRIP_KEYS } from "@/queries/useTripsQuery";
+import { buildWsEventKey, markSeenEvent } from "@/providers/wsEventDedup";
 
 export const GlobalWsListener: React.FC = () => {
   const queryClient = useQueryClient();
   const { enqueue: enqueueSnackbar } = useSnackbar();
+  const { resyncSeq } = useWs();
+  const seenRef = useRef<Set<string>>(new Set());
+
+  // Сервер после reconnect может повторно доставить события, которые
+  // клиент уже учёл через resync fetch. Возвращает true для дубликатов —
+  // обработчик должен пропустить их, чтобы не задвоить UI.
+  const isDuplicate = useCallback((type: string, payload: unknown): boolean => {
+    const { seen, duplicate } = markSeenEvent(seenRef.current, buildWsEventKey(type, payload));
+    seenRef.current = seen;
+    return duplicate;
+  }, []);
+
+  // Reconnect (WsProvider поднял resyncSeq): за время обрыва данные могли
+  // устареть — обновляем всё, что зависит от WS-событий. Дедуп выше гасит
+  // повторную доставку тех же событий сервером.
+  useEffect(() => {
+    if (resyncSeq === 0) return;
+    queryClient.invalidateQueries({ queryKey: TRIP_KEYS.all });
+    queryClient.invalidateQueries({ queryKey: ["bookings"] });
+  }, [resyncSeq, queryClient]);
 
   useWsEvent("notification:new", () => {
     // Списка уведомлений в UI пока нет (notificationsApi не используется),
@@ -15,6 +37,7 @@ export const GlobalWsListener: React.FC = () => {
   });
 
   useWsEvent("booking:new", ({ bookingId, tripId }) => {
+    if (isDuplicate("booking:new", { bookingId, tripId })) return;
     queryClient.invalidateQueries({ queryKey: ["trips", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "trip", tripId] });
     // Новая бронь меняет seatsAvailable — обновляем и публичные списки.
@@ -28,6 +51,7 @@ export const GlobalWsListener: React.FC = () => {
   });
 
   useWsEvent("booking:status_changed", ({ bookingId, tripId, status }) => {
+    if (isDuplicate("booking:status_changed", { bookingId, tripId, status })) return;
     queryClient.invalidateQueries({ queryKey: ["bookings", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "history"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "trip", tripId] });
@@ -52,6 +76,7 @@ export const GlobalWsListener: React.FC = () => {
   });
 
   useWsEvent("trip:status_changed", ({ tripId, status }) => {
+    if (isDuplicate("trip:status_changed", { tripId, status })) return;
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
     queryClient.invalidateQueries({ queryKey: ["bookings", "my"] });
     queryClient.invalidateQueries({ queryKey: ["bookings", "history"] });
@@ -76,6 +101,7 @@ export const GlobalWsListener: React.FC = () => {
   });
 
   useWsEvent("trip:details_changed", ({ tripId }) => {
+    if (isDuplicate("trip:details_changed", { tripId })) return;
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.detail(tripId) });
     queryClient.invalidateQueries({ queryKey: TRIP_KEYS.my() });
     // Публичные списки (поиск/главная) тоже могут показывать изменённые

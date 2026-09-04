@@ -1,5 +1,5 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanel.tsx
-import { type FC, useEffect, useState } from "react";
+import { type FC, useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Button,
@@ -71,6 +71,10 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [comment, setComment] = useState("");
 
+  // Черновик брони привязан к поездке: TripDetailsPanelWrapper рендерит
+  // панель с key={trip.id}, поэтому смена поездки размонтирует форму
+  // и место/комментарий из поездки A не перетекают в поездку B.
+
   // Текущее время с периодическим обновлением: Date.now() в рендере запрещён
   // (react-hooks/purity), а кнопка «Завершить поездку» должна оживать после отправления.
   const [now, setNow] = useState(() => Date.now());
@@ -80,8 +84,19 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   }, []);
 
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
   const [isCompletingTrip, setIsCompletingTrip] = useState(false);
+
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isBookingRef = useRef(false);
+  const isCancellingBookingRef = useRef(false);
+  const isCancellingTripRef = useRef(false);
+  const isCompletingTripRef = useRef(false);
+  // approve/reject — повтор блокируем по id заявки, но не мешаем
+  // параллельным действиям над разными заявками.
+  const inFlightBookingIdsRef = useRef<Set<string>>(new Set());
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const currentUser = useCurrentUser();
@@ -112,6 +127,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     data: tripBookingsData,
     isLoading: isLoadingBookings,
     isError: isErrorBookings,
+    error: bookingsError,
     refetch: refetchBookings,
     hasNextPage,
     isFetchingNextPage,
@@ -131,6 +147,11 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   );
 
   const handleSetBookingStatus = async (bookingId: string, status: DriverBookingAction) => {
+    if (inFlightBookingIdsRef.current.has(bookingId)) {
+      return;
+    }
+    inFlightBookingIdsRef.current.add(bookingId);
+
     try {
       await updateBookingStatus.mutateAsync({ id: bookingId, status });
       void triggerHaptic(status === "confirmed" ? "medium" : "light");
@@ -151,18 +172,32 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
         subtitle: error instanceof Error ? error.message : undefined,
         dedupeKey: `booking_status_error_${bookingId}`,
       });
+    } finally {
+      inFlightBookingIdsRef.current.delete(bookingId);
     }
   };
 
   const cancelMyBooking = async (bookingId: string) => {
+    if (isCancellingBookingRef.current) return;
+    isCancellingBookingRef.current = true;
+
     const confirmed = await confirm({
       title: "Отменить бронирование?",
       description: "Заявка на поездку будет отменена, а место снова станет доступно.",
       confirmTitle: "Отменить бронь",
     });
-    if (!confirmed) return;
+    if (!confirmed) {
+      isCancellingBookingRef.current = false;
+      return;
+    }
+
+    setIsCancellingBooking(true);
 
     cancelBooking.mutate(bookingId, {
+      onSettled: () => {
+        isCancellingBookingRef.current = false;
+        setIsCancellingBooking(false);
+      },
       onSuccess: () => {
         enqueueSnackbar({
           type: "success",
@@ -236,10 +271,15 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       return;
     }
 
+    if (isBookingRef.current) {
+      return;
+    }
+
     if (effectiveSelectedSeat === null) {
       return;
     }
 
+    isBookingRef.current = true;
     setIsSubmittingBooking(true);
 
     createBooking.mutate(
@@ -250,6 +290,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       },
       {
         onSettled: () => {
+          isBookingRef.current = false;
           setIsSubmittingBooking(false);
         },
         onSuccess: () => {
@@ -313,17 +354,26 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       return;
     }
 
+    if (isCancellingTripRef.current) {
+      return;
+    }
+    isCancellingTripRef.current = true;
+
     const confirmed = await confirm({
       title: "Отменить поездку?",
       description: "Поездка станет недоступна, а пассажиры получат уведомление об отмене.",
       confirmTitle: "Отменить поездку",
     });
-    if (!confirmed) return;
+    if (!confirmed) {
+      isCancellingTripRef.current = false;
+      return;
+    }
 
     setIsCancellingTrip(true);
 
     cancelTrip.mutate(trip.id, {
       onSettled: () => {
+        isCancellingTripRef.current = false;
         setIsCancellingTrip(false);
       },
       onSuccess: () => {
@@ -351,18 +401,27 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       return;
     }
 
+    if (isCompletingTripRef.current) {
+      return;
+    }
+    isCompletingTripRef.current = true;
+
     const confirmed = await confirm({
       title: "Завершить поездку?",
       description: "Поездка будет перенесена в архив, а пассажиры смогут оставить отзывы.",
       confirmTitle: "Завершить",
       confirmMode: "default",
     });
-    if (!confirmed) return;
+    if (!confirmed) {
+      isCompletingTripRef.current = false;
+      return;
+    }
 
     setIsCompletingTrip(true);
 
     completeTrip.mutate(trip.id, {
       onSettled: () => {
+        isCompletingTripRef.current = false;
         setIsCompletingTrip(false);
       },
       onSuccess: () => {
@@ -519,6 +578,8 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
             size="m"
             mode="secondary"
             stretched
+            disabled={isCancellingBooking}
+            loading={isCancellingBooking}
             onClick={() => cancelMyBooking(trip.myBooking!.id)}
           >
             Отменить бронирование
@@ -529,17 +590,31 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       {/* Секция заявок видна только когда есть что показывать:
         - есть заявки → «Управление заявками (N)»;
         - только подтверждённые → «Подтвержденные пассажиры (N)»;
-        - пусто → секция не отображается вовсе. */}
-      {isOwnTrip && (pendingBookings.length > 0 || confirmedPassengers.length > 0) && (
+        - загрузка/ошибка → секция со статусом и кнопкой повтора
+          (без этого ошибка была недостижима: при пустых списках
+          вся группа не рендерилась — тупик без retry). */}
+      {isOwnTrip && (pendingBookings.length > 0 || confirmedPassengers.length > 0 || isLoadingBookings || isErrorBookings) && (
         <Group
           header={
             <Header size="s">
-              {pendingBookings.length > 0
-                ? `Управление заявками (${pendingBookings.length})`
-                : `Подтвержденные пассажиры (${confirmedPassengers.length})`}
+              {isLoadingBookings || isErrorBookings
+                ? "Заявки пассажиров"
+                : pendingBookings.length > 0
+                  ? `Управление заявками (${pendingBookings.length})`
+                  : `Подтвержденные пассажиры (${confirmedPassengers.length})`}
             </Header>
           }
         >
+          {isLoadingBookings && (
+            <Box padding="system">
+              <Text
+                // eslint-disable-next-line react/forbid-dom-props
+                style={{ color: "var(--vkui--color_text_secondary)" }}
+              >
+                Загрузка заявок...
+              </Text>
+            </Box>
+          )}
           {/* Заявки первыми: они требуют действия водителя, подтверждённые — ниже */}
           {!isLoadingBookings && !isErrorBookings && pendingBookings.length > 0 && (
             <Box aria-live="polite" aria-label={`Список заявок, ${pendingBookings.length}`}>
@@ -581,11 +656,15 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           )}
 
            {isErrorBookings && (
-             <Box padding="system">
-               <Text>Не удалось загрузить заявки.</Text>
-               <Button size="m" mode="secondary" onClick={() => refetchBookings()}>Попробовать снова</Button>
-             </Box>
-           )}
+              <Box padding="system">
+                <Text>
+                  {bookingsError instanceof Error
+                    ? `Не удалось загрузить заявки: ${bookingsError.message}`
+                    : "Не удалось загрузить заявки."}
+                </Text>
+                <Button size="m" mode="secondary" onClick={() => { void refetchBookings(); }}>Попробовать снова</Button>
+              </Box>
+            )}
 
            {!isLoadingBookings && !isErrorBookings && hasNextPage && pendingBookings.length === 0 && (
              <Box padding="system">
@@ -668,7 +747,7 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
               size="l"
               stretched
               mode="primary"
-              disabled={effectiveSelectedSeat === null}
+              disabled={effectiveSelectedSeat === null || isSubmittingBooking}
               loading={isSubmittingBooking}
               onClick={handleFooterClick}
             >

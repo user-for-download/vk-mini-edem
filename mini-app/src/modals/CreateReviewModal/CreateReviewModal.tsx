@@ -1,5 +1,5 @@
 // mini-app/src/modals/CreateReviewModal/CreateReviewModal.tsx
-import { type FC, useState, useCallback, useMemo } from "react";
+import { type FC, useState, useCallback, useMemo, useRef } from "react";
 import {
   Avatar,
   Button,
@@ -124,6 +124,9 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   const [text, setText] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isSubmittingRef = useRef(false);
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
   const createReview = useCreateReviewMutation();
@@ -151,24 +154,45 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
   }, [isDriver, tripBookingsData]);
 
   const [selectedPassengerId, setSelectedPassengerId] = useState<string | null>(
-    null
+    target?.id ?? null
   );
 
+  // Сброс черновика между поездками не нужен: модалка открывается через
+  // openCustomModalPage — каждый open = свежий mount, состояние инициализируется
+  // из текущих trip/target.
+
   const targetUser = useMemo(() => {
-    if (target) {
+    if (target && !isDriver) {
       return target;
     }
     if (isDriver) {
-      return (
-        passengers.find((p) => p.id === selectedPassengerId) ??
-        passengers[0] ??
-        null
-      );
+      // Явный выбор пользователя важнее preselect из контекста:
+      // ручная смена preselect-пассажира продолжает работать.
+      if (selectedPassengerId) {
+        return (
+          passengers.find((p) => p.id === selectedPassengerId) ??
+          target ??
+          passengers[0] ??
+          null
+        );
+      }
+      if (target && passengers.some((p) => p.id === target.id)) {
+        return target;
+      }
+      return passengers[0] ?? target ?? null;
     }
-    return trip?.driver ?? null;
+    return target ?? trip?.driver ?? null;
   }, [target, isDriver, passengers, selectedPassengerId, trip]);
 
+  // Предвыбранный пассажир виден в DOM сразу: явный выбор >
+  // target из контекста (поездка/пассажир) > первый в списке.
+  // Без контекста поведение прежнее — выбран первый пассажир.
+  const effectiveSelectedId =
+    selectedPassengerId ?? target?.id ?? passengers[0]?.id ?? null;
+
   const handleSubmit = () => {
+    if (isSubmittingRef.current) return;
+
     if (!trip) {
       setValidationError("Поездка не выбрана");
       return;
@@ -192,6 +216,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
     }
 
     setValidationError(null);
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     createReview.mutate(
@@ -203,6 +228,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
       },
       {
         onSettled: () => {
+          isSubmittingRef.current = false;
           setIsSubmitting(false);
         },
         onSuccess: () => {
@@ -301,11 +327,7 @@ export const CreateReviewModal: FC<CreateReviewModalProps> = ({
               <Radio
                 key={passenger.id}
                 name="review-target"
-                checked={
-                  selectedPassengerId === passenger.id ||
-                  (selectedPassengerId === null &&
-                    passengers[0]?.id === passenger.id)
-                }
+                checked={effectiveSelectedId === passenger.id}
                 onChange={() => setSelectedPassengerId(passenger.id)}
               >
                 <Flex align="center" gap={8}>

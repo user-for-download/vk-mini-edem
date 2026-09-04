@@ -29,6 +29,10 @@ export type DriverProfileModalProps = CustomModalProps<
  * Данные загружаются через:
  * - GET /api/users/:id
  * - GET /api/reviews/user/:userId (cursor-based пагинация)
+ *
+ * Оба запроса стартуют параллельно по `driverId` из пропсов —
+ * reviews-запрос НЕ ждёт загрузки профиля (без waterfall
+ * `driver?.id ?? ""`, который сериализовал запросы).
  */
 const REVIEWS_PAGE_SIZE = 5;
 
@@ -39,10 +43,12 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
 }) => {
   const driverId = driverIdProp || "";
 
+  // Независимые запросы по одному driverId: стартуют параллельно.
   const {
     data: driver,
     isLoading: isLoadingDriver,
     isError: isDriverError,
+    refetch: refetchDriver,
   } = useUserQuery(driverId);
 
   const {
@@ -50,7 +56,10 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useUserReviewsInfiniteQuery(driver?.id ?? "", REVIEWS_PAGE_SIZE);
+    isLoading: isLoadingReviews,
+    isError: isReviewsError,
+    refetch: refetchReviews,
+  } = useUserReviewsInfiniteQuery(driverId, REVIEWS_PAGE_SIZE);
 
   if (!driverId) {
     return null;
@@ -66,8 +75,11 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
           padding="system"
           paddingBlockStart={0}
         >
-          <Flex justify="center">
+          <Flex justify="center" direction="column" align="center" gap={8}>
             <ScreenSpinner state="loading" />
+            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+              Загрузка профиля
+            </Text>
           </Flex>
         </Box>
       </ModalCard>
@@ -82,15 +94,94 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         description="Не удалось загрузить данные водителя"
       >
         <Box padding="system" paddingBlockStart={0}>
-          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-            Пользователь недоступен или был удален.
-          </Text>
+          <Flex direction="column" align="center" gap={12}>
+            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+              Пользователь недоступен или был удален.
+            </Text>
+            <Button
+              size="m"
+              mode="primary"
+              onClick={() => {
+                void refetchDriver();
+                void refetchReviews();
+              }}
+            >
+              Попробовать снова
+            </Button>
+          </Flex>
         </Box>
       </ModalCard>
     );
   }
 
   const allReviews = reviewsData?.pages.flatMap((page) => page.items) ?? [];
+
+  const renderReviews = () => {
+    if (isLoadingReviews) {
+      return (
+        <Box padding="system" style={{ textAlign: "center" }}>
+          <Flex justify="center" direction="column" align="center" gap={8}>
+            <ScreenSpinner state="loading" />
+            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+              Загрузка отзывов
+            </Text>
+          </Flex>
+        </Box>
+      );
+    }
+
+    if (isReviewsError) {
+      return (
+        <Box padding="system" style={{ textAlign: "center" }}>
+          <Flex direction="column" align="center" gap={12}>
+            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+              Не удалось загрузить отзывы
+            </Text>
+            <Button
+              size="s"
+              mode="tertiary"
+              onClick={() => {
+                void refetchReviews();
+              }}
+            >
+              Попробовать снова
+            </Button>
+          </Flex>
+        </Box>
+      );
+    }
+
+    if (allReviews.length === 0) {
+      return (
+        <Box padding="system" style={{ textAlign: "center" }}>
+          <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+            Отзывов пока нет
+          </Text>
+        </Box>
+      );
+    }
+
+    return (
+      <>
+        <Spacing size={8} />
+        {allReviews.map((review) => (
+          <ReviewCard key={review.id} review={review} />
+        ))}
+        {hasNextPage && (
+          <Box padding="system" style={{ textAlign: "center" }}>
+            <Button
+              size="s"
+              mode="tertiary"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? "Загрузка..." : "Показать ещё"}
+            </Button>
+          </Box>
+        )}
+      </>
+    );
+  };
 
   return (
     <ModalCard
@@ -133,26 +224,8 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
         </Flex>
       </Box>
       <Box>
-        {allReviews.length > 0 && (
-        <>
-          <Spacing size={8} />
-              {allReviews.map((review) => (
-                <ReviewCard key={review.id} review={review} />
-              ))}
-          {hasNextPage && (
-            <Box padding="system" style={{ textAlign: "center" }}>
-              <Button
-                size="s"
-                mode="tertiary"
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-              >
-                {isFetchingNextPage ? "Загрузка..." : "Показать ещё"}
-              </Button>
-            </Box>
-          )}
-        </>
-        )}</Box>
+        {renderReviews()}
+      </Box>
 
 
     </ModalCard>

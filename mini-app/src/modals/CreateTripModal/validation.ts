@@ -78,7 +78,10 @@ export function validateTripForm(values: TripFormValues): TripFormErrors {
       if (!departureTime) {
         errors.date = "Некорректная дата";
       } else if (Date.parse(departureTime) <= Date.now()) {
-        errors.time = "Укажите время в будущем";
+        // departureTime построен как московское wall-clock время
+        // (moscowWallClockToIso, Europe/Moscow) — сравнение тоже идёт
+        // относительно него, поэтому сообщение явно указывает пояс.
+        errors.time = "Укажите время в будущем (по московскому времени)";
       }
     }
   }

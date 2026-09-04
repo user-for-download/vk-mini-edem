@@ -84,6 +84,19 @@ describe("AuthGate — экран бана", () => {
     expect(html).toContain("Причина не указана");
   });
 
+  it("во время refresh-полёта (initializing) показывает загрузку, а не экран логина", () => {
+    // Arrange — возврат из фона: стор выставил initializing и летит refreshSession.
+    mockState.status = "initializing";
+
+    // Act
+    const html = renderToString(<AuthGate />);
+
+    // Assert — ни плашки логина, ни кнопки повтора: только загрузка.
+    expect(html).not.toContain("Ошибка авторизации");
+    expect(html).not.toContain("Попробовать снова");
+    expect(html).not.toContain("Аккаунт заблокирован");
+  });
+
   it("экран ошибки авторизации не изменился (не задет фичей)", () => {
     // Arrange
     mockState.status = "unauthenticated";

@@ -1,4 +1,4 @@
-import { type FC, useState } from "react";
+import { type FC, useState, useRef } from "react";
 import {
   Button,
   Caption,
@@ -31,10 +31,15 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Защита от двойного сабмита: ref синхронен (в отличие от state),
+  // поэтому второй клик до ре-рендера не отправит второй запрос.
+  const isSubmittingRef = useRef(false);
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
+
     const trimmedName = name.trim();
     const trimmedAbout = about.trim();
 
@@ -48,6 +53,7 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -76,6 +82,7 @@ export const EditProfileModal: FC<EditProfileModalProps> = ({ modalProps, close 
         dedupeKey: "profile_update_error",
       });
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
