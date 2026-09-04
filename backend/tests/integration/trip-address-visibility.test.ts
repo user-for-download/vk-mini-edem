@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * Видимость точных адресов встречи в GET /trips/:id.
@@ -11,7 +12,8 @@ import { db } from "../../src/db.js";
  * (раньше туда подставлялся город и возникали дубли «Москва / Москва»).
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 describe("GET /trips/:id — address visibility", () => {
   let driverId: string;
@@ -64,7 +66,7 @@ describe("GET /trips/:id — address visibility", () => {
 
   const getTripDetails = async (userId?: string) => {
     const res = await app.request(`/api/v1/trips/${tripId}`, {
-      headers: userId ? { Authorization: `Bearer mock-access-token-${userId}` } : {},
+      headers: userId ? { Authorization: `Bearer ${devMockAccessToken(userId)}` } : {},
     });
     expect(res.status).toBe(200);
     return res.json();

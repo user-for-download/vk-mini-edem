@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * Жизненный цикл поездки: создание → бронирование → подтверждение →
  * отмена/завершение (TOCTOU-защита в транзакциях).
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -95,7 +97,7 @@ describe("trip lifecycle: cancel/complete", () => {
   it("cancels an active trip: bookings → cancelled, passengers notified", async () => {
     const res = await app.request(`/api/v1/trips/${tripId}/cancel`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(res.status).toBe(200);
@@ -120,7 +122,7 @@ describe("trip lifecycle: cancel/complete", () => {
   it("forbids cancel by a non-driver (403)", async () => {
     const res = await app.request(`/api/v1/trips/${tripId}/cancel`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.otherUserId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.otherUserId)}` },
     });
 
     expect(res.status).toBe(403);
@@ -136,7 +138,7 @@ describe("trip lifecycle: cancel/complete", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${users.driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(users.driverId)}`,
       },
       body: JSON.stringify({ toCity: "Москва" }),
     });
@@ -150,7 +152,7 @@ describe("trip lifecycle: cancel/complete", () => {
   it("returns 404 for cancel of a missing trip", async () => {
     const res = await app.request(`/api/v1/trips/nonexistent/cancel`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(res.status).toBe(404);
@@ -159,12 +161,12 @@ describe("trip lifecycle: cancel/complete", () => {
   it("rejects cancel of an already cancelled trip (400 TRIP_NOT_ACTIVE)", async () => {
     await app.request(`/api/v1/trips/${tripId}/cancel`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     const second = await app.request(`/api/v1/trips/${tripId}/cancel`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(second.status).toBe(400);
@@ -175,7 +177,7 @@ describe("trip lifecycle: cancel/complete", () => {
   it("rejects complete before departure without force (400)", async () => {
     const res = await app.request(`/api/v1/trips/${tripId}/complete`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(res.status).toBe(400);
@@ -197,7 +199,7 @@ describe("trip lifecycle: cancel/complete", () => {
 
     const res = await app.request(`/api/v1/trips/${tripId}/complete?force=1`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(res.status).toBe(200);
@@ -232,12 +234,12 @@ describe("trip lifecycle: cancel/complete", () => {
   it("rejects complete of an already completed trip (400 TRIP_NOT_ACTIVE)", async () => {
     await app.request(`/api/v1/trips/${tripId}/complete?force=1`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     const second = await app.request(`/api/v1/trips/${tripId}/complete?force=1`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
     });
 
     expect(second.status).toBe(400);
@@ -251,11 +253,11 @@ describe("trip lifecycle: cancel/complete", () => {
     const [cancelRes, completeRes] = await Promise.all([
       app.request(`/api/v1/trips/${tripId}/cancel`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+        headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
       }),
       app.request(`/api/v1/trips/${tripId}/complete?force=1`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer mock-access-token-${users.driverId}` },
+        headers: { Authorization: `Bearer ${devMockAccessToken(users.driverId)}` },
       }),
     ]);
 

@@ -10,7 +10,7 @@ vi.hoisted(() => {
 
 const { app } = await import("../../src/app.js");
 const { db } = await import("../../src/db.js");
-const { signRefreshToken, hashToken } = await import("../../src/auth/tokens.js");
+const { signRefreshToken, hashToken, rotateRefreshToken } = await import("../../src/auth/tokens.js");
 
 /**
  * Ротация refresh-токенов: атомарность и reuse detection.
@@ -135,6 +135,67 @@ describe("refresh token rotation", () => {
 
     const newTokenRes = await postRefresh(newToken);
     expect(newTokenRes.status).toBe(401);
+  });
+
+  it("rotation issues a new pair and invalidates the old token (old reuse rejected)", async () => {
+    // Arrange
+    const userId = await createUser(4);
+    const oldToken = await signRefreshToken(userId);
+    const oldJti = getJti(oldToken);
+
+    // Act
+    const rotateRes = await postRefresh(oldToken);
+
+    // Assert — выдана новая пара, старый токен недействителен
+    expect(rotateRes.status).toBe(200);
+    const { accessToken, refreshToken: newToken } = (await rotateRes.json()) as {
+      accessToken: string;
+      refreshToken: string;
+    };
+    expect(typeof accessToken).toBe("string");
+    expect(newToken).not.toBe(oldToken);
+    expect(getJti(newToken)).not.toBe(oldJti);
+    expect(await countActiveTokens(userId)).toBe(1);
+
+    expect((await postRefresh(oldToken)).status).toBe(401);
+  });
+
+  it("rejects a refresh token whose DB row belongs to a different user (userId binding)", async () => {
+    // Arrange — запись в БД принадлежит userB, подписанный sub JWT — userA
+    const userA = await createUser(5);
+    const userB = await createUser(6);
+    const token = await signRefreshToken(userA);
+    const jti = getJti(token);
+    await db.refreshToken.update({
+      where: { tokenHash: hashToken(jti) },
+      data: { userId: userB },
+    });
+
+    // Act
+    const res = await postRefresh(token);
+
+    // Assert — 401 без оракула и без отзыва чужой семьи токенов
+    expect(res.status).toBe(401);
+    expect(await countActiveTokens(userB)).toBe(1);
+  });
+
+  it("rotateRefreshToken with a mismatched userId revokes nothing and mints nothing", async () => {
+    // Arrange
+    const userA = await createUser(7);
+    const userB = await createUser(8);
+    const token = await signRefreshToken(userA);
+    const jti = getJti(token);
+
+    // Act / Assert — предикат (tokenHash, userId) не сошёлся: count === 0
+    await expect(rotateRefreshToken(jti, userB)).rejects.toThrow("Token already used");
+
+    const oldRow = await db.refreshToken.findUnique({
+      where: { tokenHash: hashToken(jti) },
+    });
+    expect(oldRow?.revokedAt).toBeNull();
+    expect(oldRow?.userId).toBe(userA);
+    expect(await countActiveTokens(userA)).toBe(1);
+    expect(await countActiveTokens(userB)).toBe(0);
   });
 
   it("double logout does not revoke the token family", async () => {

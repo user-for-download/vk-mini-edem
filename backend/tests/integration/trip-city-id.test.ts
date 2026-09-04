@@ -9,6 +9,7 @@ vi.hoisted(() => {
 
 const { app } = await import("../../src/app.js");
 const { db } = await import("../../src/db.js");
+const { devMockAccessToken } = await import("../dev-mock-auth.js");
 
 /**
  * Интеграция справочника городов с созданием/редактированием поездки:
@@ -65,7 +66,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -90,7 +91,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -117,7 +118,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -142,7 +143,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "ЛЮБАЯ-СТРОКА", // сервер должен перезаписать
@@ -176,7 +177,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -201,7 +202,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({ fromCityId: newFromId }),
     });
@@ -213,7 +214,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -238,7 +239,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({ toCityId: newToId }),
     });
@@ -250,7 +251,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -273,7 +274,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({ fromCity: "Рязань", toCity: "Калуга" }),
     });
@@ -285,7 +286,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -308,7 +309,7 @@ describe("Trip ↔ city directory integration", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({ price: 700 }),
     });

@@ -452,16 +452,27 @@ describe("feedback/appeal: rate limit (5 запросов в час с одно�
     // (feedback-appeal:<ip>), лимит 5 запросов в час.
     const { id: userId, vkUserId } = await createUser({ banned: true });
     const ip = uniqueIp();
-    const body = validAppealBody(vkUserId);
+    // Replay-защита (verifyVkLaunchSignature): пара (vk_ts, sign) одноразовая,
+    // поэтому каждый запрос подписывается со своим vk_ts. Сдвиги в прошлое
+    // (baseTsSec - i) детерминированы: не зависят от тайминга и лежат внутри
+    // окна свежести (5 мин). Намерение теста — лимитер IP, а не переиспользование подписи.
+    const baseTsSec = Math.floor(Date.now() / 1000);
+    const freshBody = (i: number) => ({
+      searchParams: buildSignedSearchParams(vkUserId, {
+        vkTsSec: baseTsSec - i,
+      }),
+      subject: "Обжалование блокировки",
+      text: "Считаю блокировку ошибочной, прошу рассмотреть обращение.",
+    });
 
     // Act — первые 5 запросов укладываются в лимит.
     for (let i = 0; i < 5; i += 1) {
-      const res = await postAppeal(body, ip);
+      const res = await postAppeal(freshBody(i), ip);
       expect(res.status).toBe(201);
       const created = (await res.json()) as AppealCreatedBody;
       createdFeedbackIds.push(created.id);
     }
-    const sixth = await postAppeal(body, ip);
+    const sixth = await postAppeal(freshBody(5), ip);
 
     // Assert — 6-й отклонён, лишних строк не создано.
     expect(sixth.status).toBe(429);

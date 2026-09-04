@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * POST /api/v1/feedback — обращения пользователей в поддержку.
  *
- * Паттерны репо: app.request(), dev-авторизация Bearer
- * mock-access-token-{userId}, уникальные vkUserId, очистка в afterEach.
+ * Паттерны репо: app.request(), dev-авторизация mock-токеном
+ * (tests/dev-mock-auth.js: allowlist + TTL), уникальные vkUserId, очистка в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -51,7 +52,7 @@ describe("POST /api/v1/feedback", () => {
   it("201: сохраняет обращение и возвращает id + createdAt", async () => {
     const res = await postFeedback(
       { subject: "Не приходит уведомление", text: "После брони нет push." },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(201);
 
@@ -69,7 +70,7 @@ describe("POST /api/v1/feedback", () => {
   it("400: пустая тема", async () => {
     const res = await postFeedback(
       { subject: "", text: "Текст" },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(400);
 
@@ -80,7 +81,7 @@ describe("POST /api/v1/feedback", () => {
   it("400: пустой текст", async () => {
     const res = await postFeedback(
       { subject: "Тема", text: "" },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(400);
   });
@@ -88,7 +89,7 @@ describe("POST /api/v1/feedback", () => {
   it("400: тема длиннее 100 символов", async () => {
     const res = await postFeedback(
       { subject: "x".repeat(101), text: "Текст" },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(400);
   });
@@ -96,7 +97,7 @@ describe("POST /api/v1/feedback", () => {
   it("400: текст длиннее 2000 символов", async () => {
     const res = await postFeedback(
       { subject: "Тема", text: "x".repeat(2001) },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(400);
   });
@@ -104,7 +105,7 @@ describe("POST /api/v1/feedback", () => {
   it("принимает тему ровно в 100 символов", async () => {
     const res = await postFeedback(
       { subject: "x".repeat(100), text: "Текст" },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(201);
   });
@@ -112,7 +113,7 @@ describe("POST /api/v1/feedback", () => {
   it("trim: пробелы по краям убираются перед сохранением", async () => {
     const res = await postFeedback(
       { subject: "  Тема  ", text: "  Текст  " },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(201);
 
@@ -128,7 +129,7 @@ describe("POST /api/v1/feedback", () => {
         subject: "<script>alert(1)</script>Тема",
         text: '<b onclick="steal()">Текст</b>',
       },
-      `mock-access-token-${userId}`,
+      `${devMockAccessToken(userId)}`,
     );
     expect(res.status).toBe(201);
 

@@ -12,6 +12,7 @@ vi.hoisted(() => {
 const { app } = await import("../../src/app.js");
 const { db } = await import("../../src/db.js");
 const { signRefreshToken } = await import("../../src/auth/tokens.js");
+const { devMockRefreshToken } = await import("../dev-mock-auth.js");
 
 /**
  * Регрессия: «причина бана» в auth-слое.
@@ -287,12 +288,12 @@ describe("auth/refresh: banned user rejected with banReason (main branch)", () =
 
 describe("auth/refresh: banned user rejected with banReason (dev-mock branch)", () => {
   it("banned user with mock refresh token → 403 FORBIDDEN + banReason", async () => {
-    // Arrange — dev-mock refresh-токен формата `mock-refresh-token-{userId}`.
-    // Эта ветка активна только при env.ALLOW_DEV_AUTH === true; в vitest
+    // Arrange — dev-mock refresh-токен (tests/dev-mock-auth.js:
+    // allowlist + exp). Эта ветка активна только при env.ALLOW_DEV_AUTH === true; в vitest
     // это условие выполняется всегда (см. env.ts: `if (process.env.VITEST) return true`).
     const reason = "Обход правил";
     const { id: userId } = await createBannedUser({ reason });
-    const mockRefresh = `mock-refresh-token-${userId}`;
+    const mockRefresh = devMockRefreshToken(userId);
 
     // Act
     const res = await postRefresh(mockRefresh);
@@ -314,7 +315,7 @@ describe("auth/refresh: banned user rejected with banReason (dev-mock branch)", 
   it("legacy banned user via mock refresh → 403 with banReason: null", async () => {
     // Arrange
     const { id: userId } = await createBannedUser({ reason: null });
-    const mockRefresh = `mock-refresh-token-${userId}`;
+    const mockRefresh = devMockRefreshToken(userId);
 
     // Act
     const res = await postRefresh(mockRefresh);
@@ -331,7 +332,7 @@ describe("auth/refresh: banned user rejected with banReason (dev-mock branch)", 
     const { id: userId } = await createActiveUser();
 
     // Act
-    const res = await postRefresh(`mock-refresh-token-${userId}`);
+    const res = await postRefresh(devMockRefreshToken(userId));
 
     // Assert — 200, токены выданы (dev-mock ветка не срабатывает на бане).
     expect(res.status).toBe(200);

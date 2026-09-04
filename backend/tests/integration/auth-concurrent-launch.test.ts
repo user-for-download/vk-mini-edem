@@ -22,8 +22,9 @@ const { db } = await import("../../src/db.js");
  * клиентов (тут — детерминированно: до фикса падал в 1-м раунде из 30).
  *
  * Паттерны репо (см. auth-ban-reason.test.ts): app.request(), vi.hoisted
- * для лимитеров, vkUserId из выделенного диапазона (9_700_000+ — не
- * пересекается с другими интеграционными тестами).
+ * для лимитеров, vkUserId из выделенного диапазона (9_800_000+ — не
+ * пересекается с другими интеграционными тестами, в т.ч. с 9_700_000+
+ * review-unique-null-trip.test.ts).
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -43,7 +44,7 @@ afterAll(async () => {
 describe("auth/vk: concurrent launches (P2002 regression)", () => {
   it("30 tight concurrent rounds, fresh vkUserId each: both 200, exactly one user", async () => {
     for (let i = 0; i < 30; i++) {
-      const vkUserId = 9_700_000 + i;
+      const vkUserId = 9_800_000 + i;
       await db.user.deleteMany({ where: { vkUserId } });
 
       const requests = await Promise.all(

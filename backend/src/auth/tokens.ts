@@ -1,7 +1,7 @@
 // backend/src/auth/tokens.ts
 import { SignJWT, jwtVerify } from "jose";
 import { randomUUID, createHash } from "node:crypto";
-import { env } from "../env.js";
+import { env, devUserAllowlist } from "../env.js";
 import { logger } from "../logger.js";
 import { db } from "../db.js";
 
@@ -63,19 +63,140 @@ export async function signRefreshToken(
   return token;
 }
 
+// ─── Dev mock-токены (ALLOW_DEV_AUTH) ───────────────────────────────────────
+// Формат: `mock-<access|refresh>-token-<userId>-<exp>` (exp — epoch seconds).
+//
+// Безопасность (security-audit, секция «Auth & session»):
+//  - токен принимается ТОЛЬКО для пользователей из явного allowlist
+//    (DEV_AUTH_USER_ALLOWLIST) — произвольный userId из строки токена
+//    больше не имплицирует права;
+//  - токен несёт срок действия: истёкший mock-токен → 401;
+//  - срок жизни ограничен DEV_MOCK_TOKEN_TTL_SECONDS (защита от
+//    сфабрикованного токена с exp «далеко в будущем»).
+//  - mock-ветка активна только при ALLOW_DEV_AUTH: в production он
+//    всегда false, поэтому эти проверки в prod не выполняются.
+
+export const MOCK_ACCESS_TOKEN_PREFIX = "mock-access-token-";
+export const MOCK_REFRESH_TOKEN_PREFIX = "mock-refresh-token-";
+
+/** Допуск расхождения часов в проверке «TTL не превышен» (мс). */
+const MOCK_CLOCK_SKEW_MS = 5_000;
+
+export interface DevMockTokenClaims {
+  userId: string;
+  /** Момент истечения, epoch seconds. */
+  exp: number;
+}
+
+/**
+ * Разбирает dev mock-токен: префикс + userId + «-<exp epoch seconds>».
+ *
+ * exp — ПОСЛЕДНИЙ дефис-сегмент, ровно 10 цифр (epoch seconds ~2001–2286).
+ * Ровно 10 цифр исключают ложное срабатывание на legacy-формат
+ * `mock-access-token-<uuid>`: последний сегмент uuid — 16-ричные 12 символов,
+ * и «попадание» в 10 цифр невозможно. Режем справа, т.к. user id — uuid
+ * с дефисами. null при любом нарушении формата.
+ */
+export function parseDevMockToken(
+  token: string,
+  prefix: string
+): DevMockTokenClaims | null {
+  if (!token.startsWith(prefix)) return null;
+
+  const rest = token.slice(prefix.length);
+  const dashIdx = rest.lastIndexOf("-");
+  if (dashIdx <= 0) return null;
+
+  const userId = rest.slice(0, dashIdx);
+  const expRaw = rest.slice(dashIdx + 1);
+  if (!/^\d{10}$/.test(expRaw)) return null;
+
+  const exp = Number(expRaw);
+  if (!Number.isFinite(exp) || exp <= 0) return null;
+
+  return { userId, exp };
+}
+
+/**
+ * Проверяет TTL разобранных claims: не истёк и exp не далее
+ * now + ttlMs (+ допуск расхождения часов). Бросает Error при нарушении —
+ * вызывающий код трактует как 401.
+ *
+ * Чистая функция: время и TTL инжектятся (тестируемость без реальных часов).
+ */
+export function assertDevMockTokenFresh(
+  claims: DevMockTokenClaims,
+  nowMs: number,
+  ttlMs: number
+): void {
+  const expMs = claims.exp * 1000;
+  if (expMs <= nowMs) {
+    throw new Error("Mock token expired");
+  }
+  if (expMs > nowMs + ttlMs + MOCK_CLOCK_SKEW_MS) {
+    throw new Error("Mock token TTL exceeded");
+  }
+}
+
+/** Пользователь из явного allowlist mock-токенов (dev/test)? */
+export function isDevMockUserAllowed(userId: string): boolean {
+  return devUserAllowlist().has(userId);
+}
+
+/**
+ * Полная проверка dev mock-токена: формат → allowlist → TTL.
+ * При любом нарушении бросает Error — вызывающий код трактует как 401.
+ */
+export function verifyDevMockToken(
+  token: string,
+  prefix: string,
+  nowMs: number,
+  ttlMs: number
+): DevMockTokenClaims {
+  const claims = parseDevMockToken(token, prefix);
+  if (!claims) {
+    throw new Error("Invalid mock token format");
+  }
+  if (!isDevMockUserAllowed(claims.userId)) {
+    throw new Error("Mock token user not in allowlist");
+  }
+  assertDevMockTokenFresh(claims, nowMs, ttlMs);
+  return claims;
+}
+
 export interface AccessTokenClaims {
   userId: string;
   expiresAt: number | undefined;
 }
 
 export async function verifyAccessTokenClaims(token: string): Promise<AccessTokenClaims> {
-  // Support mock access tokens in test/development if ALLOW_DEV_AUTH is true
-  if (env.ALLOW_DEV_AUTH && token.startsWith("mock-access-token-")) {
-    logger.warn(
-      { env: env.NODE_ENV },
-      "[Auth] DEV mock access token accepted"
-    );
-    return { userId: token.replace("mock-access-token-", ""), expiresAt: undefined };
+  // Support mock access tokens in test/development if ALLOW_DEV_AUTH is true.
+  // Принимается только токен из явного allowlist с действующим TTL;
+  // expiresAt теперь ВСЕГДА возвращается (в т.ч. WS-сессии знают,
+  // когда закрывать соединение).
+  if (env.ALLOW_DEV_AUTH && token.startsWith(MOCK_ACCESS_TOKEN_PREFIX)) {
+    try {
+      const claims = verifyDevMockToken(
+        token,
+        MOCK_ACCESS_TOKEN_PREFIX,
+        Date.now(),
+        env.DEV_MOCK_TOKEN_TTL_SECONDS * 1000
+      );
+      logger.warn(
+        { env: env.NODE_ENV },
+        "[Auth] DEV mock access token accepted"
+      );
+      return { userId: claims.userId, expiresAt: claims.exp * 1000 };
+    } catch (error) {
+      logger.warn(
+        {
+          env: env.NODE_ENV,
+          reason: error instanceof Error ? error.message : "unknown",
+        },
+        "[Auth] DEV mock access token rejected"
+      );
+      throw error;
+    }
   }
 
   const { payload } = await jwtVerify(token, getJwtSecret());
@@ -183,18 +304,43 @@ export async function revokeAllActiveTokens(userId: string): Promise<number> {
  * Проверяет refresh-токен: подпись, наличие записи в БД,
  * отсутствие отзыва и срок действия. Возвращает userId и jti.
  *
+ * Привязка к пользователю (security-audit «Auth & session»): запись ищется
+ * по паре (tokenHash, userId из подписанного sub), а не по токену в одиночку.
+ * Несовпадение userId даёт ту же обобщённую ошибку, что и отсутствие записи, —
+ * без оракула и без отзыва чужой семьи токенов.
+ *
  * Если токен уже отозван — бросает RefreshTokenRevokedError (с userId),
  * чтобы вызывающий код мог применить политику reuse-детекции.
  */
 export async function verifyRefreshToken(
   token: string
 ): Promise<{ userId: string; jti: string }> {
-  if (env.ALLOW_DEV_AUTH && token.startsWith("mock-refresh-token-")) {
-    logger.warn(
-      { env: env.NODE_ENV },
-      "[Auth] DEV mock refresh token accepted"
-    );
-    return { userId: token.replace("mock-refresh-token-", ""), jti: "dev-jti" };
+  // DEV mock refresh: те же правила, что и для access — явный allowlist
+  // и действующий TTL. jti фиксирован ("dev-jti"): записей в БД для
+  // mock-токенов нет, ротация невозможна (см. ветку /refresh в auth/index.ts).
+  if (env.ALLOW_DEV_AUTH && token.startsWith(MOCK_REFRESH_TOKEN_PREFIX)) {
+    try {
+      const claims = verifyDevMockToken(
+        token,
+        MOCK_REFRESH_TOKEN_PREFIX,
+        Date.now(),
+        env.DEV_MOCK_TOKEN_TTL_SECONDS * 1000
+      );
+      logger.warn(
+        { env: env.NODE_ENV },
+        "[Auth] DEV mock refresh token accepted"
+      );
+      return { userId: claims.userId, jti: "dev-jti" };
+    } catch (error) {
+      logger.warn(
+        {
+          env: env.NODE_ENV,
+          reason: error instanceof Error ? error.message : "unknown",
+        },
+        "[Auth] DEV mock refresh token rejected"
+      );
+      throw error;
+    }
   }
 
   const { payload } = await jwtVerify(token, getJwtSecret());
@@ -212,8 +358,8 @@ export async function verifyRefreshToken(
   }
 
   const tokenHash = hashToken(payload.jti);
-  const dbToken = await db.refreshToken.findUnique({
-    where: { tokenHash },
+  const dbToken = await db.refreshToken.findFirst({
+    where: { tokenHash, userId: payload.sub },
   });
 
   if (!dbToken || dbToken.expiresAt < new Date()) {
@@ -231,6 +377,10 @@ export async function verifyRefreshToken(
  * Атомарная ротация refresh-токена:
  * отзывает старый и создаёт новую запись в БД в одной транзакции.
  *
+ * Предикат отзыва — (tokenHash, userId, revokedAt IS NULL): чужой jti
+ * (или перепутанный вызов с чужим userId) даёт count === 0 — ничего
+ * не отзывается и новый токен не выпускается.
+ *
  * Отзыв выполняется одним UPDATE c предикатом `revokedAt IS NULL`. Под Read
  * Committed конкурирующий UPDATE после ожидания блокировки строки перечитывает
  * её свежую версию (EvalPlanQual) и видит `revokedAt` — поэтому из двух
@@ -245,7 +395,7 @@ export async function rotateRefreshToken(
 
   return db.$transaction(async (tx) => {
     const revoked = await tx.refreshToken.updateMany({
-      where: { tokenHash: oldHash, revokedAt: null },
+      where: { tokenHash: oldHash, userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
 

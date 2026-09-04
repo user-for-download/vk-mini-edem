@@ -61,10 +61,22 @@ class Gauge {
   }
 }
 
-/** Сколько раз пользователю отказано в WS-подключении из-за лимита соединений. */
+/** Сколько раз WS-подключению отказано из-за лимита соединений (global/per-user/per-IP). */
 export const wsConnectionLimitHits = new Counter(
   "ws_connection_limit_hits_total",
-  "Number of WebSocket connections rejected because the per-user limit was reached."
+  "Number of WebSocket connections rejected because a connection limit (global, per-user, or per-IP) was reached."
+);
+
+/** Сколько раз входящее WS-сообщение отброшено per-connection rate-лимитом. */
+export const wsMessageRateHits = new Counter(
+  "ws_message_rate_hits_total",
+  "Number of WebSocket messages dropped because the per-connection rate limit was reached."
+);
+
+/** Сколько раз WS auth-попытка throttled per-IP handshake-лимитом. */
+export const wsAuthThrottleHits = new Counter(
+  "ws_auth_throttle_hits_total",
+  "Number of WebSocket auth attempts throttled because the per-IP handshake rate limit was reached."
 );
 
 /** Текущее число открытых WS-соединений. */
@@ -88,6 +100,8 @@ export const httpRequestsTotal = new Counter(
 const METRICS: Array<{ render(): string }> = [
   httpRequestsTotal,
   wsConnectionLimitHits,
+  wsMessageRateHits,
+  wsAuthThrottleHits,
   wsConnections,
   wsAuthenticatedUsers,
 ];

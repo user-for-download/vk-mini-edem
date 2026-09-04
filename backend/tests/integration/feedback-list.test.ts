@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * GET /api/v1/feedback — список СВОИХ обращений в поддержку.
@@ -57,7 +58,7 @@ describe("GET /api/v1/feedback (user-side list)", () => {
   });
 
   it("200: пустой массив, если у пользователя нет обращений", async () => {
-    const res = await getMine(`mock-access-token-${userId}`);
+    const res = await getMine(devMockAccessToken(userId));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
@@ -74,7 +75,7 @@ describe("GET /api/v1/feedback (user-side list)", () => {
       data: { userId: otherUserId, subject: "Чужое", text: "C" },
     });
 
-    const res = await getMine(`mock-access-token-${userId}`);
+    const res = await getMine(devMockAccessToken(userId));
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as Array<{
@@ -104,7 +105,7 @@ describe("GET /api/v1/feedback (user-side list)", () => {
       },
     });
 
-    const res = await getMine(`mock-access-token-${userId}`);
+    const res = await getMine(devMockAccessToken(userId));
     expect(res.status).toBe(200);
     const body = (await res.json()) as Array<{
       reply: string | null;

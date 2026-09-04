@@ -20,6 +20,7 @@ import {
   revokeAllActiveTokens,
   RefreshTokenRevokedError,
   hashToken,
+  MOCK_REFRESH_TOKEN_PREFIX,
 } from "./tokens.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
 
@@ -189,8 +190,9 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
     );
 
     // DEV mock refresh: записи в БД нет (jti "dev-jti"), ротация невозможна.
-    // Возвращаем свежий mock-токен, чтобы dev-сессия не умирала по истечении access-токена.
-    if (env.ALLOW_DEV_AUTH && parseResult.data.refreshToken.startsWith("mock-refresh-token-")) {
+    // Возвращаем свежий mock-токен с НОВЫМ exp (TTL DEV_MOCK_TOKEN_TTL_SECONDS),
+    // чтобы dev-сессия не умирала по истечении access-токена.
+    if (env.ALLOW_DEV_AUTH && parseResult.data.refreshToken.startsWith(MOCK_REFRESH_TOKEN_PREFIX)) {
       const user = await db.user.findUnique({
         where: { id: userId },
         include: { car: true },
@@ -216,10 +218,13 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       }
 
       const accessToken = await signAccessToken(user.id);
+      // Новый exp: mock refresh-токен несёт TTL (security-audit: mocks
+      // с коротким TTL), бесконечно живой refresh больше не выдаётся.
+      const refreshExp = Math.floor(Date.now() / 1000) + env.DEV_MOCK_TOKEN_TTL_SECONDS;
 
       return c.json({
         accessToken,
-        refreshToken: `mock-refresh-token-${userId}`,
+        refreshToken: `${MOCK_REFRESH_TOKEN_PREFIX}${userId}-${refreshExp}`,
         expiresIn: env.JWT_ACCESS_TTL_SECONDS,
         user: serializeUser(user),
       });

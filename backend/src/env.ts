@@ -52,6 +52,22 @@ function optionalPositiveIntEnv(name: string): number {
   return positiveIntEnv(name, 0);
 }
 
+/**
+ * Явный allowlist пользователей, которым разрешены dev mock-токены
+ * (DEV_AUTH_USER_ALLOWLIST: comma-separated user id).
+ *
+ * Читаем из process.env при КАЖДОМ вызове, а не снапшотим в env-объект:
+ * интеграционные тесты создают пользователей динамически и регистрируют
+ * их в allowlist во время выполнения. Функция вызывается только в ветке
+ * ALLOW_DEV_AUTH (dev/test) — в production ALLOW_DEV_AUTH всегда false,
+ * mock-токены сюда не доходят.
+ */
+export function devUserAllowlist(): ReadonlySet<string> {
+  const raw = process.env.DEV_AUTH_USER_ALLOWLIST;
+  if (!raw) return new Set();
+  return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
 function boolEnv(name: string, fallback: boolean): boolean {
   const value = process.env[name];
 
@@ -155,6 +171,12 @@ export const env = {
   JWT_REFRESH_TTL_SECONDS: positiveIntEnv("JWT_REFRESH_TTL_SECONDS", 30 * 24 * 60 * 60),
 
   /**
+   * TTL dev mock-токенов (mock-access-token-<id>, mock-refresh-token-<id>) в секундах.
+   * Короткий намеренно: mock-токен — одноразовый dev-артефакт, а не сессия.
+   */
+  DEV_MOCK_TOKEN_TTL_SECONDS: positiveIntEnv("DEV_MOCK_TOKEN_TTL_SECONDS", 15 * 60),
+
+  /**
    * Если приложение стоит за доверенным прокси (Nginx), прокси
    * перезаписывает X-Real-IP / X-Forwarded-For, и им можно доверять.
    * Иначе используем IP из TCP-сокета (неподделываемый).
@@ -188,6 +210,22 @@ export const env = {
   CREATE_BOOKING_RATE_MAX: positiveIntEnv("CREATE_BOOKING_RATE_MAX", 20),
   CANCEL_BOOKING_RATE_WINDOW_MS: positiveIntEnv("CANCEL_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
   CANCEL_BOOKING_RATE_MAX: positiveIntEnv("CANCEL_BOOKING_RATE_MAX", 20),
+  /** Завершение поездок водителем (PATCH /trips/:id/complete), 20 в сутки. */
+  COMPLETE_TRIP_RATE_WINDOW_MS: positiveIntEnv("COMPLETE_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  COMPLETE_TRIP_RATE_MAX: positiveIntEnv("COMPLETE_TRIP_RATE_MAX", 20),
+
+  /**
+   * Rate limits (user-based): частые, но лёгкие действия по аккаунту
+   * (профиль, машина, уведомления, личные списки). Окно — сутки.
+   */
+  PROFILE_UPDATE_RATE_WINDOW_MS: positiveIntEnv("PROFILE_UPDATE_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  PROFILE_UPDATE_RATE_MAX: positiveIntEnv("PROFILE_UPDATE_RATE_MAX", 50),
+  NOTIFICATION_READ_RATE_WINDOW_MS: positiveIntEnv("NOTIFICATION_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  NOTIFICATION_READ_RATE_MAX: positiveIntEnv("NOTIFICATION_READ_RATE_MAX", 100),
+  REVIEWS_READ_RATE_WINDOW_MS: positiveIntEnv("REVIEWS_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  REVIEWS_READ_RATE_MAX: positiveIntEnv("REVIEWS_READ_RATE_MAX", 100),
+  FEEDBACK_READ_RATE_WINDOW_MS: positiveIntEnv("FEEDBACK_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
+  FEEDBACK_READ_RATE_MAX: positiveIntEnv("FEEDBACK_READ_RATE_MAX", 100),
 
   LOG_LEVEL:
     process.env.LOG_LEVEL ||
@@ -223,4 +261,12 @@ export const env = {
     5 * 60 * 1000
   ),
   ADMIN_LOGIN_RATE_MAX: positiveIntEnv("ADMIN_LOGIN_RATE_MAX", 5),
+
+  /**
+   * Rate limit GET-эндпоинтов админ-панели (IP-based).
+   * Выше публичного read-лимитера: UI админки отдаёт запросами пачками
+   * (дашборд + списки + пагинация).
+   */
+  ADMIN_READ_RATE_WINDOW_MS: positiveIntEnv("ADMIN_READ_RATE_WINDOW_MS", 60 * 1000),
+  ADMIN_READ_RATE_MAX: positiveIntEnv("ADMIN_READ_RATE_MAX", 300),
 };

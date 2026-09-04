@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * Cursor-based пагинация GET /bookings/trip/:tripId.
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 describe("GET /bookings/trip/:tripId — cursor pagination", () => {
   let driverId: string;
@@ -85,7 +87,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
   it("returns 404 for non-existent trip", async () => {
     const fakeUuid = "22222222-2222-2222-2222-222222222222";
     const res = await app.request(`/api/v1/bookings/trip/${fakeUuid}`, {
-      headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
     });
     expect(res.status).toBe(404);
   });
@@ -101,7 +103,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
 
     try {
       const res = await app.request(`/api/v1/bookings/trip/${tripId}`, {
-        headers: { Authorization: `Bearer mock-access-token-${otherUser.id}` },
+        headers: { Authorization: `Bearer ${devMockAccessToken(otherUser.id)}` },
       });
       expect(res.status).toBe(403);
     } finally {
@@ -111,7 +113,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
 
   it("returns first page with custom limit and hasMore", async () => {
     const res = await app.request(`/api/v1/bookings/trip/${tripId}?limit=5`, {
-      headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
     });
     expect(res.status).toBe(200);
 
@@ -124,7 +126,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
 
   it("defaults limit to 50 and returns everything in one page", async () => {
     const res = await app.request(`/api/v1/bookings/trip/${tripId}`, {
-      headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
     });
     expect(res.status).toBe(200);
 
@@ -137,7 +139,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
   it("traverses pages via cursor without overlap", async () => {
     const page1 = await (
       await app.request(`/api/v1/bookings/trip/${tripId}?limit=10`, {
-        headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+        headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
       })
     ).json();
 
@@ -147,7 +149,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
     const page2 = await (
       await app.request(
         `/api/v1/bookings/trip/${tripId}?limit=10&cursor=${page1.pagination.nextCursor}`,
-        { headers: { Authorization: `Bearer mock-access-token-${driverId}` } }
+        { headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` } }
       )
     ).json();
 
@@ -164,7 +166,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
   it("returns empty page with 200 for a valid-format expired cursor", async () => {
     const fakeUuid = "33333333-3333-3333-3333-333333333333";
     const res = await app.request(`/api/v1/bookings/trip/${tripId}?cursor=${fakeUuid}`, {
-      headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
     });
     expect(res.status).toBe(200);
 
@@ -175,7 +177,7 @@ describe("GET /bookings/trip/:tripId — cursor pagination", () => {
 
   it("rejects invalid cursor format with 400", async () => {
     const res = await app.request(`/api/v1/bookings/trip/${tripId}?cursor=bad`, {
-      headers: { Authorization: `Bearer mock-access-token-${driverId}` },
+      headers: { Authorization: `Bearer ${devMockAccessToken(driverId)}` },
     });
     expect(res.status).toBe(400);
 

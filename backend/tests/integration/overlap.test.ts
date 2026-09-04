@@ -2,12 +2,14 @@ import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { Prisma } from "../../src/generated/prisma/client.js";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * Защита от перекрывающихся поездок (водитель) и броней (пассажир):
  * интервал поездки = [departureAt, departureAt + durationMinutes].
  *
- * Паттерны репо: app.request(), dev-авторизация Bearer mock-access-token-{userId}.
+ * Паттерны репо: app.request(), dev-авторизация mock-токеном
+ * (tests/dev-mock-auth.js: allowlist + TTL).
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -64,7 +66,7 @@ describe("Overlap protection", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${authId}`,
+        Authorization: `Bearer ${devMockAccessToken(authId)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",
@@ -92,7 +94,7 @@ describe("Overlap protection", () => {
       method: "PATCH",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       body: JSON.stringify({ departureAt }),
     });
@@ -107,7 +109,7 @@ describe("Overlap protection", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${authId}`,
+        Authorization: `Bearer ${devMockAccessToken(authId)}`,
       },
       body: JSON.stringify({ tripId, seat: 1 }),
     });
