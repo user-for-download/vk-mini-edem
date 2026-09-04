@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-02", "seq": "02", "title": "S0: принять решения по lifecycle и cancellation audit", "status": "pending", "depends_on": ["01"], "parallel": false, "suggested_agent": "TaskManager",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/bookings/index.ts", "backend/src/trips/index.ts", "backend/src/workers/tripWorker.ts", "packages/contracts/src/schemas/status.const.ts"],
+  "deliverables": ["ADR с pending TTL и решением о статусе expired", "ADR с правилами автозавершения", "ADR с единой моделью причины и actor отмены"],
+  "acceptance_criteria": ["Зафиксированы рекомендуемые defaults: pending истекает по expiresAt, отдельный expired вводится только при необходимости истории", "Автозавершение идемпотентно и является point-of-no-return", "Причина и исполнитель различают user/admin/system и сохраняются для аудита"],
+  "commands": ["npm run typecheck"],
+  "risks": ["Изменение статусов затронет фильтры active booking и seat accounting"]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-24", "seq": "24", "title": "S5: финальная валидация TaskManager и release sign-off", "status": "pending", "depends_on": ["23"], "parallel": false, "suggested_agent": "TaskManager",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md", "README.md"], "reference_files": [".tmp/tasks/edem-liquidity-safety/task.json", ".tmp/tasks/edem-liquidity-safety/subtask_*.json"],
+  "deliverables": ["Final implementation checklist", "Known limitations and monitoring notes", "TaskManager completion summary"],
+  "acceptance_criteria": ["task-cli validate проходит", "Все subtasks completed with summaries", "Документация, tests, build, security и e2e подтверждены", "Feature готова к отдельному user release approval"],
+  "commands": ["npx ts-node --compiler-options '{\"module\":\"commonjs\"}' .opencode/skills/task-management/scripts/task-cli.ts validate", "npx ts-node --compiler-options '{\"module\":\"commonjs\"}' .opencode/skills/task-management/scripts/task-cli.ts status"],
+  "risks": ["Нерешённые S0 defaults должны блокировать реализацию, а не замалчиваться"]
+}

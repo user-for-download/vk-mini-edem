@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-17", "seq": "17", "title": "S4: реализовать deletion UX и tests", "status": "pending", "depends_on": ["16"], "parallel": true, "suggested_agent": "OpenFrontendSpecialist",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["mini-app/src/auth", "mini-app/src", "mini-app/src/components", "backend/src/users/index.ts"],
+  "deliverables": ["Danger-zone confirmation flow", "Blocked-active-obligation UX", "Auth reset/logout and deleted-account handling"],
+  "acceptance_criteria": ["Удаление требует явного подтверждения", "Ошибки 409/403 отображаются без потери состояния", "После успеха очищаются local stores и пользователь видит корректный экран", "Deep links/notifications не вызывают crash"],
+  "commands": ["npm test --workspace=mini-app", "npm run build --workspace=mini-app"],
+  "risks": ["Удаление во время открытой вкладки/WS может вызвать stale cache"]
+}

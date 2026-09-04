@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-22", "seq": "22", "title": "S5: добавить Playwright full-cycle scenarios", "status": "pending", "depends_on": ["19", "20"], "parallel": true, "suggested_agent": "TestEngineer",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md", "e2e/full-cycle.mjs"], "reference_files": ["e2e", "docker-compose.yml", "package.json"],
+  "deliverables": ["E2E RideRequest-to-trip discovery flow", "Report admin moderation flow", "Delete/profile session flow", "Share deep-link flow if environment supports it"],
+  "acceptance_criteria": ["Existing 14-step full-cycle remains green", "New flows use deterministic fixtures and reset state", "No dependency on external VK network beyond existing mocks"],
+  "commands": ["node e2e/full-cycle.mjs"],
+  "risks": ["E2E environment and VK Bridge behavior differ between local and CI"]
+}

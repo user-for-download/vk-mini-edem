@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-13", "seq": "13", "title": "S3: реализовать mini-app и webapp moderation UI", "status": "pending", "depends_on": ["12"], "parallel": true, "suggested_agent": "OpenFrontendSpecialist",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["mini-app/src", "webapp/src", "webapp/src/routes", "webapp/src/components"],
+  "deliverables": ["Report action in allowed user contexts", "Admin reports page/filter/detail/status actions", "Empty/error/loading states"],
+  "acceptance_criteria": ["Кнопка жалобы не появляется для запрещённых targets", "Админ видит category/status/createdAt/actor и history", "UI не показывает лишние приватные данные", "Mutations invalidate reports/dashboard queries"],
+  "commands": ["npm test --workspace=mini-app", "npm run build --workspace=webapp"],
+  "risks": ["Report UI может конфликтовать с существующими detail modals"]
+}

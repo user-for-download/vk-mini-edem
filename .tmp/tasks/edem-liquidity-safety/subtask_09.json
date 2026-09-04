@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-09", "seq": "09", "title": "S2: реализовать RideRequest mini-app UX", "status": "pending", "depends_on": ["08"], "parallel": true, "suggested_agent": "OpenFrontendSpecialist",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["mini-app/src", "mini-app/src/api", "mini-app/src/components", "mini-app/src/store"],
+  "deliverables": ["Экран/панель Ищу попутку", "Create/edit/pause/cancel flows", "Empty-search CTA и matching entry point"],
+  "acceptance_criteria": ["Мобильный UX поддерживает loading/error/empty states", "Города выбираются из существующего справочника", "Нет автоматического бронирования", "После mutation queries корректно инвалидируются"],
+  "commands": ["npm test --workspace=mini-app", "npm run lint --workspace=mini-app", "npm run build --workspace=mini-app"],
+  "risks": ["Рост initial bundle; новые экраны должны быть lazy"]
+}

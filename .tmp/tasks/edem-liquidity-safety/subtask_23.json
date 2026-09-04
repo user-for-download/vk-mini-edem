@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-23", "seq": "23", "title": "S5: проверить Docker/production smoke и rollback", "status": "pending", "depends_on": ["20", "21", "22"], "parallel": false, "suggested_agent": "OpenDevopsSpecialist",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md", "README.md"], "reference_files": ["docker-compose.yml", "backend/Dockerfile", "webapp/Dockerfile", "webapp/nginx.conf"],
+  "deliverables": ["Docker build/deploy smoke report", "Migration rollback/forward runbook", "Environment variable checklist"],
+  "acceptance_criteria": ["Compose services healthy", "API unknown routes remain JSON 404", "Admin cookie and mini-app auth work through production proxy", "Migration deploy is repeatable and rollback risks documented"],
+  "commands": ["docker compose config", "docker compose up -d --build", "npm run db:migrate:deploy"],
+  "risks": ["Destructive migration or missing production env can cause downtime"]
+}

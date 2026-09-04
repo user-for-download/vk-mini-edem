@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-12", "seq": "12", "title": "S3: реализовать user/admin Report API", "status": "pending", "depends_on": ["11"], "parallel": false, "suggested_agent": "CoderAgent",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/feedback/index.ts", "backend/src/admin/index.ts", "backend/src/admin/serializers.ts", "docs/api/admin.md"],
+  "deliverables": ["User report create/list endpoints", "Admin paginated list/detail/status transitions", "Audit and notifications where approved"],
+  "acceptance_criteria": ["User cannot read other reports", "Admin guard and closed-by-default behavior preserved", "Transitions reject invalid states with documented 409", "PII in admin response minimized"],
+  "commands": ["npm test --workspace=backend", "npm run typecheck"],
+  "risks": ["Admin endpoint leakage или некорректная target authorization"]
+}

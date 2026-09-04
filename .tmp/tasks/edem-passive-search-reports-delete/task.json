@@ -1,0 +1,13 @@
+{
+  "id": "edem-passive-search-reports-delete",
+  "name": "Legacy planning placeholder",
+  "status": "archived",
+  "objective": "Placeholder retained so TaskManager can validate the pre-existing empty planning directory.",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": ["Superseded by edem-liquidity-safety"],
+  "subtask_count": 0,
+  "completed_count": 0,
+  "created_at": "2026-09-04T00:00:00Z",
+  "completed_at": null
+}

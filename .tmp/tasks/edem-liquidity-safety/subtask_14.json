@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-14", "seq": "14", "title": "S3: покрыть Reports тестами и security cases", "status": "pending", "depends_on": ["12", "13"], "parallel": true, "suggested_agent": "TestEngineer",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/**/*.test.ts", "packages/contracts/src/**/*.test.ts", "mini-app/src/**/*.test.tsx"],
+  "deliverables": ["Contract/backend/UI tests", "Authorization/rate-limit/self-report/dedup tests", "Admin transition and audit tests"],
+  "acceptance_criteria": ["Проверены user/trip/booking targets и deleted/ban edge cases", "Повторная жалоба блокируется по согласованной policy", "Тесты статусов и actor history проходят"],
+  "commands": ["npm test --workspace=packages/contracts", "npm test --workspace=backend", "npm test --workspace=mini-app"],
+  "risks": ["Сложные fixture relationships могут сделать suite нестабильным"]
+}

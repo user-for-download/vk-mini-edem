@@ -1,0 +1,8 @@
+{
+  "id": "edem-liquidity-safety-08", "seq": "08", "title": "S2: реализовать RideRequest backend API и matching", "status": "pending", "depends_on": ["07"], "parallel": false, "suggested_agent": "CoderAgent",
+  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/app.ts", "backend/src/trips/index.ts", "backend/src/cities/index.ts", "backend/src/notifications/index.ts", "backend/src/services/notification.service.ts"],
+  "deliverables": ["CRUD/activate/pause/cancel endpoints", "Driver matching query и pagination", "Expiry handling", "Rate limits и authorization"],
+  "acceptance_criteria": ["Пользователь видит только свои запросы", "Driver получает только route/time-compatible requests", "Истечение не создаёт бронь", "Mutation endpoints защищены и idempotent где требуется"],
+  "commands": ["npm test --workspace=backend", "npm run typecheck"],
+  "risks": ["N+1 queries и рассылка уведомлений при массовых совпадениях"]
+}

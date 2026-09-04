@@ -1,0 +1,40 @@
+{
+  "id": "edem-liquidity-safety",
+  "name": "Edem: пассивный поиск, жалобы и удаление профиля",
+  "status": "active",
+  "objective": "Подготовить и внедрить безопасный MVP для повышения ликвидности поездок: lifecycle-исправления, режим Ищу попутку, жалобы и soft-delete профиля.",
+  "context_files": [
+    "MEMORY.md",
+    "README.md",
+    "docs/api/admin.md",
+    "package.json"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "backend/src/app.ts",
+    "backend/src/trips/index.ts",
+    "backend/src/bookings/index.ts",
+    "backend/src/workers/tripWorker.ts",
+    "backend/src/services/notification.service.ts",
+    "backend/src/services/wsManager.ts",
+    "backend/src/auth/index.ts",
+    "backend/src/auth/tokens.ts",
+    "packages/contracts/src/index.ts",
+    "packages/contracts/src/dto/trip.dto.ts",
+    "packages/contracts/src/dto/booking.dto.ts",
+    "mini-app/src",
+    "webapp/src"
+  ],
+  "exit_criteria": [
+    "Все решения S0 подтверждены и отражены в ADR/документации",
+    "Lifecycle, RideRequest, Reports и profile deletion реализованы без нарушения существующих инвариантов",
+    "Тесты contracts/backend/mini-app/webapp и Playwright проходят",
+    "npm run typecheck, npm test, npm run build, npm run format:check и npm run bundle:check проходят",
+    "Пройдены security-проверки доступа, rate limiting, приватности и token/session cleanup",
+    "Обновлены MEMORY.md, README.md и соответствующие API-документы"
+  ],
+  "subtask_count": 24,
+  "completed_count": 1,
+  "created_at": "2026-09-04T00:00:00Z",
+  "completed_at": null
+}

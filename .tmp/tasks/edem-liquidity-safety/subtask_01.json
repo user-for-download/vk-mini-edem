@@ -1,0 +1,38 @@
+{
+  "id": "edem-liquidity-safety-01",
+  "seq": "01",
+  "title": "S0: провести доменный аудит и зафиксировать baseline",
+  "status": "completed",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "TaskManager",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-04T19:22:16.342Z",
+  "completion_summary": "Baseline audit completed; existing lifecycle and conflict boundaries documented",
+  "context_files": [
+    "MEMORY.md",
+    "README.md"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "backend/src/trips/index.ts",
+    "backend/src/bookings/index.ts",
+    "backend/src/workers/tripWorker.ts"
+  ],
+  "deliverables": [
+    "Таблица текущих статусов, переходов, cron/worker и публичных API",
+    "Список инвариантов и конфликтующих файлов"
+  ],
+  "acceptance_criteria": [
+    "Не дублируются уже реализованные auth, booking, notification, review и admin возможности",
+    "Для каждого планируемого изменения указан затрагиваемый контракт"
+  ],
+  "commands": [
+    "git status --short",
+    "npx ts-node --compiler-options '{\"module\":\"commonjs\"}' .opencode/skills/task-management/scripts/task-cli.ts validate"
+  ],
+  "risks": [
+    "Неполный аудит приведёт к повторной реализации и конфликтам миграций"
+  ]
+}
