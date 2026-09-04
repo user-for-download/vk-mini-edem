@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app } from "../src/app.js";
 import { db } from "../src/db.js";
+import { devMockAccessToken } from "./dev-mock-auth.js";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json",
@@ -259,7 +260,7 @@ describe("bookings smoke", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${passenger.id}`,
+        Authorization: `Bearer ${devMockAccessToken(passenger.id)}`,
       },
       body: JSON.stringify({
         tripId: trip.id,
@@ -332,7 +333,7 @@ describe("bookings smoke", () => {
       app.request(`/api/v1/bookings/${booking.id}/cancel`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer mock-access-token-${passenger.id}`,
+          Authorization: `Bearer ${devMockAccessToken(passenger.id)}`,
         },
       });
 

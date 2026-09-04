@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Prisma } from "../../src/generated/prisma/client.js";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * User-based rate limits: лимит на создание поездок — 10 в сутки на
@@ -73,7 +74,7 @@ describe("User-based rate limits (create trip)", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${driverId}`,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
       },
       // Непересекающиеся времена: 10:00, 12:00, 14:00... (длительность 60 мин)
       body: JSON.stringify({
@@ -137,7 +138,7 @@ describe("User-based rate limits (create trip)", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${other.id}`,
+        Authorization: `Bearer ${devMockAccessToken(other.id)}`,
       },
       body: JSON.stringify({
         fromCity: "Москва",

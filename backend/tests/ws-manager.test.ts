@@ -78,6 +78,36 @@ describe("WebSocketManager", () => {
     expect(wsManager.getStats().totalConnections).toBe(0);
   });
 
+  it("rejects authentication with an already-expired access token (4401, immediately)", () => {
+    // Arrange — expiresAt в прошлом на момент authenticate
+    const ws = makeFakeWs();
+    const connId = wsManager.register(ws);
+
+    // Act
+    const accepted = wsManager.authenticate(connId, "user-expired-past", Date.now() - 1_000);
+
+    // Assert — соединение закрыто НЕМЕДЛЕННО (не по zero-delay таймеру),
+    // в статистике не осталось.
+    expect(accepted).toBe(false);
+    expect(ws.close).toHaveBeenCalledWith(4401, "Access token expired");
+    expect(wsManager.getStats().totalConnections).toBe(0);
+  });
+
+  it("drops an established connection on re-auth with an expired token", () => {
+    // Arrange — соединение уже аутентифицировано со свежим токеном
+    const ws = makeFakeWs();
+    const connId = wsManager.register(ws);
+    expect(wsManager.authenticate(connId, "user-reauth", Date.now() + 60_000)).toBe(true);
+
+    // Act — повторная auth тем же пользователем с ИСТЁКШИМ токеном
+    const accepted = wsManager.authenticate(connId, "user-reauth", Date.now() - 1_000);
+
+    // Assert — established-соединение не переживает истёкший токен
+    expect(accepted).toBe(false);
+    expect(ws.close).toHaveBeenCalledWith(4401, "Access token expired");
+    expect(wsManager.getStats().totalConnections).toBe(0);
+  });
+
   it("closes an unauthenticated connection after the auth timeout (4401)", () => {
     const ws = makeFakeWs();
     const connId = wsManager.register(ws);

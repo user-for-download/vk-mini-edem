@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * Дозированная выдача vkUserId для кнопки «Написать» (ЛС ВКонтакте).
@@ -15,7 +16,8 @@ import { db } from "../../src/db.js";
  * - GET /bookings/trip/:tripId → passenger.vkUserId (водителю его поездки).
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 describe("vkUserId disclosure for VK DM link", () => {
   let driverId: string;
@@ -26,7 +28,7 @@ describe("vkUserId disclosure for VK DM link", () => {
   let vkSeq = 1_800_000;
 
   const auth = (userId: string) => ({
-    Authorization: `Bearer mock-access-token-${userId}`,
+    Authorization: `Bearer ${devMockAccessToken(userId)}`,
   });
 
   const createTripForDriver = async () => {
