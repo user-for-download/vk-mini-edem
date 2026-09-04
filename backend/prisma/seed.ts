@@ -76,6 +76,10 @@ interface SeedReview {
   text: string;
   tripRoute: string;
   tripId?: string;
+  // Статус модерации. По умолчанию "published" — чтобы dev-стенд
+  // показывал отзывы (публичный список и рейтинг учитывают только
+  // published, см. backend/src/reviews/).
+  status?: "pending" | "published" | "rejected";
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -982,6 +986,47 @@ const trips: SeedTrip[] = [
       { passengerId: "u-16", seat: 2, status: "confirmed" },
     ],
   },
+  // ── Прошлые (completed) — свежие, под новые отзывы ──
+  {
+    id: "t-past-6",
+    driverId: "u-3",
+    fromCity: "Вологда",
+    fromAddress: "Автовокзал",
+    toCity: "Сокол",
+    toAddress: "Ж/д вокзал",
+    daysFromNow: -2,
+    durationMinutes: 55,
+    distanceKm: 60,
+    price: 350,
+    seatsTotal: 3,
+    status: "completed",
+    tags: ["Тихая поездка", "Есть багаж"],
+    comment: "Съездили отлично, дорога сухая.",
+    bookings: [
+      { passengerId: "u-14", seat: 1, status: "confirmed" },
+      { passengerId: "u-18", seat: 2, status: "confirmed" },
+      { passengerId: "u-16", seat: 3, status: "confirmed" },
+    ],
+  },
+  {
+    id: "t-past-7",
+    driverId: "u-5",
+    fromCity: "Грязовец",
+    fromAddress: "Центр",
+    toCity: "Вологда",
+    toAddress: "Автовокзал",
+    daysFromNow: -1,
+    durationMinutes: 60,
+    distanceKm: 70,
+    price: 300,
+    seatsTotal: 3,
+    status: "completed",
+    tags: ["С остановками"],
+    bookings: [
+      { passengerId: "u-19", seat: 1, status: "confirmed" },
+      { passengerId: "u-20", seat: 2, status: "confirmed" },
+    ],
+  },
   // ── Отменённые (cancelled) ──
   {
     id: "t-c-1",
@@ -1203,6 +1248,118 @@ const reviews: SeedReview[] = [
     tripRoute: "Вытегра → Тарногский Городок",
     tripId: "t-past-5",
   },
+  // ── Новые: t-past-6 (Вологда → Сокол) ──
+  {
+    id: "r-19",
+    authorId: "u-14",
+    targetUserId: "u-3",
+    targetRole: "driver",
+    rating: 5,
+    status: "published",
+    text: "Алексей — отличный водитель! Ехали плавно, всю дорогу интересный разговор.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  {
+    id: "r-20",
+    authorId: "u-18",
+    targetUserId: "u-3",
+    targetRole: "driver",
+    rating: 4,
+    status: "published",
+    text: "Всё хорошо, только выехали минут на десять позже запланированного.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  {
+    id: "r-21",
+    authorId: "u-3",
+    targetUserId: "u-14",
+    targetRole: "passenger",
+    rating: 5,
+    status: "published",
+    text: "Павел — пунктуальный и вежливый, берите не раздумывая.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  {
+    id: "r-22",
+    authorId: "u-3",
+    targetUserId: "u-18",
+    targetRole: "passenger",
+    rating: 3,
+    status: "published",
+    text: "Артём опоздал к месту встречи, но в пути без нареканий.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  {
+    id: "r-23",
+    authorId: "u-16",
+    targetUserId: "u-3",
+    targetRole: "driver",
+    rating: 4,
+    status: "pending",
+    text: "Комфортная поездка, водитель вежливый.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  {
+    id: "r-24",
+    authorId: "u-3",
+    targetUserId: "u-16",
+    targetRole: "passenger",
+    rating: 5,
+    status: "published",
+    text: "Михаил — спокойный и аккуратный попутчик.",
+    tripRoute: "Вологда → Сокол",
+    tripId: "t-past-6",
+  },
+  // ── Новые: t-past-7 (Грязовец → Вологда) ──
+  {
+    id: "r-25",
+    authorId: "u-19",
+    targetUserId: "u-5",
+    targetRole: "driver",
+    rating: 5,
+    status: "pending",
+    text: "Дмитрий довёз быстро и с комфортом!",
+    tripRoute: "Грязовец → Вологда",
+    tripId: "t-past-7",
+  },
+  {
+    id: "r-26",
+    authorId: "u-20",
+    targetUserId: "u-5",
+    targetRole: "driver",
+    rating: 2,
+    status: "rejected",
+    text: "Ужасный водитель, больше никогда!!!",
+    tripRoute: "Грязовец → Вологда",
+    tripId: "t-past-7",
+  },
+  {
+    id: "r-27",
+    authorId: "u-5",
+    targetUserId: "u-19",
+    targetRole: "passenger",
+    rating: 5,
+    status: "published",
+    text: "Дарья — приятная попутчица, всегда вовремя.",
+    tripRoute: "Грязовец → Вологда",
+    tripId: "t-past-7",
+  },
+  {
+    id: "r-28",
+    authorId: "u-5",
+    targetUserId: "u-20",
+    targetRole: "passenger",
+    rating: 4,
+    status: "published",
+    text: "Роман немного опоздал, в остальном всё отлично.",
+    tripRoute: "Грязовец → Вологда",
+    tripId: "t-past-7",
+  },
 ];
 
 function validateSeedData(): void {
@@ -1254,6 +1411,12 @@ function validateSeedData(): void {
   }
 
   for (const review of reviews) {
+    if (
+      review.status &&
+      !["pending", "published", "rejected"].includes(review.status)
+    ) {
+      throw new Error(`Invalid status in seed review ${review.id}`);
+    }
     const trip = review.tripId ? tripById.get(review.tripId) : undefined;
     if (!userIds.has(review.authorId) || !userIds.has(review.targetUserId)) {
       throw new Error(`Unknown user in seed review ${review.id}`);
@@ -1300,6 +1463,7 @@ async function main() {
 
   // Clean old records
   await prisma.notification.deleteMany();
+  await prisma.feedback.deleteMany();
   await prisma.review.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.trip.deleteMany();
@@ -1381,12 +1545,16 @@ async function main() {
         text: r.text,
         tripRoute: r.tripRoute,
         tripId: r.tripId,
+        status: r.status ?? "published",
       },
     });
   }
 
+  // Рейтинг и счётчик — только по опубликованным (как в рантайме:
+  // backend/src/reviews/rating.ts). Pending/rejected в рейтинг не входят.
   const reviewAggregates = await prisma.review.groupBy({
     by: ["targetUserId"],
+    where: { status: "published" },
     _avg: { rating: true },
     _count: { _all: true },
   });
@@ -1444,9 +1612,59 @@ async function main() {
       body: "Татьяна Белова подтвердила вашу поездку Кадуй → Тарногский Городок.",
       isRead: true,
     },
+    {
+      userId: "u-15",
+      type: "trip_cancelled",
+      title: "Поездка отменена",
+      body: "Алексей Громов отменил поездку Федотово → Вологда.",
+      isRead: false,
+    },
+    {
+      userId: "u-4",
+      type: "trip_cancelled",
+      title: "Поездка отменена",
+      body: "Дмитрий Соколов отменил поездку Суда → Череповец.",
+      isRead: true,
+    },
   ];
   for (const n of notifications) {
     await prisma.notification.create({ data: n });
+  }
+
+  // Обращения в поддержку: с ответом админа / без / апелляция.
+  const feedbacks = [
+    {
+      userId: "u-4",
+      subject: "Не могу найти поездку",
+      text: "Ищу поездку Вологда → Череповец на завтра, но в выдаче пусто. Так и должно быть?",
+    },
+    {
+      userId: "u-14",
+      subject: "Вопрос про оплату",
+      text: "Оплата водителю наличными или переводом? В приложении кнопки оплаты не нашёл.",
+      reply: "Оплата происходит напрямую водителю при встрече — наличными или переводом по договорённости.",
+      repliedAt: new Date(Date.now() - 2 * dayMs),
+    },
+    {
+      userId: "u-18",
+      subject: "Жалоба на водителя",
+      text: "Водитель уехал без меня, хотя я был на месте за 10 минут. Прошу разобраться.",
+    },
+    {
+      userId: "u-19",
+      subject: "Апелляция: отклонённый отзыв",
+      text: "Мой отзыв о поездке отклонили, но я не нарушала правила. Пересмотрите, пожалуйста.",
+      reply: "Проверили: в тексте был номер телефона. Уберите контакты и отправьте отзыв заново.",
+      repliedAt: new Date(Date.now() - 5 * dayMs),
+    },
+    {
+      userId: "u-22",
+      subject: "Предложение: тёмная тема",
+      text: "Было бы здорово добавить тёмную тему для ночных поездок.",
+    },
+  ];
+  for (const f of feedbacks) {
+    await prisma.feedback.create({ data: f });
   }
 
   // Справочник городов: идемпотентный upsert 25 точек Вологодской
@@ -1463,6 +1681,7 @@ async function main() {
     bookings: await prisma.booking.count(),
     reviews: await prisma.review.count(),
     notifications: await prisma.notification.count(),
+    feedbacks: await prisma.feedback.count(),
     cities: await prisma.city.count(),
   };
   console.log("Seeding rich mock data complete!", stats);
