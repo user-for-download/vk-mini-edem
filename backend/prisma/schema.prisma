@@ -111,6 +111,10 @@ model Trip {
   tags            String[] @default([])
   comment         String?
   status          String   @default("active") // active, cancelled, completed
+  cancelledAt     DateTime?
+  cancelledByType String?
+  cancelledByUserId String?
+  cancellationReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -167,6 +171,11 @@ model Booking {
   // DB CHECK Booking_seat_positive (seat >= 1) — см. миграцию *compress_seats_to_max3.
   seat        Int
   status      String   @default("pending") // pending, confirmed, declined, cancelled
+  expiresAt   DateTime?
+  cancelledAt DateTime?
+  cancelledByType String?
+  cancelledByUserId String?
+  cancellationReason String?
   comment     String?
   createdAt   DateTime @default(now())
 

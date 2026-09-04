@@ -680,7 +680,11 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
 
         const updated = await tx.trip.update({
           where: { id },
-          data: { status: "cancelled" },
+          data: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledByType: "admin",
+          },
           include: { driver: true },
         });
 
@@ -782,6 +786,7 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
               tripId: trip.id,
               seat: booking.seat,
               status: { in: [...ACTIVE_BOOKING_STATUSES] },
+              OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
               id: { not: booking.id },
             },
           });

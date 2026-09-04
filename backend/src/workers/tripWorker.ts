@@ -7,6 +7,7 @@ import { createNotification } from "../services/notification.service.js";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const TRIP_WORKER_BATCH_SIZE = 100;
+const PENDING_BOOKING_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface ExpiredTrip {
   id: string;
@@ -33,6 +34,7 @@ export async function processExpiredTrips() {
   let lastId: string | null = null;
 
   try {
+    await expirePendingBookings(new Date());
     while (true) {
       const expiredTrips: ExpiredTrip[] = await db.trip.findMany({
         where: {
@@ -64,6 +66,28 @@ export async function processExpiredTrips() {
     }
   } catch (err) {
     logger.error({ err }, "trip_worker_fatal_error");
+  }
+}
+
+async function expirePendingBookings(now: Date): Promise<void> {
+  const expired = await db.booking.findMany({
+    where: { status: "pending", expiresAt: { lte: now } },
+    select: { id: true, tripId: true, passengerId: true },
+    take: TRIP_WORKER_BATCH_SIZE,
+  });
+  for (const booking of expired) {
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.booking.updateMany({
+        where: { id: booking.id, status: "pending", expiresAt: { lte: now } },
+        data: { status: "declined", cancelledAt: now, cancelledByType: "system", cancellationReason: "Booking request expired" },
+      });
+      if (claimed.count === 1) {
+        await tx.trip.updateMany({
+          where: { id: booking.tripId, status: "active" },
+          data: { seatsAvailable: { increment: 1 } },
+        });
+      }
+    }, { isolationLevel: "Serializable" });
   }
 }
 
@@ -102,7 +126,12 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
         if (pendingBookingIds.length > 0) {
           await tx.booking.updateMany({
             where: { id: { in: pendingBookingIds } },
-            data: { status: "declined" },
+            data: {
+              status: "declined",
+              cancelledAt: new Date(),
+              cancelledByType: "system",
+              cancellationReason: "Trip completed",
+            },
           });
         }
 

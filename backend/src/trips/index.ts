@@ -86,6 +86,7 @@ async function assertPassengersHaveNoBookingOverlap(
     where: {
       tripId,
       status: { in: [...ACTIVE_BOOKING_STATUSES] },
+      OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
     },
     select: { passengerId: true },
   });
@@ -103,7 +104,8 @@ async function assertPassengersHaveNoBookingOverlap(
       passengerId: { in: passengerIds },
       // Брони на ЭТУ поездку исключаем: сравниваем только с ДРУГИМИ поездками.
       tripId: { not: tripId },
-      status: { in: [...ACTIVE_BOOKING_STATUSES] },
+       status: { in: [...ACTIVE_BOOKING_STATUSES] },
+       OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
       trip: {
         status: "active",
         // Потенциально пересекаются только поездки, стартующие до конца
@@ -731,7 +733,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
 
         if (dto.seatsTotal !== undefined) {
           const activeBookingsForSeats = await tx.booking.findMany({
-            where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+             where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] }, OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }] },
             select: { seat: true },
           });
           const maxTakenSeat = activeBookingsForSeats.reduce(
@@ -901,6 +903,9 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
           data: {
             status: "cancelled",
             seatsAvailable: 0,
+            cancelledAt: new Date(),
+            cancelledByType: "user",
+            cancelledByUserId: user.id,
           },
           include: {
             driver: {

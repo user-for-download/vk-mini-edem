@@ -62,6 +62,41 @@ type CreateResult =
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_BOOKINGS_LIMIT = 50;
 const MAX_BOOKINGS_LIMIT = 50;
+const PENDING_BOOKING_TTL_MS = 24 * 60 * 60 * 1000;
+
+function activeBookingWhere(now = new Date()): Prisma.BookingWhereInput {
+  return {
+    OR: [
+      { status: "confirmed" },
+      { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    ],
+  };
+}
+
+async function releaseExpiredBookings(tx: Prisma.TransactionClient, now: Date): Promise<void> {
+  const expired = await tx.booking.findMany({
+    where: { status: "pending", expiresAt: { lte: now } },
+    select: { id: true, tripId: true },
+  });
+
+  for (const booking of expired) {
+    const released = await tx.booking.updateMany({
+      where: { id: booking.id, status: "pending", expiresAt: { lte: now } },
+      data: {
+        status: "declined",
+        cancelledAt: now,
+        cancelledByType: "system",
+        cancellationReason: "Booking request expired",
+      },
+    });
+    if (released.count === 1) {
+      await tx.trip.updateMany({
+        where: { id: booking.tripId, status: "active" },
+        data: { seatsAvailable: { increment: 1 } },
+      });
+    }
+  }
+}
 
 export const bookingsRouter = new Hono<AuthEnv>();
 
@@ -423,6 +458,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
   try {
     const result: CreateResult = await db.$transaction(
       async (tx) => {
+        await releaseExpiredBookings(tx, new Date());
         const trip = await tx.trip.findUnique({
           where: { id: tripId },
         });
@@ -456,7 +492,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
           // Исключаем брони на ЭТУ поездку: они обрабатываются ниже
           // (идемпотентный retry / ALREADY_BOOKED).
           tripId: { not: tripId },
-          status: { in: [...ACTIVE_BOOKING_STATUSES] },
+           ...activeBookingWhere(),
           trip: {
             status: "active",
             departureAt: { lt: newRange.end },
@@ -496,9 +532,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         where: {
           tripId,
           seat,
-          status: {
-            in: [...ACTIVE_BOOKING_STATUSES],
-          },
+           ...activeBookingWhere(),
         },
         select: { id: true, passengerId: true },
       });
@@ -541,9 +575,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         where: {
           tripId,
           passengerId: passenger.id,
-          status: {
-            in: [...ACTIVE_BOOKING_STATUSES],
-          },
+           ...activeBookingWhere(),
         },
       });
 
@@ -569,6 +601,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
           seat,
           comment,
           status: "pending",
+          expiresAt: new Date(Date.now() + PENDING_BOOKING_TTL_MS),
         },
         include: {
           trip: {
@@ -820,6 +853,10 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
         );
       }
 
+      if (booking.expiresAt && booking.expiresAt <= new Date()) {
+        throw new BookingError("Booking request has expired", 409, ERROR_CODES.CONFLICT);
+      }
+
       const trip = await tx.trip.findUnique({
         where: { id: booking.tripId },
       });
@@ -874,9 +911,7 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
           where: {
             tripId: booking.tripId,
             seat: booking.seat,
-            status: {
-              in: [...ACTIVE_BOOKING_STATUSES],
-            },
+             ...activeBookingWhere(),
             id: {
               not: booking.id,
             },
@@ -1071,9 +1106,12 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
 
       await tx.booking.update({
         where: { id: booking.id },
-        data: {
-          status: "cancelled",
-        },
+          data: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledByType: "user",
+            cancelledByUserId: user.id,
+          },
       });
 
       return { tripId: booking.tripId, driverId: booking.trip.driverId };

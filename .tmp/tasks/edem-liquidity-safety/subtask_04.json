@@ -1,8 +1,46 @@
 {
-  "id": "edem-liquidity-safety-04", "seq": "04", "title": "S1: реализовать lifecycle и cancellation audit", "status": "pending", "depends_on": ["02"], "parallel": false, "suggested_agent": "CoderAgent",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/prisma/schema.prisma", "backend/src/trips/index.ts", "backend/src/bookings/index.ts", "backend/src/workers/tripWorker.ts", "packages/contracts/src/dto/trip.dto.ts", "packages/contracts/src/dto/booking.dto.ts"],
-  "deliverables": ["Миграция/модель lifecycle", "API и сервисы expiry/cancellation audit", "Идемпотентные worker transitions"],
-  "acceptance_criteria": ["Истёкшие pending заявки не занимают места и не могут быть подтверждены", "Автозавершение и ручное завершение не выполняются дважды", "Причина/actor сохраняются для user/admin/system отмен", "Существующие active/confirmed invariants сохранены"],
-  "commands": ["npm run db:generate", "npm run typecheck", "npm test --workspace=backend"],
-  "risks": ["Race между driver decision, passenger cancel и worker", "Несогласованные старые записи"]
+  "id": "edem-liquidity-safety-04",
+  "seq": "04",
+  "title": "S1: реализовать lifecycle и cancellation audit",
+  "status": "completed",
+  "depends_on": [
+    "02"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-04T19:39:45.953Z",
+  "completion_summary": "Implemented pending TTL, expiry release, cancellation audit and worker transitions",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "backend/src/trips/index.ts",
+    "backend/src/bookings/index.ts",
+    "backend/src/workers/tripWorker.ts",
+    "packages/contracts/src/dto/trip.dto.ts",
+    "packages/contracts/src/dto/booking.dto.ts"
+  ],
+  "deliverables": [
+    "Миграция/модель lifecycle",
+    "API и сервисы expiry/cancellation audit",
+    "Идемпотентные worker transitions"
+  ],
+  "acceptance_criteria": [
+    "Истёкшие pending заявки не занимают места и не могут быть подтверждены",
+    "Автозавершение и ручное завершение не выполняются дважды",
+    "Причина/actor сохраняются для user/admin/system отмен",
+    "Существующие active/confirmed invariants сохранены"
+  ],
+  "commands": [
+    "npm run db:generate",
+    "npm run typecheck",
+    "npm test --workspace=backend"
+  ],
+  "risks": [
+    "Race между driver decision, passenger cancel и worker",
+    "Несогласованные старые записи"
+  ]
 }

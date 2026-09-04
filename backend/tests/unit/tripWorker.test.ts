@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const findMany = vi.fn();
+const bookingFindMany = vi.fn().mockResolvedValue([]);
+const transaction = vi.fn();
 
 vi.mock("../../src/db.js", () => ({
   db: {
     trip: { findMany },
+    booking: { findMany: bookingFindMany },
+    $transaction: transaction,
   },
 }));
 
@@ -45,6 +49,8 @@ describe("trip worker lifecycle", () => {
     startTripWorker();
 
     expect(vi.getTimerCount()).toBe(1);
+    await Promise.resolve();
+    await Promise.resolve();
     expect(findMany).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);

@@ -171,6 +171,7 @@ export function serializeBooking(
     id: booking.id,
     seat: booking.seat,
     status: booking.status as BookingStatus,
+    expiresAt: booking.expiresAt?.toISOString() ?? null,
     comment: booking.comment ?? undefined,
     // VK ID пассажира — только для водителя его собственной поездки
     // (ссылка «Написать»). По умолчанию поле не отдаётся.

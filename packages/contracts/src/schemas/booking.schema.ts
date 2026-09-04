@@ -19,6 +19,7 @@ export const bookingSchema = z.object({
   passenger: userSchema,
   seat: z.number().int().min(1).max(MAX_SEATS),
   status: bookingStatusSchema,
+  expiresAt: z.string().datetime().nullable().optional(),
   comment: z.string().max(300).optional(),
 });
 
