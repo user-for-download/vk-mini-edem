@@ -1,8 +1,42 @@
 {
-  "id": "edem-liquidity-safety-03", "seq": "03", "title": "S0: принять решения по share, RideRequest, reports и deletion", "status": "pending", "depends_on": ["01"], "parallel": false, "suggested_agent": "TaskManager",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/auth/index.ts", "backend/src/services/notification.service.ts", "backend/src/admin/index.ts", "backend/prisma/schema.prisma"],
-  "deliverables": ["ADR по VK share URL/deep-link и private detail policy", "ADR RideRequest MVP", "ADR Report categories/permissions/status/audit", "ADR deletion/anonymization/re-login policy"],
-  "acceptance_criteria": ["RideRequest MVP не создаёт автоматические брони; имеет city route, time window, seats, expiry и limits", "Reports доступны только в разрешённом контексте и имеют pending/in_review/resolved/rejected", "Удаление транзакционно отзывает refresh tokens и закрывает WS; история не ломается; политика повторного входа однозначна"],
-  "commands": ["npm run prisma:validate"],
-  "risks": ["Неутверждённые defaults могут потребовать повторных миграций"]
+  "id": "edem-liquidity-safety-03",
+  "seq": "03",
+  "title": "S0: принять решения по share, RideRequest, reports и deletion",
+  "status": "completed",
+  "depends_on": [
+    "01"
+  ],
+  "parallel": false,
+  "suggested_agent": "TaskManager",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-04T19:28:17.608Z",
+  "completion_summary": "Share, RideRequest, reports and deletion policies documented",
+  "context_files": [
+    "MEMORY.md",
+    ".tmp/tasks/edem-liquidity-safety/adr-s0-product-flows.md"
+  ],
+  "reference_files": [
+    "backend/src/auth/index.ts",
+    "backend/src/services/notification.service.ts",
+    "backend/src/admin/index.ts",
+    "backend/prisma/schema.prisma"
+  ],
+  "deliverables": [
+    "ADR по VK share URL/deep-link и private detail policy",
+    "ADR RideRequest MVP",
+    "ADR Report categories/permissions/status/audit",
+    "ADR deletion/anonymization/re-login policy"
+  ],
+  "acceptance_criteria": [
+    "RideRequest MVP не создаёт автоматические брони; имеет city route, time window, seats, expiry и limits",
+    "Reports доступны только в разрешённом контексте и имеют pending/in_review/resolved/rejected",
+    "Удаление транзакционно отзывает refresh tokens и закрывает WS; история не ломается; политика повторного входа однозначна"
+  ],
+  "commands": [
+    "npm run prisma:validate"
+  ],
+  "risks": [
+    "Неутверждённые defaults могут потребовать повторных миграций"
+  ]
 }
