@@ -54,6 +54,7 @@ import { useConfirm } from "@/providers/ConfirmProvider";
 import { triggerHaptic } from "@/helpers/bridge";
 import { openUserProfileModal } from "@/helpers/profileModal";
 import { openVkMessages } from "@/helpers/vkLink";
+import { shareTrip } from "@/helpers/tripShare";
 
 export interface TripDetailsPanelProps {
   id: string;
@@ -238,6 +239,16 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const hasActiveBooking = trip.myBooking && trip.myBooking.status !== "cancelled" && trip.myBooking.status !== "declined";
   // VK ID водителя — для кнопки «Написать» (виден участникам активной брони).
   const driverVkUserId = trip.driver.vkUserId ?? null;
+
+  const handleShareTrip = async () => {
+    const result = await shareTrip(trip.id);
+    enqueueSnackbar({
+      type: "success",
+      title: result === "shared" ? "Ссылка отправлена" : "Ссылка открыта",
+      subtitle: "Поделитесь поездкой с попутчиками",
+      dedupeKey: `share_trip_${trip.id}`,
+    });
+  };
 
   const canBook =
     !isOwnTrip &&
@@ -586,6 +597,12 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           </Button>
         </Box>
       )}
+
+      <Box padding="system">
+        <Button size="m" mode="secondary" stretched onClick={() => void handleShareTrip()}>
+          Поделиться поездкой
+        </Button>
+      </Box>
 
       {/* Секция заявок видна только когда есть что показывать:
         - есть заявки → «Управление заявками (N)»;

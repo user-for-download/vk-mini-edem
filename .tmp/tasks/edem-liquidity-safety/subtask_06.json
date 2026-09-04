@@ -1,8 +1,42 @@
 {
-  "id": "edem-liquidity-safety-06", "seq": "06", "title": "S1: реализовать share поездки и deep link", "status": "pending", "depends_on": ["03"], "parallel": true, "suggested_agent": "OpenFrontendSpecialist",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["mini-app/src/helpers/deepLink.ts", "mini-app/src", "backend/src/trips/index.ts", "packages/contracts/src/dto/trip.dto.ts"],
-  "deliverables": ["Share helper/bridge integration", "Deep-link route and auth fallback", "Privacy-safe preview"],
-  "acceptance_criteria": ["Ссылка открывает поездку после auth", "Гость не получает точные адреса", "Cancelled/completed/private trip обрабатываются явно", "VK Bridge failure имеет fallback"],
-  "commands": ["npm test --workspace=mini-app", "npm run build --workspace=mini-app"],
-  "risks": ["Deep link может раскрыть private details или конфликтовать с hash router"]
+  "id": "edem-liquidity-safety-06",
+  "seq": "06",
+  "title": "S1: реализовать share поездки и deep link",
+  "status": "completed",
+  "depends_on": [
+    "03"
+  ],
+  "parallel": true,
+  "suggested_agent": "OpenFrontendSpecialist",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-04T19:55:08.894Z",
+  "completion_summary": "Added privacy-safe VK share helper, deep-link URL and TripDetails share action",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "mini-app/src/helpers/deepLink.ts",
+    "mini-app/src",
+    "backend/src/trips/index.ts",
+    "packages/contracts/src/dto/trip.dto.ts"
+  ],
+  "deliverables": [
+    "Share helper/bridge integration",
+    "Deep-link route and auth fallback",
+    "Privacy-safe preview"
+  ],
+  "acceptance_criteria": [
+    "Ссылка открывает поездку после auth",
+    "Гость не получает точные адреса",
+    "Cancelled/completed/private trip обрабатываются явно",
+    "VK Bridge failure имеет fallback"
+  ],
+  "commands": [
+    "npm test --workspace=mini-app",
+    "npm run build --workspace=mini-app"
+  ],
+  "risks": [
+    "Deep link может раскрыть private details или конфликтовать с hash router"
+  ]
 }
