@@ -42,7 +42,7 @@ import { db } from "../db.js";
 import { env } from "../env.js";
 import { ERROR_CODES } from "../errors.js";
 import { getSanitizedBody, sanitizeValue } from "../middleware/sanitize.js";
-import { createRateLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { createRateLimiter, mutationLimiter, adminReadLimiter } from "../middleware/rateLimit.js";
 import { signAdminAccessToken, verifyAdminAccessToken } from "../auth/tokens.js";
 import { wsManager } from "../ws/manager.js";
 import { tokensEqual } from "../utils/timingSafeEqual.js";
@@ -59,6 +59,10 @@ import {
   serializeAdminUser,
 } from "./serializers.js";
 import { serializeAdminCity } from "../cities/serializers.js";
+import {
+  decrementCityTripsCount,
+  recomputeCityTripsCount,
+} from "../cities/counters.js";
 
 const SEVEN_DAYS_MS = 7 * 24 * 3600 * 1000;
 
@@ -148,7 +152,7 @@ adminRouter.post("/auth/login", adminLoginLimiter, async (c) => {
  * Всегда 200: httpOnly cookie недоступен JS, фронт опрашивает этот ресурс
  * при загрузке и после 401 от других endpoint'ов.
  */
-adminRouter.get("/auth/session", async (c) => {
+adminRouter.get("/auth/session", adminReadLimiter, async (c) => {
   const notAuthenticated: AdminSessionResponse = {
     authenticated: false,
     expiresAt: null,
@@ -204,7 +208,7 @@ function invalidQueryResponse(c: Context) {
 /**
  * Сводные метрики для дашборда.
  */
-adminRouter.get("/dashboard", async (c) => {
+adminRouter.get("/dashboard", adminReadLimiter, async (c) => {
   const weekAgo = new Date(Date.now() - SEVEN_DAYS_MS);
 
   const [totalUsers, totalTrips, activeTrips, totalBookings, totalReviews, newUsersLast7Days] =
@@ -232,7 +236,7 @@ adminRouter.get("/dashboard", async (c) => {
 /**
  * Список пользователей с поиском по имени и пагинацией.
  */
-adminRouter.get("/users", async (c) => {
+adminRouter.get("/users", adminReadLimiter, async (c) => {
   const parseResult = adminUsersQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parseResult.success) {
     return invalidQueryResponse(c);
@@ -266,7 +270,7 @@ adminRouter.get("/users", async (c) => {
 /**
  * Список поездок с фильтром по статусу и пагинацией.
  */
-adminRouter.get("/trips", async (c) => {
+adminRouter.get("/trips", adminReadLimiter, async (c) => {
   const parseResult = adminTripsQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parseResult.success) {
     return invalidQueryResponse(c);
@@ -299,7 +303,7 @@ adminRouter.get("/trips", async (c) => {
 /**
  * Список бронирований с фильтром по статусу и пагинацией.
  */
-adminRouter.get("/bookings", async (c) => {
+adminRouter.get("/bookings", adminReadLimiter, async (c) => {
   const parseResult = adminBookingsQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parseResult.success) {
     return invalidQueryResponse(c);
@@ -333,7 +337,7 @@ adminRouter.get("/bookings", async (c) => {
  * Список отзывов с пагинацией (автор и получатель).
  * Необязательный фильтр ?status=pending|published|rejected.
  */
-adminRouter.get("/reviews", async (c) => {
+adminRouter.get("/reviews", adminReadLimiter, async (c) => {
   const parseResult = adminReviewsQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parseResult.success) {
     return invalidQueryResponse(c);
@@ -367,7 +371,7 @@ adminRouter.get("/reviews", async (c) => {
  * GET /feedback — обращения пользователей в поддержку (offset-пагинация,
  * новые первыми). Read-only.
  */
-adminRouter.get("/feedback", async (c) => {
+adminRouter.get("/feedback", adminReadLimiter, async (c) => {
   const parseResult = adminFeedbackQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parseResult.success) {
     return invalidQueryResponse(c);
@@ -399,7 +403,7 @@ adminRouter.get("/feedback", async (c) => {
  * GET /feedback/:id — детальная карточка обращения (полный текст, ответ
  * админа если есть). 404 для несуществующего id.
  */
-adminRouter.get("/feedback/:id", async (c) => {
+adminRouter.get("/feedback/:id", adminReadLimiter, async (c) => {
   const id = c.req.param("id");
   const feedback = await db.feedback.findUnique({
     where: { id },
@@ -534,7 +538,7 @@ function truncateForNotification(text: string): string {
 /**
  * Read-only снимок текущих rate-limit'ов и флагов из env. Записи нет.
  */
-adminRouter.get("/settings", async (c) => {
+adminRouter.get("/settings", adminReadLimiter, async (c) => {
   const payload: AdminSettingsDto = {
     createTripRateMax: env.CREATE_TRIP_RATE_MAX,
     cancelTripRateMax: env.CANCEL_TRIP_RATE_MAX,
@@ -635,21 +639,74 @@ adminRouter.patch("/users/:id/onboarding-reset", async (c) => {
  * Только смена статуса: брони, места и уведомления не трогаем
  * (в отличие от водительской отмены с каскадом — осознанно).
  * Завершённые и уже отменённые поездки отменить нельзя (409).
+ *
+ * TOCTOU: загрузка поездки и проверка статуса выполняются ВНУТРИ
+ * Serializable-транзакции — параллельные отмены (админ/водитель) не могут
+ * дважды декрементировать счётчики городов (F17): конфликтная транзакция
+ * получит P2034 и ответит 409.
  */
 adminRouter.patch("/trips/:id/cancel", async (c) => {
   const id = c.req.param("id");
 
-  const trip = await db.trip.findUnique({
-    where: { id },
-    include: { driver: true },
-  });
-  if (!trip) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
+  type CancelResult =
+    | {
+        kind: "ok";
+        trip: Prisma.TripGetPayload<{ include: { driver: true } }>;
+      }
+    | { kind: "not_found" }
+    | { kind: "not_active" };
+
+  let result: CancelResult;
+  try {
+    result = await db.$transaction(
+      async (tx) => {
+        const trip = await tx.trip.findUnique({
+          where: { id },
+          include: { driver: true },
+        });
+        if (!trip) {
+          return { kind: "not_found" as const };
+        }
+
+        // Завершённая поездка — свершившийся факт (отзывы, история), отмена
+        // задним числом запрещена; повторная отмена тоже не допускается.
+        if (trip.status === "completed" || trip.status === "cancelled") {
+          return { kind: "not_active" as const };
+        }
+
+        // F17: декремент счётчиков городов — в той же транзакции, что и
+        // смена статуса. Guarded (tripsCount > 0): счётчик не уходит в минус.
+        await decrementCityTripsCount(tx, trip.fromCityId, trip.toCityId);
+
+        const updated = await tx.trip.update({
+          where: { id },
+          data: { status: "cancelled" },
+          include: { driver: true },
+        });
+
+        return { kind: "ok" as const, trip: updated };
+      },
+      { isolationLevel: "Serializable" }
+    );
+  } catch (error) {
+    // Serializable: параллельная отмена той же поездки — конфликтная
+    // транзакция получает 409, а не двойной декремент счётчиков.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
+        409
+      );
+    }
+    throw error;
   }
 
-  // Завершённая поездка — свершившийся факт (отзывы, история), отмена
-  // задним числом запрещена; повторная отмена тоже не допускается.
-  if (trip.status === "completed" || trip.status === "cancelled") {
+  if (result.kind === "not_found") {
+    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
+  }
+  if (result.kind === "not_active") {
     return c.json(
       {
         code: ERROR_CODES.TRIP_NOT_ACTIVE,
@@ -659,13 +716,7 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
     );
   }
 
-  const updated = await db.trip.update({
-    where: { id },
-    data: { status: "cancelled" },
-    include: { driver: true },
-  });
-
-  return c.json(serializeAdminTrip(updated));
+  return c.json(serializeAdminTrip(result.trip));
 });
 
 /**
@@ -963,7 +1014,7 @@ adminRouter.patch("/reviews/:id/reject", async (c) => {
  * GET /api/v1/admin/cities?q=&page=&pageSize= — пагинированный список.
  * Поиск case-insensitive по подстроке имени.
  */
-adminRouter.get("/cities", async (c) => {
+adminRouter.get("/cities", adminReadLimiter, async (c) => {
   const raw = sanitizeValue(c.req.query());
   const parsed = adminCitiesQuerySchema.safeParse(raw);
   if (!parsed.success) {
@@ -1122,4 +1173,22 @@ adminRouter.delete("/cities/:id", mutationLimiter, async (c) => {
   await db.city.delete({ where: { id } });
   logBusinessEvent("city.deleted", { cityId: id, name: existing.name });
   return c.json({ ok: true, id });
+});
+
+/**
+ * POST /api/v1/admin/cities/recompute-trips-count — полный пересчёт
+ * City.tripsCount по ground truth (FK + статус): количество НЕ отменённых
+ * поездок, ссылающихся на город через fromCityId/toCityId (логика в
+ * recomputeCityTripsCount, cities/counters.ts).
+ *
+ * Чинит дрейф счётчика: ручные правки в консоли, прямое удаление Trip
+ * в обход API, сид без синхронизированных счётчиков. Идемпотентен —
+ * безопасно вызывать многократно.
+ */
+adminRouter.post("/cities/recompute-trips-count", async (c) => {
+  const { updated } = await db.$transaction((tx) =>
+    recomputeCityTripsCount(tx)
+  );
+  logBusinessEvent("city.trips_count.recomputed", { updated });
+  return c.json({ ok: true, updated }, 200);
 });

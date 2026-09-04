@@ -26,6 +26,22 @@ The former single `AUTH_RATE_WINDOW_MS`/`AUTH_RATE_MAX` pair was never wired to
 the limiters and has been removed. CI sets both `*_MAX` values high so
 integration tests are never throttled.
 
+## Per-user and admin-read rate limits
+
+High-risk authenticated routes are rate-limited per user (key = `userId`) so
+changing IP/NAT cannot bypass the cap. All default to a 24-hour window. Admin
+GET endpoints use a higher IP-based cap than the public read limiter because the
+admin UI issues requests in batches (dashboard + lists + pagination).
+
+| Variable pair | Endpoint | Default |
+|---|---|---|
+| `COMPLETE_TRIP_RATE_WINDOW_MS` / `COMPLETE_TRIP_RATE_MAX` | `PATCH /api/v1/trips/:id/complete` | 24 hours / 20 requests |
+| `PROFILE_UPDATE_RATE_WINDOW_MS` / `PROFILE_UPDATE_RATE_MAX` | `PATCH /api/v1/users/me`, `POST`/`PATCH /api/v1/users/me/car` | 24 hours / 50 requests |
+| `NOTIFICATION_READ_RATE_WINDOW_MS` / `NOTIFICATION_READ_RATE_MAX` | `PATCH /api/v1/notifications/:id/read`, `PATCH /api/v1/notifications/read-all` | 24 hours / 100 requests |
+| `REVIEWS_READ_RATE_WINDOW_MS` / `REVIEWS_READ_RATE_MAX` | `GET /api/v1/reviews/my`, `GET /api/v1/reviews/available-trips` | 24 hours / 100 requests |
+| `FEEDBACK_READ_RATE_WINDOW_MS` / `FEEDBACK_READ_RATE_MAX` | `GET /api/v1/feedback` | 24 hours / 100 requests |
+| `ADMIN_READ_RATE_WINDOW_MS` / `ADMIN_READ_RATE_MAX` | all `GET` under `/api/v1/admin` | 1 minute / 300 requests |
+
 ## Admin panel
 
 `ADMIN_TOKEN` is the static secret protecting the admin panel. It is compared

@@ -19,8 +19,14 @@ const baseTripSchema = z.object({
   fromCityId: z.string().uuid(),
   toCityId: z.string().uuid(),
   departureAt: z.string().datetime(),
-  durationMinutes: z.number().int().positive(),
-  distanceKm: z.number().positive(),
+  // Верхние границы — зеркало клиентской валидации мини-апа
+  // (CreateTripModal/validation.ts): время в пути не более 7 суток
+  // (водитель вводит часы 1..168, в API уходит durationMinutes = часы × 60),
+  // расстояние не более 20000 км. Без max oversize-пayload проходил DTO
+  // и упирался в БД/переполнение интервалов (security-audit §2: bounds
+  // on both ends). seatsTotal намеренно НЕ трогаем (MAX_SEATS=3, F1).
+  durationMinutes: z.number().int().positive().max(7 * 24 * 60),
+  distanceKm: z.number().positive().max(20000),
   price: z.number().int().positive().max(100000),
   seatsTotal: z.number().int().min(1).max(MAX_SEATS),
   tags: z.array(tripTagSchema).max(6),

@@ -347,15 +347,18 @@ describe("PATCH /admin/bookings/:id/status — seat accounting", () => {
 describe("DELETE /admin/reviews/:id — rating recompute", () => {
   it("recomputes rating and reviewsCount after deleting one of two reviews", async () => {
     // Arrange: два отзыва (5 и 3) → агрегат 4.0/2.
+    // F14 partial unique index (authorId, targetUserId) WHERE tripId IS NULL:
+    // каждому NULL-trip отзыву — свой автор, иначе второй INSERT → P2002.
     const cookie = await loginAndGetCookie();
     const targetUserId = await createUser("RatingTarget");
     const authorId = await createUser("RatingAuthor");
+    const authorId2 = await createUser("RatingAuthor2");
     await db.user.update({
       where: { id: targetUserId },
       data: { rating: 4.0, reviewsCount: 2 },
     });
     const reviewToDelete = await createReview(authorId, targetUserId, 5);
-    await createReview(authorId, targetUserId, 3);
+    await createReview(authorId2, targetUserId, 3);
 
     // Act
     const res = await adminRequest(

@@ -26,4 +26,6 @@ export interface ApiErrorBody {
   code: ErrorCode;
   message: string;
   errors?: unknown;
+  // P2034 serialization-конфликты (409) клиент может безопасно повторить.
+  retryable?: boolean;
 }

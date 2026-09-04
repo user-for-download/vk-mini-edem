@@ -15,12 +15,17 @@ import {
   mutationLimiter,
   createTripLimiter,
   cancelTripLimiter,
+  completeTripLimiter,
 } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
+import {
+  decrementCityTripsCount,
+  incrementCityTripsCount,
+} from "../cities/counters.js";
 import { TripError, TripErrors } from "./errors.js";
 import { getTripRange, rangesOverlap, type TimeRange } from "../utils/overlap.js";
 import { moscowDateBoundary } from "../utils/moscowTime.js";
@@ -545,20 +550,12 @@ tripsRouter.post("/", requireUser, mutationLimiter, createTripLimiter, async (c)
           );
         }
 
-        // Денормализованный счётчик поездок на городе. Параллельное
-        // создание/удаление поездок в одной tx безопасно: serializable
+        // Денормализованный счётчик поездок на городе: единая точка
+        // изменения — cities/counters.ts (F17). Параллельное
+        // создание/отмена поездок в одной tx безопасно: serializable
         // уровень изоляции (см. опции $transaction ниже) сериализует
         // записи по (City.id) на уровне predicate locks.
-        await Promise.all([
-          tx.city.update({
-            where: { id: fromCityRow.id },
-            data: { tripsCount: { increment: 1 } },
-          }),
-          tx.city.update({
-            where: { id: toCityRow.id },
-            data: { tripsCount: { increment: 1 } },
-          }),
-        ]);
+        await incrementCityTripsCount(tx, fromCityRow.id, toCityRow.id);
 
         return tx.trip.create({
           data: {
@@ -914,6 +911,12 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
           },
         });
 
+        // F17: отмена поездки декрементирует счётчики городов — в той же
+        // транзакции, что и смена статуса, чтобы счётчик не расходился
+        // со статусом. Декремент guarded (tripsCount > 0): счётчик не
+        // уходит в минус ни при гонках, ни на дрейфованных данных.
+        await decrementCityTripsCount(tx, trip.fromCityId, trip.toCityId);
+
         return {
           updated,
           uniquePassengers: Array.from(new Set(activeBookings.map((b) => b.passengerId))),
@@ -996,7 +999,7 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
  * перезаписать статус «из-под» нас (P2034 → 409, tripsCount начисляется ровно
  * один раз).
  */
-tripsRouter.patch("/:id/complete", requireUser, async (c) => {
+tripsRouter.patch("/:id/complete", requireUser, completeTripLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user")!;
   // force=1 доступен ТОЛЬКО в development/test. В production игнорируем

@@ -244,3 +244,56 @@ export const cancelBookingLimiter = createUserRateLimiter({
   max: env.CANCEL_BOOKING_RATE_MAX,
   keyPrefix: "passenger-cancel-booking",
 });
+
+/** Водитель: завершение поездок, 20 в сутки (настраивается через ENV). */
+export const completeTripLimiter = createUserRateLimiter({
+  windowMs: env.COMPLETE_TRIP_RATE_WINDOW_MS,
+  max: env.COMPLETE_TRIP_RATE_MAX,
+  keyPrefix: "driver-complete-trip",
+});
+
+/**
+ * Пользователь: редактирование профиля и машины
+ * (PATCH /users/me, POST|PATCH /users/me/car), 50 в сутки.
+ */
+export const profileUpdateLimiter = createUserRateLimiter({
+  windowMs: env.PROFILE_UPDATE_RATE_WINDOW_MS,
+  max: env.PROFILE_UPDATE_RATE_MAX,
+  keyPrefix: "user-profile-update",
+});
+
+/**
+ * Пользователь: отметки о прочтении уведомлений
+ * (PATCH /notifications/:id/read, PATCH /notifications/read-all), 100 в сутки.
+ */
+export const notificationReadLimiter = createUserRateLimiter({
+  windowMs: env.NOTIFICATION_READ_RATE_WINDOW_MS,
+  max: env.NOTIFICATION_READ_RATE_MAX,
+  keyPrefix: "user-notification-read",
+});
+
+/** Пользователь: личные списки отзывов (GET /reviews/my, /available-trips), 100 в сутки. */
+export const reviewsReadLimiter = createUserRateLimiter({
+  windowMs: env.REVIEWS_READ_RATE_WINDOW_MS,
+  max: env.REVIEWS_READ_RATE_MAX,
+  keyPrefix: "user-reviews-read",
+});
+
+/** Пользователь: список своих обращений (GET /feedback), 100 в сутки. */
+export const feedbackReadLimiter = createUserRateLimiter({
+  windowMs: env.FEEDBACK_READ_RATE_WINDOW_MS,
+  max: env.FEEDBACK_READ_RATE_MAX,
+  keyPrefix: "user-feedback-read",
+});
+
+/**
+ * GET-эндпоинты админ-панели: IP-based, лимит выше публичного read-лимитера
+ * (300/мин против 100/мин) — UI админки отдаёт запросами пачками
+ * (дашборд + списки + пагинация). Ставится после adminGuard:
+ * неавторизованные запросы бюджет не тратят.
+ */
+export const adminReadLimiter = createRateLimiter({
+  windowMs: env.ADMIN_READ_RATE_WINDOW_MS,
+  max: env.ADMIN_READ_RATE_MAX,
+  keyPrefix: "admin-read",
+});

@@ -2,17 +2,20 @@ import { beforeAll, beforeEach, afterEach, describe, expect, it } from "vitest";
 import { Prisma } from "../../src/generated/prisma/client.js";
 import { app } from "../../src/app.js";
 import { db } from "../../src/db.js";
+import { devMockAccessToken } from "../dev-mock-auth.js";
 
 /**
  * P2002-конфликты при бронировании: идемпотентный retry, SEAT_TAKEN,
- * ALREADY_BOOKED, гонка параллельных броней.
+ * ALREADY_BOOKED, повторная подача после declined/cancelled (F15),
+ * гонка параллельных броней.
  *
  * Partial unique индексы (active_seat_booking, active_passenger_booking)
  * создаются SQL-миграцией — в тестовую БД (db push) они не попадают,
  * поэтому применяем их здесь идемпотентно (IF NOT EXISTS).
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
- * dev-авторизация Bearer mock-access-token-{userId}, уникальные vkUserId.
+ * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
+ * уникальные vkUserId.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -86,11 +89,25 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
       method: "POST",
       headers: {
         ...JSON_HEADERS,
-        Authorization: `Bearer mock-access-token-${passengerId}`,
+        Authorization: `Bearer ${devMockAccessToken(passengerId)}`,
       },
       body: JSON.stringify({ tripId, seat }),
     });
     return { status: res.status, body: await res.json() };
+  }
+
+  // Отклонение брони водителем через API (полный цикл F15: место
+  // освобождается, слот снова доступен для бронирования).
+  async function declineAsDriver(bookingId: string): Promise<number> {
+    const res = await app.request(`/api/v1/bookings/${bookingId}/status`, {
+      method: "PATCH",
+      headers: {
+        ...JSON_HEADERS,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
+      },
+      body: JSON.stringify({ status: "declined" }),
+    });
+    return res.status;
   }
 
   it("returns 200 with the existing booking on idempotent retry (same passenger, same seat)", async () => {
@@ -165,6 +182,75 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
     const { status } = await book(passenger1Id, 1);
 
     expect(status).toBe(201);
+  });
+
+  it("allows re-booking the same seat after the driver declined it (F15)", async () => {
+    // Полный цикл через API: бронь → отклонение водителем → повторная подача.
+    const first = await book(passenger1Id, 1);
+    expect(first.status).toBe(201);
+
+    expect(await declineAsDriver(first.body.id)).toBe(200);
+
+    const { status } = await book(passenger1Id, 1);
+    expect(status).toBe(201);
+
+    // Активная бронь ровно одна — дубликат не создался.
+    const count = await db.booking.count({
+      where: { tripId, status: { in: ["pending", "confirmed"] } },
+    });
+    expect(count).toBe(1);
+  });
+
+  it("allows a different passenger to take the slot freed by a decline (F15)", async () => {
+    const first = await book(passenger1Id, 1);
+    expect(first.status).toBe(201);
+
+    expect(await declineAsDriver(first.body.id)).toBe(200);
+
+    const { status, body } = await book(passenger2Id, 1);
+    expect(status).toBe(201);
+    expect(body.seat).toBe(1);
+    expect(body.status).toBe("pending");
+  });
+
+  it("still blocks duplicates on confirmed bookings (F15)", async () => {
+    await db.booking.create({
+      data: { tripId, passengerId: passenger1Id, seat: 1, status: "confirmed" },
+    });
+    await db.trip.update({
+      where: { id: tripId },
+      data: { seatsAvailable: { decrement: 1 } },
+    });
+
+    // Чужое место занято подтверждённой бронью.
+    const taken = await book(passenger2Id, 1);
+    expect(taken.status).toBe(409);
+    expect(taken.body.code).toBe("SEAT_TAKEN");
+
+    // Своя подтверждённая бронь на другое место той же поездки.
+    const own = await book(passenger1Id, 2);
+    expect(own.status).toBe(409);
+    expect(own.body.code).toBe("ALREADY_BOOKED");
+  });
+
+  it("returns 200 idempotent retry on own confirmed booking without duplicating (F15)", async () => {
+    const existing = await db.booking.create({
+      data: { tripId, passengerId: passenger1Id, seat: 1, status: "confirmed" },
+    });
+    await db.trip.update({
+      where: { id: tripId },
+      data: { seatsAvailable: { decrement: 1 } },
+    });
+
+    const { status, body } = await book(passenger1Id, 1);
+
+    expect(status).toBe(200);
+    expect(body.id).toBe(existing.id);
+
+    const count = await db.booking.count({
+      where: { tripId, status: { in: ["pending", "confirmed"] } },
+    });
+    expect(count).toBe(1);
   });
 
   it("concurrent identical bookings: exactly one wins, loser gets 200 or 409, one active row", async () => {

@@ -487,12 +487,17 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         throw new BookingError("Not enough available seats", 409, ERROR_CODES.CONFLICT);
       }
 
+      // Слот занят, только если на нём висит активная бронь.
+      // declined/cancelled слот освобождают и повторной подаче не мешают —
+      // предикат обязан совпадать с partial-индексом active_seat_booking
+      // (F15), поэтому используем общий ACTIVE_BOOKING_STATUSES, а не
+      // захардкоженные литералы.
       const seatConflict = await tx.booking.findFirst({
         where: {
           tripId,
           seat,
           status: {
-            in: ["pending", "confirmed"],
+            in: [...ACTIVE_BOOKING_STATUSES],
           },
         },
         select: { id: true, passengerId: true },
@@ -530,12 +535,14 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
       }
 
+      // Одна активная бронь на поездку (F15: declined/cancelled не в счёт —
+      // предикат совпадает с partial-индексом active_passenger_booking).
       const passengerConflict = await tx.booking.findFirst({
         where: {
           tripId,
           passengerId: passenger.id,
           status: {
-            in: ["pending", "confirmed"],
+            in: [...ACTIVE_BOOKING_STATUSES],
           },
         },
       });
@@ -652,13 +659,15 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
       // Случай 1: конфликт на active_seat_booking (tripId, seat).
       // Либо наш retry (гонка двух одинаковых запросов — оба прошли
       // pre-check, один вставил), либо место занял другой пассажир.
+      // Предикат — тот же ACTIVE_BOOKING_STATUSES, что в pre-check'ах и
+      // partial-индексе (F15): ищем только активную бронь.
       if (constraintName === "active_seat_booking") {
         const existingBooking = await db.booking.findFirst({
           where: {
             tripId,
             seat,
             passengerId: passenger.id,
-            status: { in: ["pending", "confirmed"] },
+            status: { in: [...ACTIVE_BOOKING_STATUSES] },
           },
           include: {
             trip: { include: { driver: { include: { car: true } } } },
@@ -744,7 +753,11 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
 
-  const body = await c.req.json().catch(() => ({}));
+  // Санитизируем тело ДО Zod-валидации (security-audit §2: все мутации
+  // через getSanitizedBody, без прямых c.req.json()): XSS-строки в status
+  // обезвреживаются, неизвестный статус отклоняется схемой с 400 —
+  // состояние брони при этом не меняется (транзакция ниже не стартует).
+  const body = await getSanitizedBody(c);
   const parseResult = updateBookingStatusDtoSchema.safeParse(body);
 
   if (!parseResult.success) {

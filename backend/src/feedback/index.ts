@@ -9,7 +9,7 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { verifyVkLaunchSignature } from "../auth/vkSign.js";
 import { logger } from "../logger.js";
-import { createRateLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { createRateLimiter, mutationLimiter, feedbackReadLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
@@ -130,7 +130,7 @@ feedbackRouter.post("/appeal", appealLimiter, async (c) => {
  * Содержит исходный текст и, если есть, ответ админа. Нужен мини-аппу для
  * раздела «Помощь и поддержка» → «Мои обращения».
  */
-feedbackRouter.get("/", requireUser, async (c) => {
+feedbackRouter.get("/", requireUser, feedbackReadLimiter, async (c) => {
   const user = c.get("user");
   const items = await db.feedback.findMany({
     where: { userId: user.id },

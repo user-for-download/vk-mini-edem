@@ -6,7 +6,7 @@ import { completeOnboardingBodySchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeUser } from "../serializers/index.js";
-import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import { publicReadLimiter, mutationLimiter, profileUpdateLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 
 const updateProfileSchema = z.object({
@@ -80,7 +80,7 @@ usersRouter.post("/me/onboarding", requireUser, mutationLimiter, async (c) => {
 /**
  * Редактирование профиля текущего пользователя.
  */
-usersRouter.patch("/me", requireUser, async (c) => {
+usersRouter.patch("/me", requireUser, profileUpdateLimiter, async (c) => {
   const user = c.get("user");
 
   const body = await getSanitizedBody(c);
@@ -144,12 +144,12 @@ async function upsertCar(c: Context<AuthEnv>) {
 /**
  * Создать или обновить машину текущего пользователя.
  */
-usersRouter.post("/me/car", requireUser, upsertCar);
+usersRouter.post("/me/car", requireUser, profileUpdateLimiter, upsertCar);
 
 /**
  * Алиас для обновления машины.
  */
-usersRouter.patch("/me/car", requireUser, upsertCar);
+usersRouter.patch("/me/car", requireUser, profileUpdateLimiter, upsertCar);
 
 /**
  * Публичный профиль пользователя.

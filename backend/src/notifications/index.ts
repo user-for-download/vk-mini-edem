@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
+import { notificationReadLimiter } from "../middleware/rateLimit.js";
 import { z } from "zod";
 
 export const notificationsRouter = new Hono<AuthEnv>();
@@ -56,7 +57,7 @@ notificationsRouter.get("/my", async (c) => {
   return c.json({ items, nextCursor, unreadCount });
 });
 
-notificationsRouter.patch("/:id/read", async (c) => {
+notificationsRouter.patch("/:id/read", notificationReadLimiter, async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
 
@@ -73,7 +74,7 @@ notificationsRouter.patch("/:id/read", async (c) => {
   return c.json(updated);
 });
 
-notificationsRouter.patch("/read-all", async (c) => {
+notificationsRouter.patch("/read-all", notificationReadLimiter, async (c) => {
   const user = c.get("user");
   await db.notification.updateMany({
     where: { userId: user.id, isRead: false },

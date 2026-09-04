@@ -10,6 +10,7 @@ vi.hoisted(() => {
 
 const { app } = await import("../../src/app.js");
 const { db } = await import("../../src/db.js");
+const { devMockAccessToken } = await import("../dev-mock-auth.js");
 
 /**
  * Интеграционное покрытие модерационного workflow (state machine статуса
@@ -38,7 +39,8 @@ const { db } = await import("../../src/db.js");
  *
  * Паттерны репо (admin-moderation.test.ts, reviews-pagination.test.ts):
  * app.request(), логин админа через POST /admin/auth/login с cookie
- * edem_admin_jwt, dev-авторизация пользователя Bearer mock-access-token-{userId},
+ * edem_admin_jwt, dev-авторизация пользователя mock-токеном
+ * (tests/dev-mock-auth.js: allowlist + TTL),
  * уникальные vkUserId, очистка в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -125,12 +127,16 @@ async function createBooking(tripId: string, passengerId: string): Promise<strin
 
 // Seed напрямую в БД: нужен для отзывов в заданном статусе (API создаёт
 // только pending) и для базового рейтингового агрегата.
+// F14 partial unique index (authorId, targetUserId) WHERE tripId IS NULL:
+// два NULL-trip отзыва одной пары → P2002. Для кейсов с одним автором
+// передавай distinct tripId; иначе — разных авторов.
 async function createReviewDirect(
   authorId: string,
   targetUserId: string,
   rating: number,
   status: ReviewStatus,
-  createdAt?: Date
+  createdAt?: Date,
+  tripId?: string
 ): Promise<string> {
   const review = await db.review.create({
     data: {
@@ -142,6 +148,7 @@ async function createReviewDirect(
       tripRoute: "Москва → Тула",
       status,
       ...(createdAt ? { createdAt } : {}),
+      ...(tripId ? { tripId } : {}),
     },
   });
   createdReviewIds.push(review.id);
@@ -157,7 +164,7 @@ async function createReviewViaApi(
     method: "POST",
     headers: {
       ...JSON_HEADERS,
-      Authorization: `Bearer mock-access-token-${authorId}`,
+      Authorization: `Bearer ${devMockAccessToken(authorId)}`,
     },
     body: JSON.stringify({
       tripId: params.tripId,
@@ -175,7 +182,7 @@ function publicReviews(targetUserId: string): Promise<Response> {
 // GET /api/v1/reviews/my от лица автора.
 function myReviews(authorId: string): Promise<Response> {
   return app.request("/api/v1/reviews/my", {
-    headers: { Authorization: `Bearer mock-access-token-${authorId}` },
+    headers: { Authorization: `Bearer ${devMockAccessToken(authorId)}` },
   });
 }
 
@@ -521,8 +528,11 @@ describe("GET /reviews/user/:userId — published only", () => {
   it("shows published and hides pending/rejected", async () => {
     // Arrange: три отзыва с разными статусами (createdAt различаются —
     // порядок desc не влияет на выборку, фильтрация по статусу).
+    // F14: NULL-trip отзывы — по одному автору на отзыв (один target).
     const targetUserId = await createUser("PubOnlyTarget");
     const authorId = await createUser("PubOnlyAuthor");
+    const authorId2 = await createUser("PubOnlyAuthor2");
+    const authorId3 = await createUser("PubOnlyAuthor3");
     const base = Date.now() - 3 * DAY_MS;
     const publishedId = await createReviewDirect(
       authorId,
@@ -532,14 +542,14 @@ describe("GET /reviews/user/:userId — published only", () => {
       new Date(base)
     );
     await createReviewDirect(
-      authorId,
+      authorId2,
       targetUserId,
       4,
       "pending",
       new Date(base + DAY_MS)
     );
     await createReviewDirect(
-      authorId,
+      authorId3,
       targetUserId,
       3,
       "rejected",
@@ -563,29 +573,39 @@ describe("GET /reviews/user/:userId — published only", () => {
 describe("GET /reviews/my — includes status", () => {
   it("returns the author's reviews with status for every status value", async () => {
     // Arrange
+    // F14: один автор + один target, но distinct tripId у каждого отзыва —
+    // иначе partial-индекс (authorId, targetUserId) WHERE tripId IS NULL
+    // отклонит второй INSERT (P2002). /my фильтрует по автору, distinct
+    // поездки на выборку не влияют.
     const authorId = await createUser("MyStatusAuthor");
     const targetUserId = await createUser("MyStatusTarget");
+    const myTrip1 = await createPastTrip(targetUserId);
+    const myTrip2 = await createPastTrip(targetUserId);
+    const myTrip3 = await createPastTrip(targetUserId);
     const base = Date.now() - 3 * DAY_MS;
     const pendingId = await createReviewDirect(
       authorId,
       targetUserId,
       4,
       "pending",
-      new Date(base)
+      new Date(base),
+      myTrip1
     );
     const publishedId = await createReviewDirect(
       authorId,
       targetUserId,
       5,
       "published",
-      new Date(base + DAY_MS)
+      new Date(base + DAY_MS),
+      myTrip2
     );
     const rejectedId = await createReviewDirect(
       authorId,
       targetUserId,
       2,
       "rejected",
-      new Date(base + 2 * DAY_MS)
+      new Date(base + 2 * DAY_MS),
+      myTrip3
     );
 
     // Act
@@ -628,11 +648,15 @@ describe("GET /admin/reviews?status= — filter", () => {
 
   async function seedFilterFixtures() {
     const targetUserId = await createUser("FilterTarget");
-    const authorId = await createUser("FilterAuthor");
+    // F14: каждому NULL-trip отзыву — свой автор (один target).
+    const filterAuthorIds: string[] = [];
+    for (let i = 0; i < statuses.length; i++) {
+      filterAuthorIds.push(await createUser(`FilterAuthor-${i}`));
+    }
     const base = Date.now() - 5 * DAY_MS;
     for (let i = 0; i < statuses.length; i++) {
       const id = await createReviewDirect(
-        authorId,
+        filterAuthorIds[i],
         targetUserId,
         (i % 5) + 1,
         statuses[i],
@@ -713,16 +737,18 @@ describe("GET /admin/reviews?status= — filter", () => {
 describe("DELETE /admin/reviews/:id — recompute from any status", () => {
   it("deleting a published review recomputes the rating (published only)", async () => {
     // Arrange: два published (5 и 3) → агрегат 4.0/2.
+    // F14: NULL-trip отзывы — разные авторы, один target.
     const cookie = await loginAndGetCookie();
     const targetUserId = await createUser("DelPubTarget");
     const authorId = await createUser("DelPubAuthor");
+    const authorId2 = await createUser("DelPubAuthor2");
     const reviewToDelete = await createReviewDirect(
       authorId,
       targetUserId,
       5,
       "published"
     );
-    await createReviewDirect(authorId, targetUserId, 3, "published");
+    await createReviewDirect(authorId2, targetUserId, 3, "published");
     await db.user.update({
       where: { id: targetUserId },
       data: { rating: 4.0, reviewsCount: 2 },
@@ -749,12 +775,14 @@ describe("DELETE /admin/reviews/:id — recompute from any status", () => {
 
   it("deleting a pending review does not change the rating", async () => {
     // Arrange: один published (5) → 5.0/1; pending (2) в рейтинг не входит.
+    // F14: NULL-trip отзывы — разные авторы, один target.
     const cookie = await loginAndGetCookie();
     const targetUserId = await createUser("DelPendTarget");
     const authorId = await createUser("DelPendAuthor");
+    const authorId2 = await createUser("DelPendAuthor2");
     await createReviewDirect(authorId, targetUserId, 5, "published");
     const reviewToDelete = await createReviewDirect(
-      authorId,
+      authorId2,
       targetUserId,
       2,
       "pending"
@@ -782,12 +810,14 @@ describe("DELETE /admin/reviews/:id — recompute from any status", () => {
 
   it("deleting a rejected review does not change the rating", async () => {
     // Arrange: один published (5) → 5.0/1; rejected (2) в рейтинг не входит.
+    // F14: NULL-trip отзывы — разные авторы, один target.
     const cookie = await loginAndGetCookie();
     const targetUserId = await createUser("DelRejTarget");
     const authorId = await createUser("DelRejAuthor");
+    const authorId2 = await createUser("DelRejAuthor2");
     await createReviewDirect(authorId, targetUserId, 5, "published");
     const reviewToDelete = await createReviewDirect(
-      authorId,
+      authorId2,
       targetUserId,
       2,
       "rejected"

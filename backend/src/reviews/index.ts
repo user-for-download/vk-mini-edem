@@ -8,7 +8,11 @@ import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
 import { serializeTrip, serializeReview, type TripWithDriver } from "../serializers/index.js";
-import { publicReadLimiter, mutationLimiter } from "../middleware/rateLimit.js";
+import {
+  publicReadLimiter,
+  mutationLimiter,
+  reviewsReadLimiter,
+} from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
@@ -53,8 +57,10 @@ interface CreateReviewParams {
  *
  * P2034 (serialization failure) — при параллельных записях в одни и те же
  * строки SSI-конфликт временный: повторяем транзакцию один раз. При true-дубле
- * сработает повторная проверка внутри транзакции или уникальный индекс
- * (unique_review_per_trip).
+ * сработает повторная проверка внутри транзакции или уникальные индексы
+ * (Review_authorId_tripId_targetUserId_key для tripId NOT NULL,
+ * Review_authorId_targetUserId_nullTrip_key для tripId IS NULL — F14)
+ * с отловом P2002 → 409.
  */
 async function createReviewTransaction(params: CreateReviewParams) {
   const run = () =>
@@ -89,7 +95,8 @@ async function createReviewTransaction(params: CreateReviewParams) {
         }
 
         // Повторная проверка внутри транзакции с Serializable-изоляцией:
-        // при параллельных запросах уникальный индекс (unique_review_per_trip)
+        // при параллельных запросах уникальные индексы
+        // (Review_authorId_tripId_targetUserId_key + F14-partial для NULL tripId)
         // и отлов P2002 гарантируют отсутствие дублей.
         const duplicate = await tx.review.findFirst({
           where: {
@@ -148,7 +155,7 @@ async function createReviewTransaction(params: CreateReviewParams) {
 /**
  * Отзывы, оставленные текущим пользователем.
  */
-reviewsRouter.get("/my", requireUser, async (c) => {
+reviewsRouter.get("/my", requireUser, reviewsReadLimiter, async (c) => {
   const user = c.get("user");
 
   const reviews = await db.review.findMany({
@@ -181,7 +188,7 @@ reviewsRouter.get("/my", requireUser, async (c) => {
  * - поездка уже прошла;
  * - пользователь еще не оставлял отзыв по этой поездке.
  */
-reviewsRouter.get("/available-trips", requireUser, async (c) => {
+reviewsRouter.get("/available-trips", requireUser, reviewsReadLimiter, async (c) => {
   const user = c.get("user");
   const now = new Date();
 
@@ -556,11 +563,14 @@ reviewsRouter.post("/", requireUser, mutationLimiter, async (c) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2034"
     ) {
-      // SSI-конфликт повторился после ретрая — это НЕ дубль отзыва,
-      // а временная ошибка конкурентной записи: просим повторить запрос.
+      // SSI-конфликт повторился после ретрая: параллельная запись
+      // (второй отзыв той же пары / конкурентный пересчёт) не дала
+      // транзакции подтвердиться. Это временный конфликт записи —
+      // 409 с retryable:true (security-audit §4: P2034 → 409,
+      // never 503 INTERNAL_ERROR), клиент повторяет запрос.
       return c.json(
-        { code: ERROR_CODES.INTERNAL_ERROR, message: "Concurrent update conflict, please retry" },
-        503
+        { code: ERROR_CODES.CONFLICT, message: "Concurrent update conflict, please retry", retryable: true },
+        409
       );
     }
 
