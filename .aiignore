@@ -10,6 +10,10 @@ prc.json
 .env
 backend/.env
 mini-app/.env
+mini-app/index.html
+mini-app/vite.config.ts
+mini-app/dist
+mini-app/node_modules
 webapp/.env
 **/.env.local
 **/.env.production

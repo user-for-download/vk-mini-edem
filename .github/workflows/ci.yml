@@ -87,3 +87,6 @@ jobs:
 
       - name: Backend smoke tests
         run: npm run --workspace backend test
+
+      - name: Mini-app tests
+        run: npm run --workspace mini-app test
