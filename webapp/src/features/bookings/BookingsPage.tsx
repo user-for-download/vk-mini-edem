@@ -5,6 +5,14 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -152,9 +160,26 @@ function BookingsTable({ bookings }: { bookings: AdminBookingDto[] }) {
 
 function BookingRow({ booking }: { booking: AdminBookingDto }) {
   const mutation = useBookingStatusMutation();
+  // Pending status awaiting explicit confirmation — no one-click status change.
+  const [pendingStatus, setPendingStatus] = useState<BookingStatus | null>(
+    null,
+  );
 
-  const handleChange = (value: string) => {
-    mutation.mutate({ id: booking.id, body: { status: value as BookingStatus } });
+  const handleSelectChange = (value: string) => {
+    const next = value as BookingStatus;
+    if (next === booking.status) return;
+    setPendingStatus(next);
+  };
+
+  const handleCancel = () => {
+    setPendingStatus(null);
+  };
+
+  const handleConfirm = () => {
+    if (pendingStatus === null) return;
+    const next = pendingStatus;
+    setPendingStatus(null);
+    mutation.mutate({ id: booking.id, body: { status: next } });
   };
 
   return (
@@ -169,7 +194,7 @@ function BookingRow({ booking }: { booking: AdminBookingDto }) {
       <TableCell>
         <Select
           value={booking.status}
-          onValueChange={handleChange}
+          onValueChange={handleSelectChange}
           disabled={mutation.isPending}
         >
           <SelectTrigger aria-label={`Статус брони ${booking.id}`} className="w-40">
@@ -183,6 +208,38 @@ function BookingRow({ booking }: { booking: AdminBookingDto }) {
             ))}
           </SelectContent>
         </Select>
+        <Dialog
+          open={pendingStatus !== null}
+          onOpenChange={(open) => {
+            if (!open) handleCancel();
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Сменить статус брони?</DialogTitle>
+              <DialogDescription>
+                Бронь {booking.id} ({booking.passengerName}):{" "}
+                {STATUS_LABELS[booking.status as BookingStatus]}
+                {pendingStatus !== null && (
+                  <> → {STATUS_LABELS[pendingStatus]}</>
+                )}
+                .
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={handleCancel} type="button" variant="outline">
+                Отмена
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                type="button"
+                disabled={mutation.isPending}
+              >
+                Подтвердить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </TableCell>
     </TableRow>
   );

@@ -62,11 +62,14 @@ export function CitiesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Локальный дебаунс ввода поиска (300мс): сокращает число запросов при
-  // наборе без видимой задержки для пользователя.
+  // наборе без видимой задержки для пользователя. Функциональные апдейтеры
+  // с bail-out (то же значение → без ререндера) гарантируют ровно одну
+  // загрузку на маунт/изменение параметров, в т.ч. в StrictMode.
   useEffect(() => {
+    const trimmed = search.trim();
     const handle = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-      setPage(1);
+      setDebouncedSearch((prev) => (prev === trimmed ? prev : trimmed));
+      setPage((prev) => (prev === 1 ? prev : 1));
     }, 300);
     return () => clearTimeout(handle);
   }, [search]);
@@ -259,13 +262,18 @@ function CreateCityDialog({
 }) {
   const [form, setForm] = useState<CityFormState>(EMPTY_FORM);
   const create = useCreateCityMutation();
+  // create — новый объект каждый рендер (спред результата useMutation),
+  // его нельзя класть в deps: смена статуса pending→error перезапускала бы
+  // эффект, стирая ввод и сбрасывая ошибку. reset привязан в конструкторе
+  // MutationObserver — стабильная ссылка, безопасна для deps.
+  const resetCreate = create.reset;
 
   useEffect(() => {
     if (open) {
       setForm(EMPTY_FORM);
-      create.reset();
+      resetCreate();
     }
-  }, [open, create]);
+  }, [open, resetCreate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -352,11 +360,13 @@ function EditCityDialog({
     fieldError: state.fieldError,
   });
   const update = useUpdateCityMutation();
+  // См. CreateCityDialog: объект мутации нестабилен, используем стабильный reset.
+  const resetUpdate = update.reset;
 
   useEffect(() => {
     setForm({ name: state.name, fieldError: state.fieldError });
-    update.reset();
-  }, [state.id, state.name, state.fieldError, update]);
+    resetUpdate();
+  }, [state.id, state.name, state.fieldError, resetUpdate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

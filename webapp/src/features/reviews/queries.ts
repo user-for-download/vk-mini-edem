@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReviewStatusValue } from "@edem/contracts";
 import { toast } from "sonner";
 
+import { ApiError } from "@/lib/api-client";
+
 import { approveReview, deleteReview, fetchReviews, rejectReview } from "./api";
 
 export interface ReviewsQueryParams {
@@ -17,6 +19,23 @@ export function useReviewsQuery(params: ReviewsQueryParams) {
     queryKey: reviewsKey(params),
     queryFn: () => fetchReviews(params),
   });
+}
+
+/**
+ * 409 CONFLICT на approve/reject означает, что отзыв уже обработан
+ * (другой модератор или повторный клик): локальный кэш устарел.
+ * Инвалидируем список и дашборд, чтобы админ видел актуальный статус,
+ * а не подвисший stale UI.
+ */
+function invalidateReviewCaches(
+  queryClient: ReturnType<typeof useQueryClient>
+): void {
+  void queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] });
+  void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+}
+
+function isConflict(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409;
 }
 
 export function useDeleteReviewMutation() {
@@ -50,6 +69,11 @@ export function useApproveReviewMutation() {
       toast.success("Отзыв опубликован");
     },
     onError: (error) => {
+      if (isConflict(error)) {
+        invalidateReviewCaches(queryClient);
+        toast.error("Отзыв уже обработан. Список обновлён.");
+        return;
+      }
       toast.error(
         error instanceof Error
           ? error.message
@@ -70,6 +94,11 @@ export function useRejectReviewMutation() {
       toast.success("Отзыв отклонён");
     },
     onError: (error) => {
+      if (isConflict(error)) {
+        invalidateReviewCaches(queryClient);
+        toast.error("Отзыв уже обработан. Список обновлён.");
+        return;
+      }
       toast.error(
         error instanceof Error ? error.message : "Не удалось отклонить отзыв"
       );

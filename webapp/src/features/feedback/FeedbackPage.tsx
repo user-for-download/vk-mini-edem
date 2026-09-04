@@ -116,8 +116,17 @@ function FeedbackTable({
           feedbacks.map((feedback) => (
             <TableRow
               key={feedback.id}
-              className="cursor-pointer"
+              className="cursor-pointer focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none"
+              tabIndex={0}
+              role="button"
+              aria-label={`Открыть обращение: ${feedback.subject}`}
               onClick={() => onOpen(feedback.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(feedback.id);
+                }
+              }}
             >
               <TableCell className="whitespace-nowrap">
                 {formatDateTime(feedback.createdAt)}

@@ -1,5 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AdminBookingStatusBody } from "@edem/contracts";
+import type {
+  AdminBookingDto,
+  AdminBookingStatusBody,
+  AdminPaginatedBookings,
+} from "@edem/contracts";
 import { toast } from "sonner";
 
 import {
@@ -28,13 +32,38 @@ export function useBookingStatusMutation() {
   return useMutation({
     mutationFn: ({ id, body }: BookingStatusMutationVars) =>
       updateBookingStatus(id, body),
+    // Optimistic update: render the new status instantly, roll back on failure.
+    onMutate: ({ id, body }: BookingStatusMutationVars) => {
+      const previous = queryClient.getQueriesData<AdminPaginatedBookings>({
+        queryKey: ["admin", "bookings"],
+      });
+      queryClient.setQueriesData<AdminPaginatedBookings>(
+        { queryKey: ["admin", "bookings"] },
+        (cached) => {
+          if (!cached) return cached;
+          const items: AdminBookingDto[] = cached.items.map((booking) =>
+            booking.id === id ? { ...booking, status: body.status } : booking,
+          );
+          return { ...cached, items };
+        },
+      );
+      return { previous };
+    },
+    onError: (error: Error, _vars, context) => {
+      // Roll back to the snapshot taken in onMutate so state stays consistent.
+      if (context?.previous) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+      toast.error(error.message);
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
       toast.success("Статус брони обновлён");
     },
-    onError: (error: Error) => {
-      toast.error(error.message);
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "bookings"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
     },
   });
 }

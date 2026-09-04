@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/format";
+import { ApiError } from "@/lib/api-client";
 
 import {
   useApproveReviewMutation,
@@ -65,18 +66,31 @@ const STATUS_FILTER_OPTIONS: { value: ReviewStatusValue; label: string }[] = [
 
 type StatusFilterValue = ReviewStatusValue | "all";
 
+type ModerationAction = "approve" | "reject";
+
+interface PendingModeration {
+  review: AdminReviewDto;
+  action: ModerationAction;
+}
+
 export function ReviewsPage() {
   const [status, setStatus] = useState<StatusFilterValue>("all");
   const [page, setPage] = useState(1);
   const [reviewToDelete, setReviewToDelete] = useState<AdminReviewDto | null>(
     null
   );
+  const [pendingModeration, setPendingModeration] =
+    useState<PendingModeration | null>(null);
+  const [moderateError, setModerateError] = useState<string | null>(null);
   const reviewsQuery = useReviewsQuery({
     status: status === "all" ? undefined : status,
     page,
     pageSize: PAGE_SIZE,
   });
   const deleteMutation = useDeleteReviewMutation();
+  const approveMutation = useApproveReviewMutation();
+  const rejectMutation = useRejectReviewMutation();
+  const isModerating = approveMutation.isPending || rejectMutation.isPending;
 
   const handleFilterChange = (next: StatusFilterValue) => {
     setStatus(next);
@@ -87,6 +101,43 @@ export function ReviewsPage() {
     if (!reviewToDelete) return;
     deleteMutation.mutate(reviewToDelete.id, {
       onSuccess: () => setReviewToDelete(null),
+    });
+  };
+
+  const requestModeration = (review: AdminReviewDto, action: ModerationAction) => {
+    setModerateError(null);
+    setPendingModeration({ review, action });
+  };
+
+  const closeModerationDialog = () => {
+    if (isModerating) return;
+    setPendingModeration(null);
+    setModerateError(null);
+  };
+
+  // Одобрение/отклонение — только через явный confirm-диалог.
+  // 409 (отзыв уже обработан) закрывает диалог: хук уже инвалидировал
+  // кэш и показал тост, список подтянет актуальный статус.
+  // Прочие ошибки показываем инлайном в диалоге + тостом из хука.
+  const confirmModeration = () => {
+    if (!pendingModeration || isModerating) return;
+    const mutation =
+      pendingModeration.action === "approve" ? approveMutation : rejectMutation;
+    mutation.mutate(pendingModeration.review.id, {
+      onSuccess: () => {
+        setPendingModeration(null);
+        setModerateError(null);
+      },
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 409) {
+          setPendingModeration(null);
+          setModerateError(null);
+          return;
+        }
+        setModerateError(
+          error instanceof Error ? error.message : "Неизвестная ошибка"
+        );
+      },
     });
   };
 
@@ -112,7 +163,9 @@ export function ReviewsPage() {
         <>
           <ReviewsTable
             reviews={reviewsQuery.data.items}
+            moderating={isModerating}
             onDelete={setReviewToDelete}
+            onModerate={requestModeration}
           />
           <ReviewsPagination
             data={reviewsQuery.data}
@@ -126,6 +179,13 @@ export function ReviewsPage() {
         isPending={deleteMutation.isPending}
         onClose={() => setReviewToDelete(null)}
         onConfirm={confirmDelete}
+      />
+      <ModerateReviewDialog
+        pending={pendingModeration}
+        isPending={isModerating}
+        error={moderateError}
+        onClose={closeModerationDialog}
+        onConfirm={confirmModeration}
       />
     </section>
   );
@@ -184,10 +244,14 @@ function ReviewStatusBadge({ status }: { status: ReviewStatusValue }) {
 
 function ReviewsTable({
   reviews,
+  moderating,
   onDelete,
+  onModerate,
 }: {
   reviews: AdminReviewDto[];
+  moderating: boolean;
   onDelete: (review: AdminReviewDto) => void;
+  onModerate: (review: AdminReviewDto, action: ModerationAction) => void;
 }) {
   return (
     <Table>
@@ -215,7 +279,13 @@ function ReviewsTable({
           </TableRow>
         ) : (
           reviews.map((review) => (
-            <ReviewRow key={review.id} review={review} onDelete={onDelete} />
+            <ReviewRow
+              key={review.id}
+              review={review}
+              moderating={moderating}
+              onDelete={onDelete}
+              onModerate={onModerate}
+            />
           ))
         )}
       </TableBody>
@@ -225,18 +295,15 @@ function ReviewsTable({
 
 function ReviewRow({
   review,
+  moderating,
   onDelete,
+  onModerate,
 }: {
   review: AdminReviewDto;
+  moderating: boolean;
   onDelete: (review: AdminReviewDto) => void;
+  onModerate: (review: AdminReviewDto, action: ModerationAction) => void;
 }) {
-  const approveMutation = useApproveReviewMutation();
-  const rejectMutation = useRejectReviewMutation();
-  // Пока идёт одобрение/отклонение, остальные действия по строке блокируем,
-  // чтобы не конфликтовать с параллельными запросами.
-  const isModerating =
-    approveMutation.isPending || rejectMutation.isPending;
-
   return (
     <TableRow>
       <TableCell>{review.authorName}</TableCell>
@@ -261,16 +328,16 @@ function ReviewRow({
             <>
               <Button
                 size="sm"
-                disabled={isModerating}
-                onClick={() => approveMutation.mutate(review.id)}
+                disabled={moderating}
+                onClick={() => onModerate(review, "approve")}
               >
                 Одобрить
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={isModerating}
-                onClick={() => rejectMutation.mutate(review.id)}
+                disabled={moderating}
+                onClick={() => onModerate(review, "reject")}
               >
                 Отклонить
               </Button>
@@ -279,7 +346,7 @@ function ReviewRow({
           <Button
             variant="destructive"
             size="sm"
-            disabled={isModerating}
+            disabled={moderating}
             onClick={() => onDelete(review)}
           >
             Удалить
@@ -363,6 +430,71 @@ function DeleteReviewDialog({
           </DialogClose>
           <Button variant="destructive" disabled={isPending} onClick={onConfirm}>
             {isPending ? "Удаление..." : "Удалить отзыв"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ModerateReviewDialog({
+  pending,
+  isPending,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  pending: PendingModeration | null;
+  isPending: boolean;
+  error: string | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const isApprove = pending?.action === "approve";
+
+  return (
+    <Dialog
+      open={pending !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {isApprove ? "Одобрить отзыв?" : "Отклонить отзыв?"}
+          </DialogTitle>
+          <DialogDescription>
+            {pending
+              ? isApprove
+                ? `Отзыв от ${pending.review.authorName} о ${pending.review.targetUserName} (${pending.review.tripRoute}) станет публичным и начнёт учитываться в рейтинге.`
+                : `Отзыв от ${pending.review.authorName} о ${pending.review.targetUserName} (${pending.review.tripRoute}) будет скрыт из публичного списка.`
+              : ""}
+          </DialogDescription>
+        </DialogHeader>
+        {error && (
+          <Alert variant="destructive" role="alert">
+            <AlertCircle />
+            <AlertTitle>Не удалось выполнить действие</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isPending}>
+              Отмена
+            </Button>
+          </DialogClose>
+          <Button
+            variant={isApprove ? "default" : "destructive"}
+            disabled={isPending}
+            onClick={onConfirm}
+          >
+            {isPending
+              ? "Выполнение..."
+              : isApprove
+                ? "Одобрить отзыв"
+                : "Отклонить отзыв"}
           </Button>
         </DialogFooter>
       </DialogContent>
