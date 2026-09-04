@@ -895,6 +895,10 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
           },
           data: {
             status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledByType: "user",
+            cancelledByUserId: user.id,
+            cancellationReason: "Trip cancelled by driver",
           },
         });
 
@@ -1064,6 +1068,9 @@ tripsRouter.patch("/:id/complete", requireUser, completeTripLimiter, async (c) =
           },
           data: {
             status: "declined",
+            cancelledAt: new Date(),
+            cancelledByType: "system",
+            cancellationReason: "Trip completed",
           },
         });
 

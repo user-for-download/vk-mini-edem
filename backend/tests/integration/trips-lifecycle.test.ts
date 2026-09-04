@@ -107,9 +107,15 @@ describe("trip lifecycle: cancel/complete", () => {
 
     const dbTrip = await db.trip.findUnique({ where: { id: tripId } });
     expect(dbTrip?.status).toBe("cancelled");
+    expect(dbTrip?.cancelledAt).not.toBeNull();
+    expect(dbTrip?.cancelledByType).toBe("user");
+    expect(dbTrip?.cancelledByUserId).toBe(users.driverId);
 
     const dbBooking = await db.booking.findUnique({ where: { id: bookingId } });
     expect(dbBooking?.status).toBe("cancelled");
+    expect(dbBooking?.cancelledAt).not.toBeNull();
+    expect(dbBooking?.cancelledByType).toBe("user");
+    expect(dbBooking?.cancelledByUserId).toBe(users.driverId);
 
     // Пассажиру создано персистентное уведомление.
     const notification = await db.notification.findFirst({
@@ -215,6 +221,8 @@ describe("trip lifecycle: cancel/complete", () => {
 
     const declined = await db.booking.findUnique({ where: { id: pendingBooking.id } });
     expect(declined?.status).toBe("declined");
+    expect(declined?.cancelledByType).toBe("system");
+    expect(declined?.cancellationReason).toBe("Trip completed");
 
     // tripsCount начислен водителю и подтверждённому пассажиру ровно один раз.
     const driver = await db.user.findUnique({ where: { id: users.driverId } });

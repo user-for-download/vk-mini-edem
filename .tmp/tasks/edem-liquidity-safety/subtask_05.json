@@ -1,8 +1,37 @@
 {
-  "id": "edem-liquidity-safety-05", "seq": "05", "title": "S1: добавить lifecycle regression tests", "status": "pending", "depends_on": ["04"], "parallel": true, "suggested_agent": "TestEngineer",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/**/*.test.ts", "backend/src/workers/tripWorker.ts"],
-  "deliverables": ["Backend tests expiry, races, auto/manual completion, audit actor", "Contracts tests новых DTO/status"],
-  "acceptance_criteria": ["Проверены повторный запуск worker, конфликт подтверждения и истечение pending", "Проверено восстановление seat counters"],
-  "commands": ["npm test --workspace=backend", "npm test --workspace=packages/contracts"],
-  "risks": ["Интеграционные тесты зависят от test DB"]
+  "id": "edem-liquidity-safety-05",
+  "seq": "05",
+  "title": "S1: добавить lifecycle regression tests",
+  "status": "completed",
+  "depends_on": [
+    "04"
+  ],
+  "parallel": true,
+  "suggested_agent": "TestEngineer",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-04T19:42:31.778Z",
+  "completion_summary": "Added TTL, expiry release and cancellation audit regression coverage",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/src/**/*.test.ts",
+    "backend/src/workers/tripWorker.ts"
+  ],
+  "deliverables": [
+    "Backend tests expiry, races, auto/manual completion, audit actor",
+    "Contracts tests новых DTO/status"
+  ],
+  "acceptance_criteria": [
+    "Проверены повторный запуск worker, конфликт подтверждения и истечение pending",
+    "Проверено восстановление seat counters"
+  ],
+  "commands": [
+    "npm test --workspace=backend",
+    "npm test --workspace=packages/contracts"
+  ],
+  "risks": [
+    "Интеграционные тесты зависят от test DB"
+  ]
 }

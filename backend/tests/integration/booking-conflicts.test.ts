@@ -213,6 +213,57 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
     expect(body.status).toBe("pending");
   });
 
+  it("expires a pending booking before accepting a new booking for its seat", async () => {
+    const expired = await db.booking.create({
+      data: {
+        tripId,
+        passengerId: passenger1Id,
+        seat: 1,
+        status: "pending",
+        expiresAt: new Date(Date.now() - 1),
+      },
+    });
+    await db.trip.update({
+      where: { id: tripId },
+      data: { seatsAvailable: { decrement: 1 } },
+    });
+
+    const { status, body } = await book(passenger2Id, 1);
+
+    expect(status).toBe(201);
+    expect(body.seat).toBe(1);
+
+    const expiredInDb = await db.booking.findUnique({ where: { id: expired.id } });
+    expect(expiredInDb?.status).toBe("declined");
+    expect(expiredInDb?.cancelledByType).toBe("system");
+    expect(expiredInDb?.cancellationReason).toBe("Booking request expired");
+  });
+
+  it("does not allow a driver to confirm an expired pending booking", async () => {
+    const expired = await db.booking.create({
+      data: {
+        tripId,
+        passengerId: passenger1Id,
+        seat: 1,
+        status: "pending",
+        expiresAt: new Date(Date.now() - 1),
+      },
+    });
+
+    const res = await app.request(`/api/v1/bookings/${expired.id}/status`, {
+      method: "PATCH",
+      headers: {
+        ...JSON_HEADERS,
+        Authorization: `Bearer ${devMockAccessToken(driverId)}`,
+      },
+      body: JSON.stringify({ status: "confirmed" }),
+    });
+
+    expect(res.status).toBe(409);
+    const booking = await db.booking.findUnique({ where: { id: expired.id } });
+    expect(booking?.status).toBe("pending");
+  });
+
   it("still blocks duplicates on confirmed bookings (F15)", async () => {
     await db.booking.create({
       data: { tripId, passengerId: passenger1Id, seat: 1, status: "confirmed" },
