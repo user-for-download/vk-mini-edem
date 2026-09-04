@@ -1,0 +1,359 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { app } from "../src/app.js";
+import { db } from "../src/db.js";
+
+const JSON_HEADERS = {
+  "Content-Type": "application/json",
+};
+
+async function cleanDb() {
+  await db.review.deleteMany();
+  await db.booking.deleteMany();
+  await db.trip.deleteMany();
+  await db.car.deleteMany();
+  await db.user.deleteMany();
+}
+
+beforeAll(async () => {
+  await cleanDb();
+});
+
+afterAll(async () => {
+  await cleanDb();
+  await db.$disconnect();
+});
+
+describe("health", () => {
+  it("returns ok", async () => {
+    const response = await app.request("/health");
+
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as { status: string };
+
+    expect(body.status).toBe("ok");
+  });
+});
+
+describe("auth bootstrap", () => {
+  it("creates user and returns token", async () => {
+    await cleanDb();
+
+    const response = await app.request("/api/v1/auth/vk", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        // Полный searchParams из launch-параметров VK (единственный поддерживаемый формат).
+        // В dev-режиме (ALLOW_DEV_AUTH) подпись sign=dev-sign принимается без проверки HMAC.
+        searchParams: "vk_user_id=111111&sign=dev-sign",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      accessToken: string;
+      refreshToken: string;
+      user: { id: string; name: string };
+    };
+
+    expect(body.accessToken).toBeTruthy();
+    expect(body.refreshToken).toBeTruthy();
+    expect(body.user.id).toBeTruthy();
+    expect(body.user.name).toBeTruthy();
+  });
+
+  it("client VK profile fields: display-only, avatar restricted to VK CDN", async () => {
+    await cleanDb();
+
+    const response = await app.request("/api/v1/auth/vk", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        searchParams: "vk_user_id=111112&sign=dev-sign",
+        firstName: "Ирина",
+        lastName: "Козлова",
+        photo: "https://example.com/attacker-avatar.png",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      user: {
+        name: string;
+        avatar: string;
+        isVerified: boolean;
+      };
+    };
+
+    // Имя — отображаемые данные: заполняется из полей клиента.
+    expect(body.user.name).toBe("Ирина Козлова");
+    // Аватар с чужого домена отклоняется (только https + VK CDN).
+    expect(body.user.avatar).toBe("https://vk.com/images/camera_200.png?ava=1");
+    // Идентификация от клиентских полей не зависит: пользователь, прошедший
+    // через VK launch-params (даже dev-bypass), считается верифицированным —
+    // это и есть суть «приложение ВК».
+    expect(body.user.isVerified).toBe(true);
+  });
+
+  it("accepts avatar from VK CDN (userapi.com)", async () => {
+    await cleanDb();
+
+    const response = await app.request("/api/v1/auth/vk", {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        searchParams: "vk_user_id=111114&sign=dev-sign",
+        firstName: "Олег",
+        photo: "https://sun9-10.userapi.com/imp/xyz.jpg",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      user: { name: string; avatar: string };
+    };
+    expect(body.user.name).toBe("Олег");
+    expect(body.user.avatar).toBe("https://sun9-10.userapi.com/imp/xyz.jpg");
+  });
+
+  it("creates one user for concurrent VK launches", async () => {
+    await cleanDb();
+
+    const requests = await Promise.all(
+       Array.from({ length: 2 }, () =>
+        app.request("/api/v1/auth/vk", {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            searchParams: "vk_user_id=111113&sign=dev-sign",
+          }),
+        })
+      )
+    );
+
+    // Диагностика флейков: без реальных статусов/тел 429/500/401 выглядят
+    // одинаково («expected false to be true») — CI с LOG_LEVEL=silent не
+    // показывает и серверный лог, поэтому печатаем сами.
+    const results = await Promise.all(
+      requests.map(async (response) => ({
+        status: response.status,
+        body: await response.text(),
+      }))
+    );
+
+    if (results.some((result) => result.status !== 200)) {
+      console.error("non-200 on concurrent VK launches:", results);
+    }
+
+    expect(results.map((result) => result.status)).toEqual([200, 200]);
+    const users = await db.user.findMany({ where: { vkUserId: 111113 } });
+    expect(users).toHaveLength(1);
+  });
+});
+
+describe("trips", () => {
+  it("returns only active trips", async () => {
+    await cleanDb();
+
+    const driver = await db.user.create({
+      data: {
+        vkUserId: 222222,
+        name: "Driver",
+        avatar: "https://i.pravatar.cc/200?img=1",
+      },
+    });
+
+    await db.trip.create({
+      data: {
+        driverId: driver.id,
+        fromCity: "Москва",
+        fromAddress: "м. Тёплый Стан",
+        toCity: "Тула",
+        toAddress: "пр-т Ленина",
+        departureAt: new Date("2030-01-01T09:00:00Z"),
+        durationMinutes: 120,
+        distanceKm: 180,
+        price: 700,
+        seatsTotal: 3,
+        seatsAvailable: 3,
+        tags: ["Есть багаж"],
+      },
+    });
+
+    await db.trip.create({
+      data: {
+        driverId: driver.id,
+        fromCity: "Москва",
+        fromAddress: "м. ВДНХ",
+        toCity: "Ярославль",
+        toAddress: "Автовокзал",
+        departureAt: new Date("2030-01-01T10:00:00Z"),
+        durationMinutes: 180,
+        distanceKm: 265,
+        price: 800,
+        seatsTotal: 3,
+        seatsAvailable: 3,
+        tags: [],
+        status: "cancelled",
+      },
+    });
+
+    const response = await app.request("/api/v1/trips");
+
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      items: Array<{
+        fromCity: string;
+        toCity: string;
+        status: string;
+      }>;
+    };
+
+    expect(body.items.length).toBe(1);
+    expect(body.items[0].fromCity).toBe("Москва");
+    expect(body.items[0].toCity).toBe("Тула");
+    expect(body.items[0].status).toBe("active");
+  });
+});
+
+describe("bookings smoke", () => {
+  it("creates booking and decreases seatsAvailable", async () => {
+    await cleanDb();
+
+    const passenger = await db.user.create({
+      data: {
+        vkUserId: 333333,
+        name: "Passenger",
+        avatar: "https://i.pravatar.cc/200?img=2",
+      },
+    });
+
+    const driver = await db.user.create({
+      data: {
+        vkUserId: 444444,
+        name: "Driver",
+        avatar: "https://i.pravatar.cc/200?img=3",
+      },
+    });
+
+    const trip = await db.trip.create({
+      data: {
+        driverId: driver.id,
+        fromCity: "Москва",
+        fromAddress: "м. Тёплый Стан",
+        toCity: "Тула",
+        toAddress: "пр-т Ленина",
+        departureAt: new Date("2030-01-01T09:00:00Z"),
+        durationMinutes: 120,
+        distanceKm: 180,
+        price: 700,
+        seatsTotal: 3,
+        seatsAvailable: 2,
+        tags: [],
+      },
+    });
+
+    const response = await app.request("/api/v1/bookings", {
+      method: "POST",
+      headers: {
+        ...JSON_HEADERS,
+        Authorization: `Bearer mock-access-token-${passenger.id}`,
+      },
+      body: JSON.stringify({
+        tripId: trip.id,
+        seat: 1,
+        comment: "Буду вовремя",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+
+    const booking = (await response.json()) as { id: string; seat: number };
+
+    expect(booking.id).toBeTruthy();
+    expect(booking.seat).toBe(1);
+
+    const updatedTrip = await db.trip.findUnique({
+      where: { id: trip.id },
+    });
+
+    expect(updatedTrip?.seatsAvailable).toBe(1);
+  });
+
+  it("does not double-free a seat on concurrent cancels (Serializable)", async () => {
+    await cleanDb();
+
+    const passenger = await db.user.create({
+      data: {
+        vkUserId: 555555,
+        name: "Passenger",
+        avatar: "https://i.pravatar.cc/200?img=4",
+      },
+    });
+
+    const driver = await db.user.create({
+      data: {
+        vkUserId: 666666,
+        name: "Driver",
+        avatar: "https://i.pravatar.cc/200?img=5",
+      },
+    });
+
+    const trip = await db.trip.create({
+      data: {
+        driverId: driver.id,
+        fromCity: "Москва",
+        fromAddress: "м. Тёплый Стан",
+        toCity: "Тула",
+        toAddress: "пр-т Ленина",
+        departureAt: new Date("2030-01-01T09:00:00Z"),
+        durationMinutes: 120,
+        distanceKm: 180,
+        price: 700,
+        seatsTotal: 3,
+        seatsAvailable: 2,
+        tags: [],
+      },
+    });
+
+    const booking = await db.booking.create({
+      data: {
+        tripId: trip.id,
+        passengerId: passenger.id,
+        seat: 1,
+        status: "confirmed",
+        comment: "",
+      },
+    });
+
+    const cancel = () =>
+      app.request(`/api/v1/bookings/${booking.id}/cancel`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer mock-access-token-${passenger.id}`,
+        },
+      });
+
+    // Два параллельных запроса на отмену одной брони.
+    const [r1, r2] = await Promise.all([cancel(), cancel()]);
+
+    // Один запрос должен пройти, второй — получить 409/400 (уже отменена).
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses[0]).toBe(200);
+    expect(statuses[1]).toBeGreaterThanOrEqual(400);
+    expect(statuses[1]).toBeLessThan(500);
+
+    // Место освободилось ровно один раз: 2 → 3, но не 4.
+    const updatedTrip = await db.trip.findUnique({
+      where: { id: trip.id },
+    });
+    expect(updatedTrip?.seatsAvailable).toBe(3);
+
+    const cancelledCount = await db.booking.count({
+      where: { id: booking.id, status: "cancelled" },
+    });
+    expect(cancelledCount).toBe(1);
+  });
+});

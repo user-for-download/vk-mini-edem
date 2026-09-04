@@ -1,0 +1,231 @@
+import vkBridge from "@vkontakte/vk-bridge";
+import vkBridgeMock from "@vkontakte/vk-bridge-mock";
+import type { ShowSlidesSheetRequest } from "@vkontakte/vk-bridge";
+
+const customBridgeMock = new Proxy(vkBridgeMock, {
+  get(target, prop, receiver) {
+    if (prop === "send") {
+      return async (method: string, props?: unknown) => {
+        if (method === "VKWebAppGetUserInfo") {
+          return {
+            id: 100001,
+            first_name: "Илья",
+            last_name: "Северов",
+            photo_200: "https://i.pravatar.cc/200?img=12",
+            photo_100: "https://i.pravatar.cc/100?img=12",
+            sex: 2,
+            city: { id: 1, title: "Москва" },
+            country: { id: 1, title: "Россия" },
+          };
+        }
+        if (method === "VKWebAppGetLaunchParams") {
+          return {
+            vk_user_id: 100001,
+            vk_app_id: 0,
+            vk_platform: "desktop_web",
+            vk_is_app_user: 1,
+            vk_are_notifications_enabled: 1,
+            vk_language: "ru",
+            vk_ref: "other",
+            vk_access_token_settings: "",
+            vk_sign: "dev-sign",
+            vk_ts: Math.floor(Date.now() / 1000),
+            sign: "dev-sign",
+          };
+        }
+        // Проброс в mock: сигнатура vk-bridge слишком узкая для произвольных строк
+        return vkBridgeMock.send(
+          method as Parameters<typeof vkBridgeMock.send>[0],
+          props as Parameters<typeof vkBridgeMock.send>[1],
+        );
+      };
+    }
+    return Reflect.get(target, prop, receiver);
+  },
+});
+
+export const bridge = import.meta.env.DEV
+  ? (customBridgeMock as unknown as typeof vkBridge)
+  : vkBridge;
+
+/**
+ * Профильные данные пользователя из VK (VKWebAppGetUserInfo).
+ * В dev-режиме не используется для автозаполнения ФИО/аватара —
+ * синхронизация профиля выполняется только в продакшене.
+ */
+export interface VkUserInfo {
+  id: number;
+  firstName?: string;
+  lastName?: string;
+  photo?: string;
+}
+
+export type BridgeActionResult = "success" | "unsupported" | "cancelled" | "failed";
+
+export async function triggerHaptic(
+  style: "light" | "medium" | "heavy" = "light",
+): Promise<boolean> {
+  const method = "VKWebAppTapticImpactOccurred" as Parameters<typeof vkBridge.supportsAsync>[0];
+  if (!(await supports(method))) return false;
+  try {
+    await (bridge.send as (method: string, props: { style: string }) => Promise<unknown>)(method, { style });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function supports(method: Parameters<typeof vkBridge.supportsAsync>[0]): Promise<boolean> {
+  try {
+    return await bridge.supportsAsync(method);
+  } catch {
+    return false;
+  }
+}
+
+function isCancelledBridgeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const data = "error_data" in error ? error.error_data : null;
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      "error_reason" in data &&
+      String(data.error_reason).toLowerCase().includes("cancel"),
+  );
+}
+
+export async function getVkUserInfo(): Promise<VkUserInfo | null> {
+  try {
+    const data = (await bridge.send(
+      "VKWebAppGetUserInfo"
+    )) as Record<string, unknown> | null;
+    if (!data || typeof data.id !== "number") {
+      return null;
+    }
+    return {
+      id: data.id,
+      firstName:
+        typeof data.first_name === "string" ? data.first_name : undefined,
+      lastName:
+        typeof data.last_name === "string" ? data.last_name : undefined,
+      photo: typeof data.photo_200 === "string" ? data.photo_200 : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Запрашивает у пользователя разрешение на отправку сообщений
+ * от имени сообщества (VKWebAppAllowMessagesFromGroup).
+ * Без этого согласия VK API messages.send вернёт ошибку
+ * "Can't send messages for users without permission".
+ *
+ * Вызывается только в продакшене (в dev пропускаем), результат не критичен.
+ * В качестве key используем VK ID пользователя (из VKWebAppGetUserInfo).
+ */
+export async function requestVkMessagesPermission(groupId: number): Promise<BridgeActionResult> {
+  if (import.meta.env.DEV) {
+    return "unsupported";
+  }
+  try {
+    if (!(await supports("VKWebAppAllowMessagesFromGroup"))) {
+      return "unsupported";
+    }
+    const userInfo = await getVkUserInfo();
+    if (!userInfo) return "failed";
+    const data = (await bridge.send("VKWebAppAllowMessagesFromGroup", {
+      group_id: groupId,
+      key: String(userInfo.id),
+    })) as { result?: boolean } | null;
+    return data?.result === true ? "success" : "cancelled";
+  } catch (error) {
+    return isCancelledBridgeError(error) ? "cancelled" : "failed";
+  }
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  const openUrlMethod = "VKWebAppOpenUrl" as Parameters<typeof vkBridge.supportsAsync>[0];
+  if (bridge.isWebView() && (await supports(openUrlMethod))) {
+    try {
+      await (bridge.send as (method: string, props: { url: string }) => Promise<unknown>)(
+        "VKWebAppOpenUrl",
+        { url },
+      );
+      return;
+    } catch {
+      // Continue to the browser fallback.
+    }
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.assign(url);
+}
+
+/**
+ * Запрашивает у пользователя разрешение на отправку push-уведомлений
+ * мини-аппа (VKWebAppAllowNotifications). Без этого согласия серверные
+ * вызовы notifications.sendMessage будут возвращать ошибку.
+ *
+ * Деградирует gracefully: unsupported / cancelled / failed / success.
+ * В dev bridge.send уходит в vkBridgeMock (см. customBridgeMock) —
+ * это позволяет тестировать все ветки, включая "success".
+ */
+export async function requestNotificationsPermission(): Promise<BridgeActionResult> {
+  try {
+    if (!(await supports("VKWebAppAllowNotifications"))) {
+      return "unsupported";
+    }
+    const data = (await bridge.send(
+      "VKWebAppAllowNotifications",
+      {}
+    )) as { result?: boolean } | null;
+    return data?.result === true ? "success" : "cancelled";
+  } catch (error) {
+    return isCancelledBridgeError(error) ? "cancelled" : "failed";
+  }
+}
+
+/**
+ * Итог показа информационных слайдов (VKWebAppShowSlidesSheet).
+ *
+ * confirm — просмотрены все слайды; reject — нажата отмена на слайде
+ * (slideIndex — на каком, с 0); cancel — закрыто иначе (кнопка назад);
+ * unsupported/failed — метод недоступен или платформа вернула ошибку.
+ */
+export type SlidesSheetOutcome =
+  | { status: "confirm" }
+  | { status: "reject"; slideIndex: number }
+  | { status: "cancel" }
+  | { status: "unsupported" }
+  | { status: "failed" };
+
+/**
+ * Показывает информационные слайды (онбординг).
+ *
+ * Не выбрасывает исключения: недоступность метода и ошибки платформы
+ * возвращаются как unsupported/failed, чтобы вызывающий код мог
+ * деградировать без try/catch.
+ */
+export async function showSlidesSheet(
+  slides: ShowSlidesSheetRequest["slides"],
+): Promise<SlidesSheetOutcome> {
+  try {
+    if (!(await supports("VKWebAppShowSlidesSheet"))) {
+      return { status: "unsupported" };
+    }
+    const data = (await bridge.send("VKWebAppShowSlidesSheet", { slides })) as {
+      result?: boolean;
+      action?: string;
+      slide_index?: number;
+    } | null;
+    if (!data || data.result !== true) return { status: "failed" };
+    if (data.action === "reject") {
+      return { status: "reject", slideIndex: data.slide_index ?? 0 };
+    }
+    if (data.action === "cancel") return { status: "cancel" };
+    return { status: "confirm" };
+  } catch {
+    return { status: "failed" };
+  }
+}

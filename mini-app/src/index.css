@@ -1,0 +1,50 @@
+/* Один акцент поверх нативной палитры VKUI — только для маршрута, рейтинга и выбранного места.
+   Всё остальное намеренно остаётся нативным цветом платформы (vkBase/vkIOS/vkCom). */
+/* Браузерный reset — не относится к компонентам VKUI */
+html {
+  height: 100%;
+}
+
+body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* Блокируем системный rubber-band/overscroll на уровне документа,
+     не мешая внутреннему скроллу Panel__in. */
+  overscroll-behavior-y: none;
+}
+
+.RootError {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100vh;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  place-items: center;
+  text-align: center;
+}
+
+.RootError__content {
+  max-width: 420px;
+}
+
+.RootError button {
+  border: 0;
+  border-radius: 8px;
+  background: #2688eb;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  padding: 12px 18px;
+}
+
+.OfflineBanner {
+  box-sizing: border-box;
+  padding-block-start: var(--vkui_internal--safe_area_inset_top, env(safe-area-inset-top));
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Браузерный reset — не относится к компонентам VKUI */

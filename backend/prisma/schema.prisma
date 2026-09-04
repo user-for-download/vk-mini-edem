@@ -1,0 +1,223 @@
+generator client {
+  provider              = "prisma-client"
+  // Prisma 7: генерация в src (компилируется tsc в dist), gitignore'd.
+  output                = "../src/generated/prisma"
+  moduleFormat          = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  // Prisma 7: URL подключения живёт в prisma.config.ts (env("DATABASE_URL")),
+  // а не в схеме.
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  vkUserId     Int?      @unique
+  name         String
+  avatar       String
+  rating       Float     @default(5.0)
+  reviewsCount Int       @default(0)
+  tripsCount   Int       @default(0)
+  isVerified   Boolean   @default(true)
+  notificationsEnabled Boolean @default(true)
+  verifiedAt           DateTime?
+  bannedAt             DateTime?
+  // Причина бана (обязательна при бане через админку: 1..500 символов).
+  // null для старых банов, выставленных до этого поля (UI показывает «Причина не указана»).
+  banReason            String?
+  about        String?
+  // Версия онбординга (слайдов), показанного пользователю; null — ещё не показан.
+  // Админка может сбросить (PATCH /admin/users/:id/onboarding-reset).
+  onboardingVersion String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  car          Car?
+  driverTrips  Trip[]    @relation("DriverTrips")
+  bookings     Booking[] @relation("PassengerBookings")
+  reviewsGiven Review[]  @relation("AuthorReviews")
+  reviewsRecv  Review[]  @relation("TargetReviews")
+  notifications Notification[]
+  refreshTokens RefreshToken[]
+  feedbacks    Feedback[]
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // booking_created, booking_confirmed, trip_cancelled
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+}
+
+model Car {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  model     String
+  color     String
+  plate     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Trip {
+  id              String    @id @default(uuid())
+  driverId        String
+  fromCity        String
+  fromAddress     String
+  toCity          String
+  toAddress       String
+  // FK на справочник городов. Nullable, чтобы старые поездки (без FK)
+  // продолжали работать. Снимок `fromCity`/`toCity` выше — единственный
+  // источник правды для UI/поиска/уведомлений; FK нужен для аналитики
+  // и для автодополнения в форме создания.
+  fromCityId      String?
+  toCityId        String?
+  fromCityRef     City?     @relation("TripFromCity", fields: [fromCityId], references: [id], onDelete: SetNull)
+  toCityRef       City?     @relation("TripToCity", fields: [toCityId], references: [id], onDelete: SetNull)
+  departureAt     DateTime
+  durationMinutes Int
+  distanceKm      Float
+  price           Int
+  seatsTotal      Int
+  seatsAvailable  Int
+  tags            String[]  @default([])
+  comment         String?
+  status          String    @default("active") // active, cancelled, completed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  driver          User      @relation("DriverTrips", fields: [driverId], references: [id])
+  bookings        Booking[]
+  reviews         Review[]
+
+  @@index([status, departureAt(sort: Asc)])
+  @@index([driverId, status])
+  @@index([driverId, status, departureAt(sort: Asc)])
+  @@index([fromCity, toCity, status])
+  @@index([fromCityId])
+  @@index([toCityId])
+}
+
+// Справочник точек (городов) для автодополнения. Маленький городок →
+// конечный список, которым управляет админ. UI мини-апа НЕ позволяет
+// вводить город вручную — только выбор из справочника.
+model City {
+  id             String   @id @default(uuid())
+  // Имя города. Нормализуется в API (trim, схлопывание пробелов).
+  // Ограничение 1..100 символов — на уровне Zod DTO.
+  name           String
+  // Нормализованное имя (lower + trim) — для регистронезависимой
+  // уникальности. `nameNormalized` хранится уже в lowercase-форме
+  // (нормализация в коде через `cityNameNormalized`), поэтому это
+  // обычная колонка String с @unique — выражений/функций нет, Prisma
+  // создаёт индекс автоматически. db:push и migrate deploy оба
+  // гарантируют UNIQUE INDEX, что критично для проверки дубликатов
+  // (P2002) в POST /admin/cities.
+  nameNormalized String @unique
+  // Счётчик поездок с этим городом (для отображения в админке и
+  // предотвращения удаления используемого города). Денормализация
+  // ради O(1) проверки «можно ли удалить» и быстрого отображения
+  // в UI; инкрементируется при создании/редактировании поездки.
+  tripsCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tripsFrom Trip[] @relation("TripFromCity")
+  tripsTo   Trip[] @relation("TripToCity")
+
+  @@index([name])
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  tripId      String
+  passengerId String
+  seat        Int
+  status      String   @default("pending") // pending, confirmed, declined, cancelled
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  passenger   User     @relation("PassengerBookings", fields: [passengerId], references: [id])
+
+  @@index([tripId, status])
+  @@index([passengerId, status])
+  @@index([tripId, seat])
+  @@index([tripId, passengerId])
+  @@index([tripId, createdAt(sort: Desc)])
+}
+
+// Partial unique constraints создаются SQL-миграцией (Prisma не поддерживает
+// `where` в @@unique):
+// - active_seat_booking (tripId, seat) WHERE status IN ('pending', 'confirmed')
+// - active_passenger_booking (tripId, passengerId) WHERE status IN ('pending', 'confirmed')
+// См. prisma/migrations/*_booking_unique_indexes/migration.sql
+
+model Review {
+  id           String   @id @default(uuid())
+  authorId     String
+  targetUserId String
+  targetRole   String   // passenger, driver
+  rating       Int
+  text         String
+  tripRoute    String
+  status       String   @default("pending") // pending, published, rejected
+  createdAt    DateTime @default(now())
+
+  tripId       String?
+  trip         Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
+  author       User     @relation("AuthorReviews", fields: [authorId], references: [id])
+  targetUser   User     @relation("TargetReviews", fields: [targetUserId], references: [id])
+
+  @@index([targetUserId, createdAt(sort: Desc)])
+  @@index([targetUserId, status])
+  @@index([authorId, tripId])
+  // Имя индекса — дефолтное Prisma (Review_authorId_tripId_targetUserId_key):
+  // миграция 20260811174647 переименовала unique_review_per_trip в него,
+  // поэтому явный name здесь вызывал бы дрейф schema/migrations.
+  @@unique([authorId, tripId, targetUserId])
+}
+
+// Обращения пользователей в поддержку (Профиль → Помощь и поддержка).
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  subject   String
+  text      String
+  // Ответ админа (≤ 2000 символов). null = ещё не отвечено.
+  // `repliedAt` проставляется сервером при первом ответе; при редактировании
+  // ответа сохраняем исходное время (аудит «когда был дан ответ»).
+  reply     String?
+  repliedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([repliedAt])
+}

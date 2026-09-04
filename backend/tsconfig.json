@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    // Сгенерированный Prisma-клиент (src/generated) импортирует свои модули
+    // с явным расширением .ts: разрешаем такие импорты и переписываем их в
+    // .js при сборке (tsx/vitest читают .ts напрямую).
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "noEmit": false,
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*", "prisma/**/*"]
+}

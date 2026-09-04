@@ -1,0 +1,28 @@
+node_modules/
+.tmp/
+build/
+dist/
+# Сгенерированный Prisma-клиент (v7, provider "prisma-client"): собирается
+# `prisma generate` (npm run db:generate) и компилируется tsc в dist.
+backend/src/generated/
+coverage/
+.DS_Store
+*.log
+.env
+!.env.example
+backend/.env
+!backend/.env.test
+# Канонический lockfile — package-lock.json (npm ci в CI/Docker).
+bun.lock
+*.db
+*.db-journal
+.opencode/
+prc.json
+assets/
+# Исходные изображения мини-аппа (онбординг и т.п.) — хранятся в репозитории,
+# в отличие от build-артефактов dist/**/assets.
+!mini-app/src/assets/
+dump/
+fix/
+opencode.json
+run_workflow.sh

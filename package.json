@@ -1,0 +1,66 @@
+{
+  "name": "edem",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "mini-app",
+    "backend",
+    "packages/*",
+    "webapp"
+  ],
+  "scripts": {
+    "dev": "npm run build:contracts && npm run db:generate && VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "BACKEND_PORT=${BACKEND_PORT:-3011} npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=mini-app",
+    "build": "npm run build:contracts && npm run db:generate && npm run build --workspace=backend && npm run build --workspace=mini-app",
+    "start": "node backend/dist/src/index.js",
+    "build:contracts": "npm run build --workspace=packages/contracts",
+    "db:push": "npm run db:push --workspace=backend",
+    "db:push:force": "npm run db:push:force --workspace=backend",
+    "db:migrate": "npm run db:migrate --workspace=backend",
+    "db:migrate:deploy": "npm run db:migrate:deploy --workspace=backend",
+    "db:generate": "npm run db:generate --workspace=backend",
+    "db:seed": "npm run db:seed --workspace=backend",
+    "prisma:validate": "npm run prisma:validate --workspace=backend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "clean": "rm -rf backend/dist mini-app/dist packages/contracts/dist",
+    "lint": "npm run typecheck && npm run lint --workspace=mini-app",
+    "format:check": "node scripts/format-check.mjs",
+    "bundle:check": "node scripts/check-bundle.mjs",
+    "load:test": "node scripts/load-test.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@sentry/react": "^10.73.0",
+    "@tanstack/react-query": "^5.102.8",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@vkontakte/icons": "^3.68.0",
+    "@vkontakte/vk-bridge": "^3.0.2",
+    "@vkontakte/vk-bridge-mock": "^2.2.0",
+    "@vkontakte/vk-bridge-react": "^2.0.1",
+    "@vkontakte/vk-mini-apps-router": "^1.8.6",
+    "@vkontakte/vkui": "^8.4.0",
+    "dotenv": "^17.2.3",
+    "hono": "^4.13.5",
+    "jose": "^6.2.10",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vitest": "^4.1.11",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "concurrently": "^10.0.4",
+    "playwright": "^1.62.1",
+    "tsx": "^4.23.13",
+    "typescript": "~5.8.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,0 +1,24 @@
+# Local development stack: PostgreSQL only on port 5433.
+services:
+  db-dev:
+    image: postgres:16-alpine
+    container_name: vk-mini-edem-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edem
+      POSTGRES_PASSWORD: edem_local
+      POSTGRES_DB: edem
+    ports:
+      # Только loopback: dev-БД с известными креденшалами не должна быть
+      # доступна из LAN/публичной сети.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edem -d edem"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata_dev:

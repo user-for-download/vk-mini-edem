@@ -1,0 +1,99 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: edem
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: edem
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edem -d edem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: "Europe/Moscow"
+      DATABASE_URL: postgresql://edem:${POSTGRES_PASSWORD}@db:5432/edem?schema=public&connection_limit=10
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      VK_APP_SECRET: ${VK_APP_SECRET:?VK_APP_SECRET is required}
+      # VK API: отправка сообщений пользователям от имени сообщества (опционально)
+      VK_GROUP_ID: ${VK_GROUP_ID:-}
+      VK_GROUP_TOKEN: ${VK_GROUP_TOKEN:-}
+      # VK API: сервисный ключ мини-аппа для push-уведомлений (опционально)
+      # notifications.sendMessage. Пусто = push не отправляются, приложение работает.
+      VK_SERVICE_KEY: ${VK_SERVICE_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ALLOW_DEV_AUTH: "false"
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      # Rate limits (дефолты совпадают с backend/src/env.ts)
+      VK_AUTH_RATE_WINDOW_MS: ${VK_AUTH_RATE_WINDOW_MS:-300000}
+      VK_AUTH_RATE_MAX: ${VK_AUTH_RATE_MAX:-5}
+      REFRESH_RATE_WINDOW_MS: ${REFRESH_RATE_WINDOW_MS:-600000}
+      REFRESH_RATE_MAX: ${REFRESH_RATE_MAX:-10}
+      PUBLIC_READ_RATE_WINDOW_MS: ${PUBLIC_READ_RATE_WINDOW_MS:-60000}
+      PUBLIC_READ_RATE_MAX: ${PUBLIC_READ_RATE_MAX:-100}
+      MUTATION_RATE_WINDOW_MS: ${MUTATION_RATE_WINDOW_MS:-60000}
+      MUTATION_RATE_MAX: ${MUTATION_RATE_MAX:-30}
+      CREATE_TRIP_RATE_WINDOW_MS: ${CREATE_TRIP_RATE_WINDOW_MS:-86400000}
+      CREATE_TRIP_RATE_MAX: ${CREATE_TRIP_RATE_MAX:-10}
+      CANCEL_TRIP_RATE_WINDOW_MS: ${CANCEL_TRIP_RATE_WINDOW_MS:-86400000}
+      CANCEL_TRIP_RATE_MAX: ${CANCEL_TRIP_RATE_MAX:-20}
+      CREATE_BOOKING_RATE_WINDOW_MS: ${CREATE_BOOKING_RATE_WINDOW_MS:-86400000}
+      CREATE_BOOKING_RATE_MAX: ${CREATE_BOOKING_RATE_MAX:-20}
+      CANCEL_BOOKING_RATE_WINDOW_MS: ${CANCEL_BOOKING_RATE_WINDOW_MS:-86400000}
+      CANCEL_BOOKING_RATE_MAX: ${CANCEL_BOOKING_RATE_MAX:-20}
+      # Админ-панель: пусто = панель выключена (все запросы 403).
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ADMIN_JWT_TTL_SECONDS: ${ADMIN_JWT_TTL_SECONDS:-43200}
+      # Backend доступен только через внешний reverse proxy. Не доверяем
+      # произвольным forwarding headers от прямых клиентов.
+      TRUST_PROXY: "false"
+    ports:
+      # Адрес публикации настраивается через BACKEND_BIND_ADDR (root .env).
+      # Дефолт 127.0.0.1 — для reverse proxy на том же хосте.
+      # Для прокси на отдельном хосте установите BACKEND_BIND_ADDR=0.0.0.0
+      # и ограничьте порт 3000 firewall-правилами (только Traefik/nginx).
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health/ready', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      # Адрес публикации настраивается через WEBAPP_BIND_ADDR (root .env).
+      # Дефолт 127.0.0.1 — для reverse proxy на том же хосте.
+      # Для прокси на отдельном хосте установите WEBAPP_BIND_ADDR=0.0.0.0
+      # и ограничьте порт 3014 firewall-правилами.
+      - "${WEBAPP_BIND_ADDR:-127.0.0.1}:3014:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

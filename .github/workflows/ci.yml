@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edem_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      # Append ?statement_cache_size=0 to disable Prisma's prepared statement caching
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/edem_test?statement_cache_size=0
+      JWT_SECRET: ci-jwt-secret
+      VK_APP_SECRET: ci-vk-secret
+      ALLOW_DEV_AUTH: "true"
+      # E2E в CI не гоняется — не качать браузеры в postinstall (экономит минуты на npm ci).
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      # error (не silent): unhandled_error с кодом Prisma должен быть виден
+      # в логах CI при редких флейках интеграционных тестов.
+      LOG_LEVEL: error
+      VK_AUTH_RATE_WINDOW_MS: "900000"
+      VK_AUTH_RATE_MAX: "1000"
+      REFRESH_RATE_WINDOW_MS: "900000"
+      REFRESH_RATE_MAX: "1000"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: dist must not be tracked
+        run: |
+          TRACKED_DIST=$(git ls-files | grep -E '(^|/)dist/' || true)
+          if [ -n "$TRACKED_DIST" ]; then echo "dist/ files are tracked: $TRACKED_DIST"; exit 1; fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build contracts
+        run: npm run --workspace "@edem/contracts" build
+
+      - name: Prisma generate
+        run: npm run --workspace backend db:generate
+
+      - name: Prisma validate
+        run: npm run --workspace backend prisma:validate
+
+      - name: Push Prisma schema to DB
+        run: npm run --workspace backend db:push
+
+      - name: Lint and typecheck
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle budget
+        run: npm run bundle:check
+
+      - name: Contract tests
+        run: npm run --workspace "@edem/contracts" test
+
+      - name: Backend smoke tests
+        run: npm run --workspace backend test

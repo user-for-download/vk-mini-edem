@@ -1,0 +1,47 @@
+# AI indexing ignore — Edem (vk-mini-edem)
+# Не давать AI индексировать секреты, локальные env, логи и артефакты.
+# Безопасные примеры (*.example) и контракты остаются в индексе.
+
+# --- Live secrets: провайдеры/ключи (главный триггер сканеров) ---
+opencode.json
+prc.json
+
+# --- Real env (значения только на сервере/локально, в git их нет) ---
+.env
+backend/.env
+mini-app/.env
+webapp/.env
+**/.env.local
+**/.env.production
+
+# --- Test env с dummy-секретами (флагают сканеры, для AI бесполезны) ---
+# Реал смотреть в backend/.env.example + backend/src/env.ts
+backend/.env.test
+
+# --- Логи и локальные артефакты ---
+*.log
+dev.log
+dump/
+fix/
+.tmp/
+coverage/
+*.db
+*.db-journal
+
+# --- Зависимости и сборки ---
+node_modules/
+.opencode/node_modules/
+backend/dist/
+mini-app/dist/
+webapp/dist/
+packages/*/dist/
+dist/
+build/
+
+# --- E2E артефакты (скриншоты могут содержать PII тестовых юзеров) ---
+e2e/shots/
+e2e/results.json
+
+# --- Локальные скрипты/раннеры ---
+run_workflow.sh
+assets/
