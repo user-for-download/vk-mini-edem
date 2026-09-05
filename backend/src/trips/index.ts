@@ -22,6 +22,7 @@ import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
 import { wsManager } from "../ws/manager.js";
+import { notifyMatchingRideRequests } from "../rideRequests/matching.js";
 import {
   decrementCityTripsCount,
   incrementCityTripsCount,
@@ -614,6 +615,10 @@ tripsRouter.post("/", requireUser, mutationLimiter, createTripLimiter, async (c)
     driverId: driver.id,
     fromCity: dto.fromCity,
     toCity: dto.toCity,
+  });
+
+  void notifyMatchingRideRequests(created).catch((error) => {
+    logger.error({ err: error, tripId: created.id }, "ride_request_match_notify_failed");
   });
 
   return c.json(
