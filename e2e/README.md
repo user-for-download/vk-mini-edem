@@ -15,6 +15,9 @@ Full-cycle E2E tests for the Edem VK Mini App using Playwright + Chromium.
 
 ```bash
 node e2e/full-cycle.mjs
+
+# Liquidity/safety API flow
+node e2e/liquidity-safety.mjs
 ```
 
 ## Env overrides
@@ -24,6 +27,9 @@ node e2e/full-cycle.mjs
 | `E2E_BASE_URL` | `http://localhost:3010` | Frontend base URL |
 | `E2E_DB_CONTAINER` | `vk-mini-edem-db-dev` | Docker container for time-travel (`departureAt`) + cleanup |
 | `E2E_VERBOSE` | unset (`1` = verbose) | Log screenshot-helper failures instead of failing the step |
+| `E2E_API_URL` | `http://localhost:3011/api/v1` | Backend API base for the liquidity/safety flow |
+| `E2E_PASSENGER_ID` | `100004` | Seed/dev-auth passenger |
+| `E2E_DRIVER_ID` | `100001` | Seed/dev-auth driver |
 
 `vk_ts` auth timestamps are generated fresh on every `authUrl()` call (single
 timestamp per run expires after the 5-min server window on long runs).
@@ -62,6 +68,8 @@ timestamp per run expires after the 5-min server window on long runs).
 13. Driver completes trip (departureTime in past)
 14. Passenger leaves review (5★ + comment)
 15. Mini-app: `/profile/notifications` → VK push notifications block (banner «Включить» or «Включены»)
+
+The separate `liquidity-safety.mjs` flow checks RideRequest creation, driver matching visibility, pause transition and cleanup. It does not create a booking automatically.
 
 ## Artifacts
 
