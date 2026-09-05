@@ -250,6 +250,15 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     });
   };
 
+  const handleReportTrip = async () => {
+    const module = await loadModule(() => import("@/modals/ReportModal/ReportModal"));
+    if (!module) return;
+    modalApi.openCustomModalPage({
+      component: module.ReportModal,
+      additionalProps: { targetType: "trip", targetId: trip.id },
+    });
+  };
+
   const canBook =
     !isOwnTrip &&
     isTripActive(trip.status) &&
@@ -601,6 +610,10 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       <Box padding="system">
         <Button size="m" mode="secondary" stretched onClick={() => void handleShareTrip()}>
           Поделиться поездкой
+        </Button>
+        <Spacing size={8} />
+        <Button size="m" mode="tertiary" stretched onClick={() => void handleReportTrip()}>
+          Пожаловаться на поездку
         </Button>
       </Box>
 

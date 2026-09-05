@@ -96,6 +96,12 @@ const feedbackRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/feedback")),
 });
 
+const reportsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/reports",
+  component: lazyRouteComponent(() => import("./pages/reports")),
+});
+
 const citiesRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: "/cities",
@@ -118,6 +124,7 @@ const routeTree = rootRoute.addChildren([
     bookingsRoute,
     reviewsRoute,
     feedbackRoute,
+    reportsRoute,
     citiesRoute,
     settingsRoute,
   ]),

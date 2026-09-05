@@ -6,6 +6,7 @@ import {
   LogOut,
   MapPin,
   MessageSquare,
+  Flag,
   Route,
   Settings,
   Users,
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/bookings", label: "Bookings", icon: CalendarCheck },
   { to: "/reviews", label: "Reviews", icon: MessageSquare },
   { to: "/feedback", label: "Feedback", icon: LifeBuoy },
+  { to: "/reports", label: "Жалобы", icon: Flag },
   { to: "/cities", label: "Города", icon: MapPin },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;

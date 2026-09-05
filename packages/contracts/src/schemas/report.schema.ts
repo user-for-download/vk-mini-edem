@@ -15,6 +15,7 @@ export const REPORT_STATUSES = ["pending", "in_review", "resolved", "rejected"] 
 export const reportCategorySchema = z.enum(REPORT_CATEGORIES);
 export const reportTargetTypeSchema = z.enum(REPORT_TARGET_TYPES);
 export const reportStatusSchema = z.enum(REPORT_STATUSES);
+export type ReportTargetType = z.infer<typeof reportTargetTypeSchema>;
 
 export const reportSchema = z.object({
   id: z.string().uuid(),
