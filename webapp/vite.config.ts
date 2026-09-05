@@ -14,11 +14,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (id.includes("react") || id.includes("react-dom")) return "react-vendor";
-          if (id.includes("@tanstack/react-router") || id.includes("@tanstack/react-query")) return "router-query";
-          if (id.includes("lucide-react") || id.includes("radix-ui") || id.includes("sonner")) return "ui-vendor";
-          if (id.includes("/zod/")) return "zod";
+          const normalizedId = id.replaceAll("\\", "/");
+          if (!normalizedId.includes("/node_modules/")) return undefined;
+          if (normalizedId.includes("/node_modules/react-dom/")) return "react-dom-vendor";
+          if (normalizedId.includes("/node_modules/react/")) return "react-vendor";
+          if (normalizedId.includes("/node_modules/@tanstack/react-router/") || normalizedId.includes("/node_modules/@tanstack/react-query/")) return "router-query";
+          if (normalizedId.includes("/node_modules/lucide-react/") || normalizedId.includes("/node_modules/radix-ui/") || normalizedId.includes("/node_modules/sonner/")) return "ui-vendor";
+          if (normalizedId.includes("/node_modules/zod/")) return "zod";
           return "vendor";
         },
       },
