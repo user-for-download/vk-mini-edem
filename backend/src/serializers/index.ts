@@ -85,7 +85,7 @@ export function serializeUser(
       ? { vkUserId: user.vkUserId }
       : {}),
     name: isDeleted ? "Удалённый пользователь" : user.name,
-    avatar: DEFAULT_AVATAR_URL,
+    avatar: isDeleted ? DEFAULT_AVATAR_URL : user.avatar || DEFAULT_AVATAR_URL,
     rating: user.rating,
     reviewsCount: user.reviewsCount,
     tripsCount: user.tripsCount,

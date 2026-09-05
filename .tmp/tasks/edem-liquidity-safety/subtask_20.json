@@ -1,8 +1,45 @@
 {
-  "id": "edem-liquidity-safety-20", "seq": "20", "title": "S5: выполнить полный typecheck, unit и integration suite", "status": "pending", "depends_on": ["19"], "parallel": true, "suggested_agent": "BuildAgent",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md", "package.json"], "reference_files": ["backend", "mini-app", "webapp", "packages/contracts"],
-  "deliverables": ["Полный отчёт typecheck/test/lint/format/bundle/build", "Исправления найденных регрессий"],
-  "acceptance_criteria": ["Все workspace tests проходят", "typecheck/lint/format/bundle budgets проходят", "Нет новых flaky tests или unhandled warnings"],
-  "commands": ["npm run typecheck", "npm test", "npm run lint", "npm run format:check", "npm run bundle:check", "npm run build"],
-  "risks": ["Суммарный bundle может превысить установленный лимит"]
+  "id": "edem-liquidity-safety-20",
+  "seq": "20",
+  "title": "S5: выполнить полный typecheck, unit и integration suite",
+  "status": "completed",
+  "depends_on": [
+    "19"
+  ],
+  "parallel": true,
+  "suggested_agent": "BuildAgent",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T14:29:00.447Z",
+  "completion_summary": "Full typecheck, backend 403 tests, mini-app 165 tests and build checks completed",
+  "context_files": [
+    "MEMORY.md",
+    "package.json"
+  ],
+  "reference_files": [
+    "backend",
+    "mini-app",
+    "webapp",
+    "packages/contracts"
+  ],
+  "deliverables": [
+    "Полный отчёт typecheck/test/lint/format/bundle/build",
+    "Исправления найденных регрессий"
+  ],
+  "acceptance_criteria": [
+    "Все workspace tests проходят",
+    "typecheck/lint/format/bundle budgets проходят",
+    "Нет новых flaky tests или unhandled warnings"
+  ],
+  "commands": [
+    "npm run typecheck",
+    "npm test",
+    "npm run lint",
+    "npm run format:check",
+    "npm run bundle:check",
+    "npm run build"
+  ],
+  "risks": [
+    "Суммарный bundle может превысить установленный лимит"
+  ]
 }
