@@ -1,8 +1,44 @@
 {
-  "id": "edem-liquidity-safety-15", "seq": "15", "title": "S4: спроектировать deletion/anonymization mapping", "status": "pending", "depends_on": ["03", "04", "11"], "parallel": false, "suggested_agent": "TaskManager",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/prisma/schema.prisma", "backend/src/serializers/index.ts", "backend/src/auth/tokens.ts", "backend/src/admin/serializers.ts"],
-  "deliverables": ["Data retention matrix по User relations", "Anonymization mapping и re-login policy", "Операционная/юридическая checklist"],
-  "acceptance_criteria": ["Активные obligations имеют явную policy, не отменяются молча", "Исторические trip/booking/review/report связи не ломаются", "Публичные поля анонимизируются, секреты и tokens удаляются/revoked", "Повторный VK login однозначно обрабатывается"],
-  "commands": ["npm run prisma:validate"],
-  "risks": ["Нельзя восстановить анонимизированные данные; policy должна быть подтверждена"]
+  "id": "edem-liquidity-safety-15",
+  "seq": "15",
+  "title": "S4: спроектировать deletion/anonymization mapping",
+  "status": "completed",
+  "depends_on": [
+    "03",
+    "04",
+    "11"
+  ],
+  "parallel": false,
+  "suggested_agent": "TaskManager",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T13:57:06.725Z",
+  "completion_summary": "Deletion retention matrix and concurrency/privacy policy documented",
+  "context_files": [
+    "MEMORY.md",
+    ".tmp/tasks/edem-liquidity-safety/deletion-retention-matrix.md"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "backend/src/serializers/index.ts",
+    "backend/src/auth/tokens.ts",
+    "backend/src/admin/serializers.ts"
+  ],
+  "deliverables": [
+    "Data retention matrix по User relations",
+    "Anonymization mapping и re-login policy",
+    "Операционная/юридическая checklist"
+  ],
+  "acceptance_criteria": [
+    "Активные obligations имеют явную policy, не отменяются молча",
+    "Исторические trip/booking/review/report связи не ломаются",
+    "Публичные поля анонимизируются, секреты и tokens удаляются/revoked",
+    "Повторный VK login однозначно обрабатывается"
+  ],
+  "commands": [
+    "npm run prisma:validate"
+  ],
+  "risks": [
+    "Нельзя восстановить анонимизированные данные; policy должна быть подтверждена"
+  ]
 }
