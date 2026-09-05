@@ -90,3 +90,33 @@ jobs:
 
       - name: Mini-app tests
         run: npm run --workspace mini-app test
+
+  # Замер скорости bun install vs npm ci — только измерение, прод-рантайм не трогаем.
+  # Отдельная job на отдельном раннере: основную job checks не замедляет и не ломает.
+  install-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Benchmark bun install (cold, no lockfile)
+        run: |
+          rm -f bun.lock bun.lockb
+          /usr/bin/time -v bun install --no-progress 2>&1 | tail -20 || bun install --no-progress
+          echo "--- node_modules size (bun) ---"
+          du -sh node_modules
+
+      - name: Benchmark npm ci (cold cache, for comparison)
+        run: |
+          rm -rf node_modules
+          npm cache clean --force
+          /usr/bin/time -v npm ci --no-audit --no-fund 2>&1 | tail -20 || npm ci --no-audit --no-fund
+          echo "--- node_modules size (npm) ---"
+          du -sh node_modules
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
