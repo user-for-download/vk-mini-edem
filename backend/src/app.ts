@@ -15,6 +15,7 @@ import { usersRouter } from "./users/index.js";
 import { adminRouter } from "./admin/index.js";
 import { citiesRouter } from "./cities/index.js";
 import { notificationsRouter } from "./notifications/index.js";
+import { rideRequestsRouter } from "./rideRequests/index.js";
 import { createWsHandler } from "./ws/index.js";
 
 import { env } from "./env.js";
@@ -212,6 +213,7 @@ app.route("/api/v1/bookings", bookingsRouter);
 app.route("/api/v1/reviews", reviewsRouter);
 app.route("/api/v1/feedback", feedbackRouter);
 app.route("/api/v1/notifications", notificationsRouter);
+app.route("/api/v1/ride-requests", rideRequestsRouter);
 app.route("/api/v1/users", usersRouter);
 app.route("/api/v1/cities", citiesRouter);
 app.route("/api/v1/admin", adminRouter);
