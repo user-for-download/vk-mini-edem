@@ -10,6 +10,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("react") || id.includes("react-dom")) return "react-vendor";
+          if (id.includes("@tanstack/react-router") || id.includes("@tanstack/react-query")) return "router-query";
+          if (id.includes("lucide-react") || id.includes("radix-ui") || id.includes("sonner")) return "ui-vendor";
+          if (id.includes("/zod/")) return "zod";
+          return "vendor";
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
