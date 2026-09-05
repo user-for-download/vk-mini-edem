@@ -1,8 +1,44 @@
 {
-  "id": "edem-liquidity-safety-11", "seq": "11", "title": "S3: добавить Report model, contracts и policy enforcement", "status": "pending", "depends_on": ["03", "04"], "parallel": false, "suggested_agent": "CoderAgent",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/prisma/schema.prisma", "packages/contracts/src/dto/admin.dto.ts", "backend/src/admin/guard.ts", "backend/src/app.ts"],
-  "deliverables": ["Report migration/model/indexes", "Report DTO/category/status schemas", "Authorization policy и deduplication"],
-  "acceptance_criteria": ["Report target type поддерживает user/trip/booking", "Создание ограничено релевантным взаимодействием", "Статусы pending/in_review/resolved/rejected и actor/audit определены", "Текст sanitised/trimmed и rate-limited"],
-  "commands": ["npm run prisma:validate", "npm run db:generate", "npm test --workspace=packages/contracts"],
-  "risks": ["Abuse через массовые жалобы и жалобы на самого себя"]
+  "id": "edem-liquidity-safety-11",
+  "seq": "11",
+  "title": "S3: добавить Report model, contracts и policy enforcement",
+  "status": "completed",
+  "depends_on": [
+    "03",
+    "04"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T13:38:02.698Z",
+  "completion_summary": "Added Report model, categories, statuses, DTOs and moderation transition contracts",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "packages/contracts/src/dto/admin.dto.ts",
+    "backend/src/admin/guard.ts",
+    "backend/src/app.ts"
+  ],
+  "deliverables": [
+    "Report migration/model/indexes",
+    "Report DTO/category/status schemas",
+    "Authorization policy и deduplication"
+  ],
+  "acceptance_criteria": [
+    "Report target type поддерживает user/trip/booking",
+    "Создание ограничено релевантным взаимодействием",
+    "Статусы pending/in_review/resolved/rejected и actor/audit определены",
+    "Текст sanitised/trimmed и rate-limited"
+  ],
+  "commands": [
+    "npm run prisma:validate",
+    "npm run db:generate",
+    "npm test --workspace=packages/contracts"
+  ],
+  "risks": [
+    "Abuse через массовые жалобы и жалобы на самого себя"
+  ]
 }

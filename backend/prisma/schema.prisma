@@ -44,6 +44,8 @@ model User {
   refreshTokens RefreshToken[]
   feedbacks     Feedback[]
   rideRequests  RideRequest[]
+  reportsMade   Report[] @relation("ReportReporter")
+  reportsHandled Report[] @relation("ReportAdminActor")
 }
 
 model RefreshToken {
@@ -187,6 +189,28 @@ model RideRequest {
   @@index([status, expiresAt])
   @@index([fromCityId, toCityId, status, earliestAt])
   @@index([userId, status])
+}
+
+model Report {
+  id              String   @id @default(uuid())
+  reporterId      String
+  targetType      String   // user, trip, booking
+  targetId        String
+  category        String   // safety, fraud, harassment, spam, inaccurate_info, other
+  description     String
+  status          String   @default("pending") // pending, in_review, resolved, rejected
+  resolutionNote  String?
+  adminActorId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  resolvedAt      DateTime?
+
+  reporter   User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  adminActor User? @relation("ReportAdminActor", fields: [adminActorId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([targetType, targetId, status])
+  @@index([reporterId, targetType, targetId, category])
 }
 
 model Booking {
