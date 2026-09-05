@@ -22,7 +22,10 @@ import type { PassengerBookingScope } from "@/types";
 
 // VKUI SegmentedControl принимает mutable-массив options — разовый спред
 // статичного списка (вычисляется один раз на уровне модуля).
-const BOOKING_SCOPE_OPTIONS: Array<{ label: string; value: PassengerBookingScope }> = [
+const BOOKING_SCOPE_OPTIONS: Array<{
+  label: string;
+  value: PassengerBookingScope;
+}> = [
   { label: "Активные", value: "active" },
   { label: "История", value: "history" },
 ];
@@ -44,20 +47,12 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
 }) => {
   const [tab, setTab] = useState<PassengerBookingScope>("active");
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useMyBookingsQuery();
+  const { data, isLoading, isError, error, refetch } = useMyBookingsQuery();
 
   const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
 
   const visibleBookings = useMemo(() => {
-    const bookings = (data ?? []).filter(
-      (booking) => booking.scope === tab
-    );
+    const bookings = (data ?? []).filter((booking) => booking.scope === tab);
 
     return [...bookings].sort((a, b) => {
       const aTime = a.trip.departureAt ? Date.parse(a.trip.departureAt) : 0;
@@ -80,89 +75,95 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <div>
-      <Group>
-        <Box padding="system">
-          <SegmentedControl<PassengerBookingScope>
-            value={tab}
-            onChange={(value) => setTab(value)}
-            options={[...BOOKING_SCOPE_OPTIONS]}
-          />
-        </Box>
-      </Group>
-
-      <Group>
-        {isLoading && (
-          <Box padding="system">
-            <Flex direction="column" gap={12} aria-busy="true">
-              <TripCardSkeleton />
-              <TripCardSkeleton />
-            </Flex>
-          </Box>
-        )}
-
-        {isError && (
-          <EmptyState
-            title="Не удалось загрузить поездки"
-            subtitle={
-              error instanceof Error
-                ? error.message
-                : "Попробуйте обновить список позже"
-            }
-            action={
-              <Box padding="system">
-                <Button size="m" mode="primary" onClick={() => refetch()}>
-                  Попробовать снова
-                </Button>
-              </Box>
-            }
-          />
-        )}
-
-        {!isLoading && !isError && visibleBookings.length > 0 && (
-          <Box padding="system">
-            <Flex
-              direction="column"
-              gap={12}
-              aria-live="polite"
-              aria-label={`Список поездок, всего ${visibleBookings.length}`}
-            >
-              {visibleBookings.map((booking) => (
-              <PassengerTripCard
-                key={booking.id}
-                booking={booking}
-                onOpen={() => onOpenTrip(booking.trip)}
-                onOpenReview={onOpenReview}
+        <div>
+          <Group>
+            <Box padding="system">
+              <SegmentedControl<PassengerBookingScope>
+                value={tab}
+                onChange={(value) => setTab(value)}
+                options={[...BOOKING_SCOPE_OPTIONS]}
               />
-            ))}
-            </Flex>
-          </Box>
-        )}
+            </Box>
+          </Group>
 
-        {!isLoading && !isError && visibleBookings.length === 0 && tab === "active" && (
-          <EmptyState
-            title="Нет активных броней"
-            subtitle="Найдите поездку и отправьте заявку водителю"
-            action={
+          <Group>
+            {isLoading && (
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={onGoSearch}>
-                  Найти поездку
-                </Button>
+                <Flex direction="column" gap={12} aria-busy="true">
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                </Flex>
               </Box>
-            }
-          />
-        )}
+            )}
 
-        {!isLoading && !isError && visibleBookings.length === 0 && tab === "history" && (
-          <EmptyState
-            title="История пуста"
-            subtitle="Здесь будут ваши прошлые поездки"
-          />
-        )}
-      </Group>
+            {isError && (
+              <EmptyState
+                title="Не удалось загрузить поездки"
+                subtitle={
+                  error instanceof Error
+                    ? error.message
+                    : "Попробуйте обновить список позже"
+                }
+                action={
+                  <Box padding="system">
+                    <Button size="l" mode="primary" onClick={() => refetch()}>
+                      Попробовать снова
+                    </Button>
+                  </Box>
+                }
+              />
+            )}
 
-      <Spacing size={24} />
-      </div>
+            {!isLoading && !isError && visibleBookings.length > 0 && (
+              <Box padding="system">
+                <Flex
+                  direction="column"
+                  gap={12}
+                  aria-live="polite"
+                  aria-label={`Список поездок, всего ${visibleBookings.length}`}
+                >
+                  {visibleBookings.map((booking) => (
+                    <PassengerTripCard
+                      key={booking.id}
+                      booking={booking}
+                      onOpen={() => onOpenTrip(booking.trip)}
+                      onOpenReview={onOpenReview}
+                    />
+                  ))}
+                </Flex>
+              </Box>
+            )}
+
+            {!isLoading &&
+              !isError &&
+              visibleBookings.length === 0 &&
+              tab === "active" && (
+                <EmptyState
+                  title="Нет активных броней"
+                  subtitle="Найдите поездку и отправьте заявку водителю"
+                  action={
+                    <Box padding="system">
+                      <Button size="l" mode="primary" onClick={onGoSearch}>
+                        Найти поездку
+                      </Button>
+                    </Box>
+                  }
+                />
+              )}
+
+            {!isLoading &&
+              !isError &&
+              visibleBookings.length === 0 &&
+              tab === "history" && (
+                <EmptyState
+                  title="История пуста"
+                  subtitle="Здесь будут ваши прошлые поездки"
+                />
+              )}
+          </Group>
+
+          <Spacing size={24} />
+        </div>
       </PullToRefresh>
     </Panel>
   );

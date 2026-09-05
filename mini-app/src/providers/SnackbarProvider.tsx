@@ -1,7 +1,18 @@
 // mini-app/src/providers/SnackbarProvider.tsx
-import { createContext, useCallback, useContext, useRef, type FC, type PropsWithChildren } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  type FC,
+  type PropsWithChildren,
+} from "react";
 import { useSnackbarManager } from "@vkontakte/vkui";
-import { Icon28CheckCircleOutline, Icon28ErrorOutline, Icon28InfoCircleOutline } from "@vkontakte/icons";
+import {
+  Icon28CheckCircleOutline,
+  Icon28ErrorOutline,
+  Icon28InfoCircleOutline,
+} from "@vkontakte/icons";
 
 export type SnackbarType = "success" | "error" | "info";
 
@@ -30,7 +41,8 @@ export const useSnackbar = (): SnackbarApi => {
 };
 
 export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
-  const [api, contextHolder] = useSnackbarManager();
+  // offsetYEnd поднимает снеки над закреплённым Tabbar (дока useSnackbarManager).
+  const [api, contextHolder] = useSnackbarManager({ offsetYEnd: 88 });
   // dedupeKey → время последнего показа: одинаковый снекбар не спамится
   // в течение окна, но может появиться снова позже (в отличие от
   // бессрочного запоминания одного ключа).
@@ -72,18 +84,13 @@ export const SnackbarProvider: FC<PropsWithChildren> = ({ children }) => {
         duration: 4000,
         action: item.actionLabel,
         onActionClick: item.onActionClick,
-        placement: "top",
-        slotProps: {
-          root: {
-            style: {
-              inlineSize: "100vw",
-              maxInlineSize: "none",
-            },
-          },
-        },
+        // bottom + offsetYEnd: снек не уезжает под PanelHeader (как top)
+        // и не перекрывается Tabbar; без 100vw-переопределения —
+        // ширину отдаём адаптивной вёрстке библиотеки.
+        placement: "bottom",
       });
     },
-    [api]
+    [api],
   );
 
   const dismiss = useCallback(() => {

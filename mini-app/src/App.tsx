@@ -3,7 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Epic, SplitCol, SplitLayout } from "@vkontakte/vkui";
+import {
+  Epic,
+  PanelHeader,
+  SplitCol,
+  SplitLayout,
+  usePlatform,
+} from "@vkontakte/vkui";
 import {
   useActiveVkuiLocation,
   useFirstPageCheck,
@@ -11,7 +17,12 @@ import {
   usePopout,
 } from "@vkontakte/vk-mini-apps-router";
 
-import { VIEW_ACTION, VIEW_HOME, VIEW_PROFILE, type ViewId } from "@/consts/views";
+import {
+  VIEW_ACTION,
+  VIEW_HOME,
+  VIEW_PROFILE,
+  type ViewId,
+} from "@/consts/views";
 import type { Role, Trip, User } from "@/types";
 import { AppTabbar } from "@/components/AppTabbar";
 import { HomeView } from "@/views/HomeView/HomeView";
@@ -51,21 +62,28 @@ export default function App() {
     hasOverlay,
   } = useActiveVkuiLocation();
   const isFirstPage = useFirstPageCheck();
+  const platform = usePlatform();
   const routeNavigator = useRouteNavigator();
   const routerPopout = usePopout();
   const modalApi = useModalApi();
   const deepLinkHandledRef = useRef(false);
 
-  const openDriverProfile = useCallback(async (driverOrId: User | string) => {
-    const driverId = typeof driverOrId === "string" ? driverOrId : driverOrId.id;
-    const module = await loadModule(() => import("@/modals/DriverProfileModal/DriverProfileModal"));
-    if (!module) return;
-    const { DriverProfileModal } = module;
-    modalApi.openCustomModalCard({
-      component: DriverProfileModal,
-      additionalProps: { driverId },
-    });
-  }, [modalApi]);
+  const openDriverProfile = useCallback(
+    async (driverOrId: User | string) => {
+      const driverId =
+        typeof driverOrId === "string" ? driverOrId : driverOrId.id;
+      const module = await loadModule(
+        () => import("@/modals/DriverProfileModal/DriverProfileModal"),
+      );
+      if (!module) return;
+      const { DriverProfileModal } = module;
+      modalApi.openCustomModalCard({
+        component: DriverProfileModal,
+        additionalProps: { driverId },
+      });
+    },
+    [modalApi],
+  );
 
   useEffect(() => {
     if (deepLinkHandledRef.current) return;
@@ -106,7 +124,9 @@ export default function App() {
   };
 
   const openCreateTrip = async () => {
-    const module = await loadModule(() => import("@/modals/CreateTripModal/CreateTripModal"));
+    const module = await loadModule(
+      () => import("@/modals/CreateTripModal/CreateTripModal"),
+    );
     if (!module) return;
     const { CreateTripModal } = module;
     modalApi.openCustomModalPage({
@@ -117,7 +137,9 @@ export default function App() {
   };
 
   const openSelectReviewTrip = async () => {
-    const module = await loadModule(() => import("@/modals/SelectReviewTripModal/SelectReviewTripModal"));
+    const module = await loadModule(
+      () => import("@/modals/SelectReviewTripModal/SelectReviewTripModal"),
+    );
     if (!module) return;
     const { SelectReviewTripModal } = module;
     modalApi.openCustomModalPage({
@@ -128,7 +150,9 @@ export default function App() {
   };
 
   const openReviewForTrip = async (trip: Trip) => {
-    const module = await loadModule(() => import("@/modals/CreateReviewModal/CreateReviewModal"));
+    const module = await loadModule(
+      () => import("@/modals/CreateReviewModal/CreateReviewModal"),
+    );
     if (!module) return;
     const { CreateReviewModal } = module;
     // ModalPage — единый стиль с EditProfileModal/FeedbackModal.
@@ -143,7 +167,9 @@ export default function App() {
   };
 
   const openCarForm = async () => {
-    const module = await loadModule(() => import("@/modals/CarFormModal/CarFormModal"));
+    const module = await loadModule(
+      () => import("@/modals/CarFormModal/CarFormModal"),
+    );
     if (!module) return;
     const { CarFormModal } = module;
     modalApi.openCustomModalPage({
@@ -153,7 +179,9 @@ export default function App() {
   };
 
   const openEditProfile = async () => {
-    const module = await loadModule(() => import("@/modals/EditProfileModal/EditProfileModal"));
+    const module = await loadModule(
+      () => import("@/modals/EditProfileModal/EditProfileModal"),
+    );
     if (!module) return;
     const { EditProfileModal } = module;
     modalApi.openCustomModalPage({
@@ -166,7 +194,12 @@ export default function App() {
     <>
       <OfflineBanner isOnline={isOnline} wasOffline={wasOffline} />
       {!isFirstPage && !modal && !hasOverlay ? <SwipeBackSync /> : null}
-      <SplitLayout center>
+      {/* header-заглушка компенсирует инсеты видимых PanelHeader
+          и нужна для корректной анимации навигации (дока navigation). */}
+      <SplitLayout
+        center
+        header={platform !== "vkcom" && <PanelHeader delimiter="none" />}
+      >
         <SplitCol autoSpaced stretchedOnMobile maxWidth="720px">
           <Epic
             activeStory={activeView as ViewId}

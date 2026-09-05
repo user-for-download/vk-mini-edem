@@ -31,10 +31,11 @@ type DriverTripTab = "active" | "archive";
 
 // VKUI SegmentedControl принимает mutable-массив options — разовый спред
 // статичного списка (вычисляется один раз на уровне модуля).
-const DRIVER_TRIP_TAB_OPTIONS: Array<{ label: string; value: DriverTripTab }> = [
-  { label: "Активные", value: "active" },
-  { label: "Архив", value: "archive" },
-];
+const DRIVER_TRIP_TAB_OPTIONS: Array<{ label: string; value: DriverTripTab }> =
+  [
+    { label: "Активные", value: "active" },
+    { label: "Архив", value: "archive" },
+  ];
 
 function getSeatsLabel(trip: Trip): string {
   const pending = trip.pendingRequestsCount ?? 0;
@@ -89,7 +90,7 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
           fetchNextPage();
         }
       },
-      { rootMargin: "200px" }
+      { rootMargin: "200px" },
     );
 
     observer.observe(sentinel);
@@ -118,98 +119,107 @@ export const TripsManagePanel: FC<TripsManagePanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <div>
+        <div>
+          <Group>
+            <Box padding="system">
+              <SegmentedControl<DriverTripTab>
+                value={tab}
+                onChange={(value) => setTab(value)}
+                options={[...DRIVER_TRIP_TAB_OPTIONS]}
+              />
+            </Box>
+          </Group>
 
-      <Group>
-        <Box padding="system">
-          <SegmentedControl<DriverTripTab>
-            value={tab}
-            onChange={(value) => setTab(value)}
-            options={[...DRIVER_TRIP_TAB_OPTIONS]}
-          />
-        </Box>
-      </Group>
-
-      <Group>
-        {isLoading && (
-          <Box padding="system">
-            <Flex
-              direction="column"
-              gap={12}
-              aria-busy="true"
-              aria-label="Загрузка списка поездок"
-            >
-              <TripCardSkeleton />
-              <TripCardSkeleton />
-            </Flex>
-          </Box>
-        )}
-
-        {isError && (
-          <EmptyState
-            title="Не удалось загрузить поездки"
-            subtitle={
-              error instanceof Error
-                ? error.message
-                : "Попробуйте обновить список позже"
-            }
-            action={
+          <Group>
+            {isLoading && (
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={() => refetch()}>
-                  Попробовать снова
-                </Button>
+                <Flex
+                  direction="column"
+                  gap={12}
+                  aria-busy="true"
+                  aria-label="Загрузка списка поездок"
+                >
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                </Flex>
               </Box>
-            }
-          />
-        )}
+            )}
 
-        {!isLoading && !isError && myTrips.length > 0 && (
-          <Box padding="system">
-            <Flex direction="column" gap={12}>
-              {myTrips.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  onOpen={onOpenTrip}
-                  seatsLabel={getSeatsLabel(trip)}
-                  archivedStatus={
-                    tab === "archive"
-                      ? (trip.status as "completed" | "cancelled")
-                      : undefined
+            {isError && (
+              <EmptyState
+                title="Не удалось загрузить поездки"
+                subtitle={
+                  error instanceof Error
+                    ? error.message
+                    : "Попробуйте обновить список позже"
+                }
+                action={
+                  <Box padding="system">
+                    <Button size="l" mode="primary" onClick={() => refetch()}>
+                      Попробовать снова
+                    </Button>
+                  </Box>
+                }
+              />
+            )}
+
+            {!isLoading && !isError && myTrips.length > 0 && (
+              <Box padding="system">
+                <Flex direction="column" gap={12}>
+                  {myTrips.map((trip) => (
+                    <TripCard
+                      key={trip.id}
+                      trip={trip}
+                      onOpen={onOpenTrip}
+                      seatsLabel={getSeatsLabel(trip)}
+                      archivedStatus={
+                        tab === "archive"
+                          ? (trip.status as "completed" | "cancelled")
+                          : undefined
+                      }
+                    />
+                  ))}
+                  {/* eslint-disable-next-line react/forbid-dom-props */}
+                  <div ref={sentinelRef} style={{ height: 1 }} />
+                  {isFetchingNextPage && <TripCardSkeleton />}
+                </Flex>
+              </Box>
+            )}
+
+            {!isLoading &&
+              !isError &&
+              myTrips.length === 0 &&
+              tab === "active" && (
+                <EmptyState
+                  title="Нет активных поездок"
+                  subtitle="Опубликуйте маршрут — и попутчики смогут отправить заявку"
+                  action={
+                    <Box padding="system">
+                      <Button
+                        size="l"
+                        mode="primary"
+                        onClick={onOpenCreateTrip}
+                      >
+                        Создать поездку
+                      </Button>
+                    </Box>
                   }
                 />
-              ))}
-              {/* eslint-disable-next-line react/forbid-dom-props */}
-              <div ref={sentinelRef} style={{ height: 1 }} />
-              {isFetchingNextPage && <TripCardSkeleton />}
-            </Flex>
-          </Box>
-        )}
+              )}
 
-        {!isLoading && !isError && myTrips.length === 0 && tab === "active" && (
-          <EmptyState
-            title="Нет активных поездок"
-            subtitle="Опубликуйте маршрут — и попутчики смогут отправить заявку"
-            action={
-              <Box padding="system">
-                <Button size="m" mode="primary" onClick={onOpenCreateTrip}>
-                  Создать поездку
-                </Button>
-              </Box>
-            }
-          />
-        )}
+            {!isLoading &&
+              !isError &&
+              myTrips.length === 0 &&
+              tab === "archive" && (
+                <EmptyState
+                  title="Архив пуст"
+                  subtitle="Здесь будут завершенные и отмененные поездки"
+                />
+              )}
+          </Group>
 
-        {!isLoading && !isError && myTrips.length === 0 && tab === "archive" && (
-          <EmptyState
-            title="Архив пуст"
-            subtitle="Здесь будут завершенные и отмененные поездки"
-          />
-        )}
-      </Group>
-
-      <Spacing size={24} />
-      </div>
+          <Spacing size={24} />
+        </div>
       </PullToRefresh>
     </Panel>
   );

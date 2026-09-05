@@ -6,8 +6,8 @@ import {
   Flex,
   ModalCard,
   Spacing,
+  Spinner,
   Text,
-  ScreenSpinner,
 } from "@vkontakte/vkui";
 import type { CustomModalProps, OpenModalCardProps } from "@vkontakte/vkui";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -67,16 +67,12 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
 
   if (isLoadingDriver) {
     return (
-      <ModalCard
-        {...modalProps}
-        title={title}
-      >
-        <Box
-          padding="system"
-          paddingBlockStart={0}
-        >
+      <ModalCard {...modalProps} title={title}>
+        <Box padding="system" paddingBlockStart={0}>
           <Flex justify="center" direction="column" align="center" gap={8}>
-            <ScreenSpinner state="loading" />
+            {/* Spinner вместо ScreenSpinner: полноэкранный оверлей
+                накрыл бы весь экран, а не карточку. */}
+            <Spinner size="l" aria-label="Загрузка профиля" />
             <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
               Загрузка профиля
             </Text>
@@ -121,7 +117,7 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       return (
         <Box padding="system" style={{ textAlign: "center" }}>
           <Flex justify="center" direction="column" align="center" gap={8}>
-            <ScreenSpinner state="loading" />
+            <Spinner size="l" aria-label="Загрузка отзывов" />
             <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
               Загрузка отзывов
             </Text>
@@ -189,18 +185,15 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
       title={driver.name}
       description={driver.isVerified ? "Личность подтверждена" : undefined}
     >
-      <Box
-        padding="system"
-        paddingBlockStart={0}
-      >
+      <Box padding="system" paddingBlockStart={0}>
         <Flex direction="column" align="center" gap={12}>
-          <Avatar
-            src={resolveAvatar(driver.avatar)}
-            size={72}
-          />
+          <Avatar src={resolveAvatar(driver.avatar)} size={72} />
 
           <Flex justify="center">
-            <RatingBadge value={driver.rating} reviewsCount={driver.reviewsCount} />
+            <RatingBadge
+              value={driver.rating}
+              reviewsCount={driver.reviewsCount}
+            />
           </Flex>
 
           <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
@@ -212,22 +205,25 @@ export const DriverProfileModal: FC<DriverProfileModalProps> = ({
           {driver.car && (
             <>
               <Spacing size={12} />
-              <Text weight="2">{driver.car.model} · {driver.car.color}</Text>
+              <Text weight="2">
+                {driver.car.model} · {driver.car.color}
+              </Text>
             </>
           )}
 
           {driver.about && (
-            <Text style={{ textAlign: "center", color: "var(--vkui--color_text_secondary)" }}>
+            <Text
+              style={{
+                textAlign: "center",
+                color: "var(--vkui--color_text_secondary)",
+              }}
+            >
               {driver.about}
             </Text>
           )}
         </Flex>
       </Box>
-      <Box>
-        {renderReviews()}
-      </Box>
-
-
+      <Box>{renderReviews()}</Box>
     </ModalCard>
   );
 };

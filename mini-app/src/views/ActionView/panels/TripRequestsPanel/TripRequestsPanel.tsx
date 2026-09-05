@@ -24,7 +24,10 @@ import { RouteLine } from "@/components/RouteLine";
 import { EmptyState } from "@/components/EmptyState";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useModalApi } from "@/providers/ModalProvider";
-import { useCancelTripMutation, useCompleteTripMutation } from "@/queries/useTripsQuery";
+import {
+  useCancelTripMutation,
+  useCompleteTripMutation,
+} from "@/queries/useTripsQuery";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { useConfirm } from "@/providers/ConfirmProvider";
 import { loadModule } from "@/helpers/loadModule";
@@ -40,7 +43,10 @@ export interface TripRequestsPanelProps {
   isRefreshing: boolean;
   onBack: () => void;
   onRefresh: () => void | Promise<void>;
-  onSetStatus: (bookingId: string, status: DriverBookingAction) => Promise<void>;
+  onSetStatus: (
+    bookingId: string,
+    status: DriverBookingAction,
+  ) => Promise<void>;
   onRetry: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
@@ -92,7 +98,8 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
 
     const confirmed = await confirm({
       title: "Отменить поездку?",
-      description: "Поездка станет недоступна, а пассажиры получат уведомление об отмене.",
+      description:
+        "Поездка станет недоступна, а пассажиры получат уведомление об отмене.",
       confirmTitle: "Отменить поездку",
     });
     if (!confirmed) return;
@@ -123,7 +130,8 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
 
     const confirmed = await confirm({
       title: "Завершить поездку?",
-      description: "Поездка будет перенесена в архив, а пассажиры смогут оставить отзывы.",
+      description:
+        "Поездка будет перенесена в архив, а пассажиры смогут оставить отзывы.",
       confirmTitle: "Завершить",
       confirmMode: "default",
     });
@@ -168,9 +176,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
       >
         <PanelHeaderContent
           subtitle={
-            trip
-              ? `${trip.fromCity} → ${trip.toCity}, ${trip.date}`
-              : undefined
+            trip ? `${trip.fromCity} → ${trip.toCity}, ${trip.date}` : undefined
           }
         >
           Управление поездкой
@@ -178,143 +184,155 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <div>
-
-      {trip && (
-        <Group>
-          <Box padding="system">
-            <RouteLine
-              from={{ city: trip.fromCity, address: trip.fromAddress }}
-              to={{ city: trip.toCity, address: trip.toAddress }}
-            />
-            <Spacing size={12} />
-            <SimpleGrid columns={2} gap={12}>
-              <InfoRow header="Цена">
-                {trip.price.toLocaleString("ru-RU")} ₽
-              </InfoRow>
-              <InfoRow header="Свободно мест">
-                {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
-              </InfoRow>
-            </SimpleGrid>
-
-            {trip.status === "active" && (
-              <>
-                <Spacing size={16} />
-                <Button
-                  size="m"
-                  mode="secondary"
-                  stretched
-                  onClick={handleEditTrip}
-                  disabled={cancelTrip.isPending || completeTrip.isPending}
-                >
-                  Редактировать поездку
-                </Button>
-                <Spacing size={8} />
-                <ButtonGroup mode="horizontal" gap="s" stretched>
-                  <Button
-                    size="m"
-                    mode="primary"
-                    appearance="positive"
-                    stretched
-                    onClick={handleCompleteTrip}
-                    loading={completeTrip.isPending}
-                    disabled={!canComplete || cancelTrip.isPending}
-                  >
-                    Завершить
-                  </Button>
-                  <Button
-                    size="m"
-                    mode="secondary"
-                    appearance="negative"
-                    stretched
-                    onClick={handleCancelTrip}
-                    loading={cancelTrip.isPending}
-                    disabled={completeTrip.isPending}
-                  >
-                    Отменить
-                  </Button>
-                </ButtonGroup>
-                {!canComplete && (
-                  <Caption
-                    level="1"
-                    style={{ textAlign: "center", color: "var(--vkui--color_text_secondary)" }}
-                  >
-                    Завершение будет доступно после времени отправления
-                  </Caption>
-                )}
-              </>
-            )}
-
-            {trip.status === "cancelled" && (
-              <FormStatus mode="default" title="Поездка отменена">
-                Эта поездка больше недоступна для бронирования.
-              </FormStatus>
-            )}
-            {trip.status === "completed" && (
-              <FormStatus mode="default" title="Поездка завершена">
-                Пассажиры могут оставить отзыв.
-              </FormStatus>
-            )}
-          </Box>
-        </Group>
-      )}
-
-      <Group header={<Header size="s">Заявки ({bookings.length})</Header>}>
-        {isLoading && (
-          <Box padding="system">
-            <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
-              Загрузка заявок...
-            </Text>
-          </Box>
-        )}
-
-        {isError && (
-          <EmptyState
-            title="Не удалось загрузить заявки"
-            subtitle="Попробуйте обновить страницу или повторить позже"
-            action={
+        <div>
+          {trip && (
+            <Group>
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={onRetry}>
-                  Попробовать снова
-                </Button>
+                <RouteLine
+                  from={{ city: trip.fromCity, address: trip.fromAddress }}
+                  to={{ city: trip.toCity, address: trip.toAddress }}
+                />
+                <Spacing size={12} />
+                <SimpleGrid columns={2} gap={12}>
+                  <InfoRow header="Цена">
+                    {trip.price.toLocaleString("ru-RU")} ₽
+                  </InfoRow>
+                  <InfoRow header="Свободно мест">
+                    {`${trip.seatsAvailable} из ${trip.seatsTotal}`}
+                  </InfoRow>
+                </SimpleGrid>
+
+                {trip.status === "active" && (
+                  <>
+                    <Spacing size={16} />
+                    <Button
+                      size="m"
+                      mode="secondary"
+                      stretched
+                      onClick={handleEditTrip}
+                      disabled={cancelTrip.isPending || completeTrip.isPending}
+                    >
+                      Редактировать поездку
+                    </Button>
+                    <Spacing size={8} />
+                    <ButtonGroup mode="horizontal" gap="s" stretched>
+                      <Button
+                        size="m"
+                        mode="primary"
+                        appearance="positive"
+                        stretched
+                        onClick={handleCompleteTrip}
+                        loading={completeTrip.isPending}
+                        disabled={!canComplete || cancelTrip.isPending}
+                      >
+                        Завершить
+                      </Button>
+                      <Button
+                        size="m"
+                        mode="secondary"
+                        appearance="negative"
+                        stretched
+                        onClick={handleCancelTrip}
+                        loading={cancelTrip.isPending}
+                        disabled={completeTrip.isPending}
+                      >
+                        Отменить
+                      </Button>
+                    </ButtonGroup>
+                    {!canComplete && (
+                      <Caption
+                        level="1"
+                        style={{
+                          textAlign: "center",
+                          color: "var(--vkui--color_text_secondary)",
+                        }}
+                      >
+                        Завершение будет доступно после времени отправления
+                      </Caption>
+                    )}
+                  </>
+                )}
+
+                {trip.status === "cancelled" && (
+                  <FormStatus mode="default" title="Поездка отменена">
+                    Эта поездка больше недоступна для бронирования.
+                  </FormStatus>
+                )}
+                {trip.status === "completed" && (
+                  <FormStatus mode="default" title="Поездка завершена">
+                    Пассажиры могут оставить отзыв.
+                  </FormStatus>
+                )}
               </Box>
-            }
-          />
-        )}
+            </Group>
+          )}
 
-        {!isLoading && !isError && bookings.length > 0 && (
-          <Box
-            aria-live="polite"
-            aria-label={`Список заявок, ${bookings.length}`}
-          >
-             {bookings.map((booking) => (
-              <BookingRequestRow
-                key={booking.id}
-                booking={booking}
-                onSetStatus={onSetStatus}
-                onOpenProfile={() => {
-                  void openUserProfileModal(modalApi, booking.passenger.id, "Профиль пассажира");
-                }}
+          <Group header={<Header size="s">Заявки ({bookings.length})</Header>}>
+            {isLoading && (
+              <Box padding="system">
+                <Text style={{ color: "var(--vkui--color_text_secondary)" }}>
+                  Загрузка заявок...
+                </Text>
+              </Box>
+            )}
+
+            {isError && (
+              <EmptyState
+                title="Не удалось загрузить заявки"
+                subtitle="Попробуйте обновить страницу или повторить позже"
+                action={
+                  <Box padding="system">
+                    <Button size="l" mode="primary" onClick={onRetry}>
+                      Попробовать снова
+                    </Button>
+                  </Box>
+                }
               />
-             ))}
-             {hasNextPage && (
-               <Box padding="system">
-                 <Button size="m" mode="secondary" stretched onClick={onLoadMore} loading={isFetchingNextPage}>
-                   Загрузить ещё
-                 </Button>
-               </Box>
-             )}
-          </Box>
-        )}
+            )}
 
-        {!isLoading && !isError && bookings.length === 0 && (
-          <EmptyState
-            title="Заявок пока нет"
-            subtitle="Как только кто-то отправит заявку, она появится здесь"
-          />
-        )}
-      </Group>
-      </div>
+            {!isLoading && !isError && bookings.length > 0 && (
+              <Box
+                aria-live="polite"
+                aria-label={`Список заявок, ${bookings.length}`}
+              >
+                {bookings.map((booking) => (
+                  <BookingRequestRow
+                    key={booking.id}
+                    booking={booking}
+                    onSetStatus={onSetStatus}
+                    onOpenProfile={() => {
+                      void openUserProfileModal(
+                        modalApi,
+                        booking.passenger.id,
+                        "Профиль пассажира",
+                      );
+                    }}
+                  />
+                ))}
+                {hasNextPage && (
+                  <Box padding="system">
+                    <Button
+                      size="m"
+                      mode="secondary"
+                      stretched
+                      onClick={onLoadMore}
+                      loading={isFetchingNextPage}
+                    >
+                      Загрузить ещё
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {!isLoading && !isError && bookings.length === 0 && (
+              <EmptyState
+                title="Заявок пока нет"
+                subtitle="Как только кто-то отправит заявку, она появится здесь"
+              />
+            )}
+          </Group>
+        </div>
       </PullToRefresh>
     </Panel>
   );

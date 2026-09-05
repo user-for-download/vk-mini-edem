@@ -1,6 +1,12 @@
 // mini-app/src/views/ActionView/panels/TripRequestsPanel/TripRequestsPanelWrapper.tsx
 import { type FC, useCallback, useMemo } from "react";
-import { Box, Button, Panel, PanelHeaderBack, ScreenSpinner } from "@vkontakte/vkui";
+import {
+  Box,
+  Button,
+  Panel,
+  PanelHeaderBack,
+  ScreenSpinner,
+} from "@vkontakte/vkui";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { useParams, useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
@@ -30,7 +36,8 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
   const currentUser = useCurrentUser();
 
   // Заявки видит только водитель поездки (driver-only эндпоинт, иначе 403).
-  const isOwnTrip = !!currentUser && !!trip && trip.driver.id === currentUser.id;
+  const isOwnTrip =
+    !!currentUser && !!trip && trip.driver.id === currentUser.id;
 
   const {
     data: bookingsData,
@@ -48,27 +55,31 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   const bookings = useMemo(
     () => bookingsData?.pages.flatMap((page) => page.items) ?? [],
-    [bookingsData]
+    [bookingsData],
   );
 
-  const handleSetStatus = useCallback(async (bookingId: string, status: DriverBookingAction) => {
-    try {
-      await updateBooking.mutateAsync({ id: bookingId, status });
-      void triggerHaptic(status === "confirmed" ? "medium" : "light");
-      enqueueSnackbar({
-        type: status === "confirmed" ? "success" : "info",
-        title: status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
-        dedupeKey: `booking_status_${bookingId}_${status}`,
-      });
-    } catch (error) {
-      enqueueSnackbar({
-        type: "error",
-        title: "Не удалось обновить заявку",
-        subtitle: error instanceof Error ? error.message : undefined,
-        dedupeKey: `booking_status_error_${bookingId}`,
-      });
-    }
-  }, [updateBooking, enqueueSnackbar]);
+  const handleSetStatus = useCallback(
+    async (bookingId: string, status: DriverBookingAction) => {
+      try {
+        await updateBooking.mutateAsync({ id: bookingId, status });
+        void triggerHaptic(status === "confirmed" ? "medium" : "light");
+        enqueueSnackbar({
+          type: status === "confirmed" ? "success" : "info",
+          title:
+            status === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
+          dedupeKey: `booking_status_${bookingId}_${status}`,
+        });
+      } catch (error) {
+        enqueueSnackbar({
+          type: "error",
+          title: "Не удалось обновить заявку",
+          subtitle: error instanceof Error ? error.message : undefined,
+          dedupeKey: `booking_status_error_${bookingId}`,
+        });
+      }
+    },
+    [updateBooking, enqueueSnackbar],
+  );
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refetchTrip(), refetchBookings()]);
@@ -80,7 +91,12 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Управление поездкой
         </AppPanelHeader>
@@ -93,7 +109,12 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Управление поездкой
         </AppPanelHeader>
@@ -102,7 +123,7 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
           subtitle="Проверьте соединение и попробуйте снова"
           action={
             <Box padding="system">
-              <Button size="m" mode="primary" onClick={() => refetchTrip()}>
+              <Button size="l" mode="primary" onClick={() => refetchTrip()}>
                 Попробовать снова
               </Button>
             </Box>
@@ -116,7 +137,12 @@ export const TripRequestsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Управление поездкой
         </AppPanelHeader>

@@ -1,6 +1,19 @@
 // mini-app/src/views/ActionView/panels/SearchPanel/SearchPanel.tsx
-import { useEffect, useMemo, useState, useRef, type FC } from "react";
-import { Accordion, Box, Button, Card, Caption, DateInput, Flex, Group, Panel, PullToRefresh, Search, Spacing } from "@vkontakte/vkui";
+import { useEffect, useId, useMemo, useState, useRef, type FC } from "react";
+import {
+  Accordion,
+  Box,
+  Button,
+  Card,
+  DateInput,
+  Flex,
+  FormItem,
+  Group,
+  Panel,
+  PullToRefresh,
+  Search,
+  Spacing,
+} from "@vkontakte/vkui";
 import type { Trip } from "@/types";
 import type { TripTag } from "@edem/contracts";
 import { TripCard } from "@/components/TripCard";
@@ -78,13 +91,20 @@ function toDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRequests }) => {
+export const SearchPanel: FC<SearchPanelProps> = ({
+  id,
+  onOpenTrip,
+  onOpenRideRequests,
+}) => {
   const currentUser = useCurrentUser();
 
   const [searchValue, setSearchValue] = useState("");
   const [selectedTags, setSelectedTags] = useState<TripTag[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
+  // Связка FormItem htmlFor ↔ DateInput id (a11y, дока FormItem).
+  const dateFromFieldId = useId();
+  const dateToFieldId = useId();
   const debouncedSearchValue = useDebouncedValue(searchValue, 400);
 
   const filters = useMemo(() => {
@@ -97,7 +117,14 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRe
   }, [debouncedSearchValue, selectedTags, dateFrom, dateTo]);
 
   const {
-    data, isLoading, isError, error, refetch, isFetchingNextPage, hasNextPage, fetchNextPage,
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
   } = useInfiniteTripsQuery(filters);
 
   const { isRefreshing, handleRefresh } = usePullToRefresh(refetch);
@@ -110,11 +137,16 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRe
       (entries) => {
         // При ошибке запроса не догружаем страницы: иначе observer будет
         // бесконечно перезапускать неудачный fetchNextPage.
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !isError) {
+        if (
+          entries[0].isIntersecting &&
+          hasNextPage &&
+          !isFetchingNextPage &&
+          !isError
+        ) {
           fetchNextPage();
         }
       },
-      { rootMargin: "200px" }
+      { rootMargin: "200px" },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -135,7 +167,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRe
       shouldFetchMoreTrips(
         results.length,
         Boolean(hasNextPage),
-        isFetchingNextPage
+        isFetchingNextPage,
       )
     ) {
       fetchNextPage();
@@ -147,132 +179,157 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRe
       <AppPanelHeader>Поиск поездок</AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <div>
-      <Group>
-        <Box padding="system" >
-          <Search
-            placeholder="Откуда — куда"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-          />
-                      </Box>
-        <Box padding="system" paddingBlockStart={0}>
-          <TagsScroll tags={TRIP_TAGS} selected={selectedTags} onChange={(next) => setSelectedTags(next as TripTag[])} />
-                                                  </Box>
-        {/* Такая же карточка, как у поездок в списке. Отступы явные,
-            в пикселях — не зависят от theme-токенов VKUI */}
-        <Box padding={16} paddingBlockStart={0}>
-          <Card mode="outline">
-            <Accordion defaultExpanded={false}>
-              <Accordion.Summary>
-                Выбор даты
-              </Accordion.Summary>
-                                  <Accordion.Content>
-                <Box padding={16} paddingBlockStart={4}>
-                  <Flex gap={8}>
-                    <Flex direction="column" gap={4} style={{ flex: 1 }}>
-                      <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>Дата от</Caption>
-                      <DateInput
-                        value={dateFrom}
-                        onChange={setDateFrom}
-                        disablePast
-                        placeholder="Не выбрано"
-                      />
-                    </Flex>
-                    <Flex direction="column" gap={4} style={{ flex: 1 }}>
-                      <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>Дата до</Caption>
-                      <DateInput
-                        value={dateTo}
-                        onChange={setDateTo}
-                        disablePast
-                        minDateTime={dateFrom ?? undefined}
-                        placeholder="Не выбрано"
-                      />
-                    </Flex>
-                  </Flex>
-                  {(dateFrom || dateTo) && (
-                    <Spacing size={8} />
-                  )}
-                  {(dateFrom || dateTo) && (
-                    <Button
-                      size="s"
-                      mode="tertiary"
-                      appearance="neutral"
-                      onClick={() => {
-                        setDateFrom(null);
-                        setDateTo(null);
-                      }}
-                    >
-                      Сбросить даты
-                    </Button>
-                  )}
-                </Box>
-              </Accordion.Content>
-            </Accordion>
-          </Card>
-        </Box>
-      </Group>
+        <div>
+          <Group>
+            <Box padding="system">
+              <Search
+                placeholder="Откуда — куда"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+              />
+            </Box>
+            <Box padding="system" paddingBlockStart={0}>
+              <TagsScroll
+                tags={TRIP_TAGS}
+                selected={selectedTags}
+                onChange={(next) => setSelectedTags(next as TripTag[])}
+              />
+            </Box>
+            {/* Карточка фильтров: отступы системными токенами VKUI. */}
+            <Box padding="system" paddingBlockStart={0}>
+              <Card mode="outline">
+                <Accordion defaultExpanded={false}>
+                  <Accordion.Summary>Выбор даты</Accordion.Summary>
+                  <Accordion.Content>
+                    <Box padding="system" paddingBlockStart={4}>
+                      <Flex gap={8}>
+                        <FormItem
+                          top="Дата от"
+                          htmlFor={dateFromFieldId}
+                          noPadding
+                          style={{ flex: 1 }}
+                        >
+                          <DateInput
+                            id={dateFromFieldId}
+                            value={dateFrom}
+                            onChange={setDateFrom}
+                            disablePast
+                            placeholder="Не выбрано"
+                          />
+                        </FormItem>
+                        <FormItem
+                          top="Дата до"
+                          htmlFor={dateToFieldId}
+                          noPadding
+                          style={{ flex: 1 }}
+                        >
+                          <DateInput
+                            id={dateToFieldId}
+                            value={dateTo}
+                            onChange={setDateTo}
+                            disablePast
+                            minDateTime={dateFrom ?? undefined}
+                            placeholder="Не выбрано"
+                          />
+                        </FormItem>
+                      </Flex>
+                      {(dateFrom || dateTo) && <Spacing size={8} />}
+                      {(dateFrom || dateTo) && (
+                        <Button
+                          size="s"
+                          mode="tertiary"
+                          appearance="neutral"
+                          onClick={() => {
+                            setDateFrom(null);
+                            setDateTo(null);
+                          }}
+                        >
+                          Сбросить даты
+                        </Button>
+                      )}
+                    </Box>
+                  </Accordion.Content>
+                </Accordion>
+              </Card>
+            </Box>
+          </Group>
 
-      <Group>
-        {isLoading && results.length === 0 && (
-          <Box padding="system">
-            <Flex
-              direction="column"
-              gap={12}
-              aria-busy="true"
-              aria-label="Загрузка списка поездок"
-            >
-              <TripCardSkeleton />
-              <TripCardSkeleton />
-              <TripCardSkeleton />
-            </Flex>
-          </Box>
-        )}
-
-        {isError && (
-          <EmptyState
-            title="Не удалось загрузить поездки"
-            subtitle={
-              error instanceof Error
-                ? error.message
-                : "Попробуйте обновить список позже"
-            }
-            action={
+          <Group>
+            {isLoading && results.length === 0 && (
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={() => refetch()}>
-                  Попробовать снова
-                </Button>
+                <Flex
+                  direction="column"
+                  gap={12}
+                  aria-busy="true"
+                  aria-label="Загрузка списка поездок"
+                >
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                </Flex>
               </Box>
-            }
-          />
-        )}
+            )}
 
-        {/* Как и в TripsManagePanel: при ошибке список с sentinel-элементом
+            {isError && (
+              <EmptyState
+                title="Не удалось загрузить поездки"
+                subtitle={
+                  error instanceof Error
+                    ? error.message
+                    : "Попробуйте обновить список позже"
+                }
+                action={
+                  <Box padding="system">
+                    <Button size="l" mode="primary" onClick={() => refetch()}>
+                      Попробовать снова
+                    </Button>
+                  </Box>
+                }
+              />
+            )}
+
+            {/* Как и в TripsManagePanel: при ошибке список с sentinel-элементом
             размонтируется, чтобы observer не перезапускал запрос. */}
-        {!isError && results.length > 0 && (
-          <Box padding="system">
-            <Flex direction="column" gap={12} aria-busy={isFetchingNextPage}>
-              {results.map((trip) => (
-                <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
-              ))}
-              {/* eslint-disable-next-line react/forbid-dom-props */}
-              <div ref={sentinelRef} style={{ height: 1 }} />
-              {isFetchingNextPage && <TripCardSkeleton />}
-            </Flex>
-          </Box>
-        )}
+            {!isError && results.length > 0 && (
+              <Box padding="system">
+                <Flex
+                  direction="column"
+                  gap={12}
+                  aria-busy={isFetchingNextPage}
+                >
+                  {results.map((trip) => (
+                    <TripCard key={trip.id} trip={trip} onOpen={onOpenTrip} />
+                  ))}
+                  {/* eslint-disable-next-line react/forbid-dom-props */}
+                  <div ref={sentinelRef} style={{ height: 1 }} />
+                  {isFetchingNextPage && <TripCardSkeleton />}
+                </Flex>
+              </Box>
+            )}
 
-        {!isLoading && !isError && results.length === 0 && !hasNextPage && (
-          <EmptyState
-            title="Ничего не нашлось"
-            subtitle="Попробуйте изменить маршрут или поискать другой город"
-            action={onOpenRideRequests ? <Box padding="system"><Button size="m" mode="primary" onClick={onOpenRideRequests}>Ищу попутку</Button></Box> : undefined}
-          />
-        )}
-      </Group>
+            {!isLoading && !isError && results.length === 0 && !hasNextPage && (
+              <EmptyState
+                title="Ничего не нашлось"
+                subtitle="Попробуйте изменить маршрут или поискать другой город"
+                action={
+                  onOpenRideRequests ? (
+                    <Box padding="system">
+                      <Button
+                        size="l"
+                        mode="primary"
+                        onClick={onOpenRideRequests}
+                      >
+                        Ищу попутку
+                      </Button>
+                    </Box>
+                  ) : undefined
+                }
+              />
+            )}
+          </Group>
 
-      <Spacing size={24} />
-      </div>
+          <Spacing size={24} />
+        </div>
       </PullToRefresh>
     </Panel>
   );

@@ -16,6 +16,9 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
     ? Array.from({ length: seatsTotal - 1 }, (_, i) => i + 2)
     : Array.from({ length: seatsTotal }, (_, i) => i + 1);
 
+  // Кнопки-переключатели вместо radiogroup: Tappable сам адаптирует
+  // семантику, а role="radio" на хосте button — mismatch роль/хост.
+  // Полный radiogroup потребовал бы стрелок + roving tabindex.
   const renderSeat = (seat: number) => {
     const isTaken = takenSeats.includes(seat);
     const isSelected = selectedSeat === seat;
@@ -31,9 +34,8 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
         disabled={isTaken}
         onClick={() => onSelect(isSelected ? null : seat)}
         aria-label={isTaken ? `Место ${seat} занято` : `Выбрать место ${seat}`}
-        role="radio"
-        aria-checked={isSelected}
-        tabIndex={isTaken ? -1 : 0}
+        aria-pressed={isSelected}
+        aria-disabled={isTaken || undefined}
       >
         {seat}
       </Tappable>
@@ -41,7 +43,7 @@ export const SeatScheme: FC<SeatSchemeProps> = ({ seatsTotal, takenSeats, select
   };
 
   return (
-    <div className="SeatScheme" role="radiogroup" aria-label="Выбор места">
+    <div className="SeatScheme" role="group" aria-label="Выбор места">
       <div className="SeatScheme__row">
         <div className="SeatScheme__seat SeatScheme__seat--driver" aria-label="Водитель"><Icon24CarOutline /></div>
         {frontSeats.map(renderSeat)}

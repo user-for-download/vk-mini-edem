@@ -50,14 +50,8 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
 }) => {
   const [filter, setFilter] = useState<HistoryFilter>("all");
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = usePassengerHistoryQuery();
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    usePassengerHistoryQuery();
 
   const visibleItems = useMemo(() => {
     let items = data ?? [];
@@ -92,103 +86,105 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
       </AppPanelHeader>
 
       <PullToRefresh onRefresh={handleRefresh} isFetching={isRefreshing}>
-      <div>
+        <div>
+          <Group>
+            <Box padding="system">
+              <SegmentedControl<HistoryFilter>
+                value={filter}
+                onChange={(value) => setFilter(value)}
+                options={[...HISTORY_FILTER_OPTIONS]}
+              />
+            </Box>
+          </Group>
 
-      <Group>
-        <Box padding="system">
-          <SegmentedControl<HistoryFilter>
-            value={filter}
-            onChange={(value) => setFilter(value)}
-            options={[...HISTORY_FILTER_OPTIONS]}
-          />
-        </Box>
-      </Group>
-
-      <Group>
-        {isLoading && (
-          <Box padding="system">
-            <Flex
-              direction="column"
-              gap={12}
-              aria-busy="true"
-              aria-label="Загрузка истории поездок"
-            >
-              <TripCardSkeleton />
-              <TripCardSkeleton />
-            </Flex>
-          </Box>
-        )}
-
-        {isError && (
-          <EmptyState
-            title="Не удалось загрузить историю"
-            subtitle={
-              error instanceof Error
-                ? error.message
-                : "Попробуйте обновить список позже"
-            }
-            action={
+          <Group>
+            {isLoading && (
               <Box padding="system">
-                <Button size="m" mode="primary" onClick={() => refetch()}>
-                  Попробовать снова
-                </Button>
+                <Flex
+                  direction="column"
+                  gap={12}
+                  aria-busy="true"
+                  aria-label="Загрузка истории поездок"
+                >
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                </Flex>
               </Box>
-            }
-          />
-        )}
+            )}
 
-        {!isLoading && !isError && visibleItems.length > 0 && (
-          <Box padding="system">
-            <Flex direction="column" gap={12}>
-              {visibleItems.map((booking) => (
-                <PassengerTripCard
-                  key={booking.id}
-                  booking={booking}
-                  onOpen={() => onOpenTrip(booking.trip)}
-                  onOpenReview={onOpenReview}
+            {isError && (
+              <EmptyState
+                title="Не удалось загрузить историю"
+                subtitle={
+                  error instanceof Error
+                    ? error.message
+                    : "Попробуйте обновить список позже"
+                }
+                action={
+                  <Box padding="system">
+                    <Button size="l" mode="primary" onClick={() => refetch()}>
+                      Попробовать снова
+                    </Button>
+                  </Box>
+                }
+              />
+            )}
+
+            {!isLoading && !isError && visibleItems.length > 0 && (
+              <Box padding="system">
+                <Flex direction="column" gap={12}>
+                  {visibleItems.map((booking) => (
+                    <PassengerTripCard
+                      key={booking.id}
+                      booking={booking}
+                      onOpen={() => onOpenTrip(booking.trip)}
+                      onOpenReview={onOpenReview}
+                    />
+                  ))}
+                </Flex>
+              </Box>
+            )}
+
+            {!isLoading &&
+              !isError &&
+              visibleItems.length === 0 &&
+              filter === "all" && (
+                <EmptyState
+                  title="История пока пуста"
+                  subtitle="Здесь появятся завершенные и отмененные поездки"
+                  action={
+                    <Box padding="system">
+                      <Button size="l" mode="primary" onClick={onGoSearch}>
+                        Найти поездку
+                      </Button>
+                    </Box>
+                  }
                 />
-              ))}
-            </Flex>
-          </Box>
-        )}
+              )}
 
-        {!isLoading && !isError && visibleItems.length === 0 && filter === "all" && (
-          <EmptyState
-            title="История пока пуста"
-            subtitle="Здесь появятся завершенные и отмененные поездки"
-            action={
-              <Box padding="system">
-                <Button size="m" mode="primary" onClick={onGoSearch}>
-                  Найти поездку
-                </Button>
-              </Box>
-            }
-          />
-        )}
+            {!isLoading &&
+              !isError &&
+              visibleItems.length === 0 &&
+              filter === "completed" && (
+                <EmptyState
+                  title="Нет завершенных поездок"
+                  subtitle="Когда вы совершите поездку, она появится здесь"
+                />
+              )}
 
-        {!isLoading &&
-          !isError &&
-          visibleItems.length === 0 &&
-          filter === "completed" && (
-            <EmptyState
-              title="Нет завершенных поездок"
-              subtitle="Когда вы совершите поездку, она появится здесь"
-            />
-          )}
+            {!isLoading &&
+              !isError &&
+              visibleItems.length === 0 &&
+              filter === "cancelled" && (
+                <EmptyState
+                  title="Нет отмененных поездок"
+                  subtitle="Здесь появятся отмененные и отклоненные заявки"
+                />
+              )}
+          </Group>
 
-        {!isLoading &&
-          !isError &&
-          visibleItems.length === 0 &&
-          filter === "cancelled" && (
-            <EmptyState
-              title="Нет отмененных поездок"
-              subtitle="Здесь появятся отмененные и отклоненные заявки"
-            />
-          )}
-      </Group>
-
-      <Spacing size={24} />
-      </div>
+          <Spacing size={24} />
+        </div>
       </PullToRefresh>
     </Panel>
   );

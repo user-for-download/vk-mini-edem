@@ -1,7 +1,13 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanelWrapper.tsx
 import { type FC } from "react";
 import { useParams, useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
-import { Box, Button, Panel, PanelHeaderBack, ScreenSpinner } from "@vkontakte/vkui";
+import {
+  Box,
+  Button,
+  Panel,
+  PanelHeaderBack,
+  ScreenSpinner,
+} from "@vkontakte/vkui";
 import { TripDetailsPanel } from "@/panels/TripDetailsPanel/TripDetailsPanel";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -16,13 +22,23 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
 
   const tripId = params?.tripId;
 
-  const { data: trip, isLoading, isError, refetch } = useTripDetailQuery(tripId ?? "");
+  const {
+    data: trip,
+    isLoading,
+    isError,
+    refetch,
+  } = useTripDetailQuery(tripId ?? "");
 
   if (!tripId) {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Поездка
         </AppPanelHeader>
@@ -38,7 +54,12 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Поездка
         </AppPanelHeader>
@@ -51,7 +72,12 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     return (
       <Panel id={id}>
         <AppPanelHeader
-          before={<PanelHeaderBack onClick={() => routeNavigator.back()} aria-label="Назад" />}
+          before={
+            <PanelHeaderBack
+              onClick={() => routeNavigator.back()}
+              aria-label="Назад"
+            />
+          }
         >
           Поездка
         </AppPanelHeader>
@@ -60,7 +86,7 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
           subtitle="Проверьте соединение и попробуйте снова"
           action={
             <Box padding="system">
-              <Button size="m" mode="primary" onClick={() => refetch()}>
+              <Button size="l" mode="primary" onClick={() => refetch()}>
                 Попробовать снова
               </Button>
             </Box>
@@ -74,7 +100,9 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
     if (!trip) {
       return;
     }
-    const module = await loadModule(() => import("@/modals/DriverProfileModal/DriverProfileModal"));
+    const module = await loadModule(
+      () => import("@/modals/DriverProfileModal/DriverProfileModal"),
+    );
     if (!module) return;
     const { DriverProfileModal } = module;
     modalApi.openCustomModalCard({

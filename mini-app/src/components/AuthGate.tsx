@@ -1,6 +1,14 @@
 // mini-app/src/components/AuthGate.tsx
 import { type FC, type PropsWithChildren, useEffect } from "react";
-import { ScreenSpinner, Placeholder, Button, Panel, View } from "@vkontakte/vkui";
+import {
+  ScreenSpinner,
+  Placeholder,
+  Button,
+  Panel,
+  PanelHeader,
+  View,
+} from "@vkontakte/vkui";
+import { Icon56LockOutline, Icon56ErrorOutline } from "@vkontakte/icons";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiClient } from "@/api/client";
 import { bridge } from "@/helpers/bridge";
@@ -23,7 +31,9 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
    * публичный appeal-эндпоинт (подпись VK launch-параметров).
    */
   const handleOpenFeedback = () => {
-    void openFeedbackModal(modalApi, { initialSubject: "Обжалование блокировки" });
+    void openFeedbackModal(modalApi, {
+      initialSubject: "Обжалование блокировки",
+    });
   };
 
   useEffect(() => {
@@ -88,9 +98,13 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
 
   useEffect(() => {
     const handleVisibility = () => {
-      useAuthStore.getState().handleBackgroundState(document.visibilityState === "hidden");
+      useAuthStore
+        .getState()
+        .handleBackgroundState(document.visibilityState === "hidden");
     };
-    const handleBridgeEvent: Parameters<typeof bridge.subscribe>[0] = (event) => {
+    const handleBridgeEvent: Parameters<typeof bridge.subscribe>[0] = (
+      event,
+    ) => {
       if (event.detail.type === "VKWebAppViewHide") {
         useAuthStore.getState().handleBackgroundState(true);
       } else if (event.detail.type === "VKWebAppViewRestore") {
@@ -114,10 +128,12 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     return (
       <View activePanel="auth-banned">
         <Panel id="auth-banned">
+          <PanelHeader>Вход</PanelHeader>
           <Placeholder
+            icon={<Icon56LockOutline />}
             title="Аккаунт заблокирован"
             action={
-              <Button size="m" mode="primary" onClick={handleOpenFeedback}>
+              <Button size="l" mode="primary" onClick={handleOpenFeedback}>
                 Обратная связь
               </Button>
             }
@@ -133,15 +149,18 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     return (
       <View activePanel="auth-error">
         <Panel id="auth-error">
+          <PanelHeader>Вход</PanelHeader>
           <Placeholder
+            icon={<Icon56ErrorOutline />}
             title="Ошибка авторизации"
             action={
-              <Button size="m" onClick={() => void bootstrap()}>
+              <Button size="l" onClick={() => void bootstrap()}>
                 Попробовать снова
               </Button>
             }
           >
-            Не удалось проверить данные авторизации. Проверьте подключение к интернету.
+            Не удалось проверить данные авторизации. Проверьте подключение к
+            интернету.
           </Placeholder>
         </Panel>
       </View>

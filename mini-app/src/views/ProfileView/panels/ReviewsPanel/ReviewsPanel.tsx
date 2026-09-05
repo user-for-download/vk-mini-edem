@@ -39,18 +39,24 @@ export interface ReviewsPanelProps {
 const TAB_OPTIONS = [...REVIEW_TAB_OPTIONS];
 
 /** Подсказки пустых состояний по вкладкам (CTA — только там, где оно имеет смысл). */
-function getEmptyState(tab: ReviewTab): { title: string; subtitle: string; cta: boolean } {
+function getEmptyState(tab: ReviewTab): {
+  title: string;
+  subtitle: string;
+  cta: boolean;
+} {
   switch (tab) {
     case "mine":
       return {
         title: "Вы пока не оставили отзывов",
-        subtitle: "Оставьте отзыв о поездке — это поможет другим выбрать маршрут",
+        subtitle:
+          "Оставьте отзыв о поездке — это поможет другим выбрать маршрут",
         cta: true,
       };
     case "about":
       return {
         title: "О вас пока нет отзывов",
-        subtitle: "После поездок пассажиры и водители смогут оценить вас — отзывы появятся здесь",
+        subtitle:
+          "После поездок пассажиры и водители смогут оценить вас — отзывы появятся здесь",
         cta: false,
       };
   }
@@ -98,7 +104,7 @@ export const ReviewsPanel: FC<ReviewsPanelProps> = ({
 
   const visibleReviews = useMemo(
     () => getReviewsForTab(myReviews ?? [], aboutReviews ?? [], tab, role),
-    [myReviews, aboutReviews, tab, role]
+    [myReviews, aboutReviews, tab, role],
   );
 
   const handleRefresh = useCallback(async () => {
@@ -107,14 +113,21 @@ export const ReviewsPanel: FC<ReviewsPanelProps> = ({
 
   const isLoading = myReviewsLoading || aboutReviewsLoading;
   const isError = myReviewsError || aboutReviewsError;
-  const error = isError ? (myReviewsError ? myReviewsErrorObj : aboutReviewsErrorObj) : null;
-  const isRefreshing = (myReviewsFetching || aboutReviewsFetching) && !isLoading;
+  const error = isError
+    ? myReviewsError
+      ? myReviewsErrorObj
+      : aboutReviewsErrorObj
+    : null;
+  const isRefreshing =
+    (myReviewsFetching || aboutReviewsFetching) && !isLoading;
 
   const emptyState = getEmptyState(tab);
 
   return (
     <Panel id={id}>
-      <AppPanelHeader before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}>
+      <AppPanelHeader
+        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+      >
         Отзывы
       </AppPanelHeader>
 
@@ -149,11 +162,17 @@ export const ReviewsPanel: FC<ReviewsPanelProps> = ({
               <EmptyState
                 title="Не удалось загрузить отзывы"
                 subtitle={
-                  error instanceof Error ? error.message : "Попробуйте обновить список позже"
+                  error instanceof Error
+                    ? error.message
+                    : "Попробуйте обновить список позже"
                 }
                 action={
                   <Box padding="system">
-                    <Button size="m" mode="primary" onClick={() => void handleRefresh()}>
+                    <Button
+                      size="l"
+                      mode="primary"
+                      onClick={() => void handleRefresh()}
+                    >
                       Попробовать снова
                     </Button>
                   </Box>
@@ -178,7 +197,11 @@ export const ReviewsPanel: FC<ReviewsPanelProps> = ({
                 action={
                   emptyState.cta ? (
                     <Box padding="system">
-                      <Button size="m" mode="primary" onClick={onOpenCreateReview}>
+                      <Button
+                        size="l"
+                        mode="primary"
+                        onClick={onOpenCreateReview}
+                      >
                         Оставить отзыв
                       </Button>
                     </Box>

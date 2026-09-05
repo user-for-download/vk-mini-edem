@@ -1,4 +1,4 @@
-import { type FC, useState } from "react";
+import { type FC, useId, useState } from "react";
 import {
   Button,
   FormItem,
@@ -43,6 +43,13 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
   const [latestAt, setLatestAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Связка FormItem htmlFor ↔ поле id (a11y, дока Select/FormItem).
+  const fromCityFieldId = useId();
+  const toCityFieldId = useId();
+  const earliestFieldId = useId();
+  const latestFieldId = useId();
+  const expiresFieldId = useId();
 
   const submit = async () => {
     setFormError(null);
@@ -146,43 +153,51 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
         Ищу попутку
       </AppPanelHeader>
       <Group header="Новый запрос">
-        <FormItem top="Откуда">
+        {/* Select onChange: значение берём из второго аргумента (дока Select) —
+          event.target.value надёжен только для NativeSelect (мобилы). */}
+        <FormItem top="Откуда" htmlFor={fromCityFieldId}>
           <Select
+            id={fromCityFieldId}
             value={fromCityId}
-            onChange={(event) => setFromCityId(event.target.value)}
+            onChange={(_, v) => setFromCityId(String(v ?? ""))}
             options={cityOptions}
             placeholder="Выберите город"
           />
         </FormItem>
-        <FormItem top="Куда">
+        <FormItem top="Куда" htmlFor={toCityFieldId}>
           <Select
+            id={toCityFieldId}
             value={toCityId}
-            onChange={(event) => setToCityId(event.target.value)}
+            onChange={(_, v) => setToCityId(String(v ?? ""))}
             options={cityOptions.filter((city) => city.value !== fromCityId)}
             placeholder="Выберите город"
           />
         </FormItem>
         <FormItem
           top="Время отправления от"
+          htmlFor={earliestFieldId}
           status={formError ? "error" : "default"}
           bottom={formError ?? undefined}
         >
           <Input
+            id={earliestFieldId}
             type="datetime-local"
             value={earliestAt}
             onChange={(event) => setEarliestAt(event.target.value)}
             aria-invalid={formError ? true : undefined}
           />
         </FormItem>
-        <FormItem top="Время отправления до">
+        <FormItem top="Время отправления до" htmlFor={latestFieldId}>
           <Input
+            id={latestFieldId}
             type="datetime-local"
             value={latestAt}
             onChange={(event) => setLatestAt(event.target.value)}
           />
         </FormItem>
-        <FormItem top="Запрос действует до">
+        <FormItem top="Запрос действует до" htmlFor={expiresFieldId}>
           <Input
+            id={expiresFieldId}
             type="datetime-local"
             value={expiresAt}
             onChange={(event) => setExpiresAt(event.target.value)}
