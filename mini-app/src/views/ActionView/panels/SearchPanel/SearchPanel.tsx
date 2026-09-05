@@ -18,6 +18,7 @@ import { filterTripsForUser, shouldFetchMoreTrips } from "@/helpers/tripSearch";
 export interface SearchPanelProps {
   id: string;
   onOpenTrip: (trip: Trip) => void;
+  onOpenRideRequests?: () => void;
 }
 
 const ROUTE_SEPARATOR_REGEX = /→|\s+[-—–]\s+/;
@@ -77,7 +78,7 @@ function toDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
+export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip, onOpenRideRequests }) => {
   const currentUser = useCurrentUser();
 
   const [searchValue, setSearchValue] = useState("");
@@ -265,6 +266,7 @@ export const SearchPanel: FC<SearchPanelProps> = ({ id, onOpenTrip }) => {
           <EmptyState
             title="Ничего не нашлось"
             subtitle="Попробуйте изменить маршрут или поискать другой город"
+            action={onOpenRideRequests ? <Box padding="system"><Button size="m" mode="primary" onClick={onOpenRideRequests}>Ищу попутку</Button></Box> : undefined}
           />
         )}
       </Group>

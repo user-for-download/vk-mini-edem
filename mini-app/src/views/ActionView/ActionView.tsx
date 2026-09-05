@@ -6,6 +6,7 @@ import {
   PANEL_TRIPS_MANAGE,
   PANEL_TRIP_DETAILS,
   PANEL_TRIP_REQUESTS,
+  PANEL_RIDE_REQUESTS,
   PANEL_PASSENGER_BOOKINGS,
   PANEL_PASSENGER_HISTORY,
 } from "@/consts/panels";
@@ -45,6 +46,11 @@ const TripDetailsPanelWrapper = lazy(() =>
     default: m.TripDetailsPanelWrapper,
   }))
 );
+const RideRequestsPanel = lazy(() =>
+  loadLazyModule(() => import("@/views/ActionView/panels/RideRequestsPanel/RideRequestsPanel")).then((m) => ({
+    default: m.RideRequestsPanel,
+  }))
+);
 
 export interface ActionViewProps {
   id: string;
@@ -67,7 +73,7 @@ export const ActionView: FC<ActionViewProps> = ({
     <Suspense fallback={<PanelSpinner />}>
       <ViewErrorBoundary>
         <View id={id} activePanel={activePanel}>
-          <SearchPanel id={PANEL_SEARCH} onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)} />
+           <SearchPanel id={PANEL_SEARCH} onOpenTrip={(trip) => routeNavigator.push(`/trips/${trip.id}`)} onOpenRideRequests={() => routeNavigator.push("/ride-requests")} />
           <TripsManagePanel
             id={PANEL_TRIPS_MANAGE}
             onOpenCreateTrip={onOpenCreateTrip}
@@ -88,7 +94,8 @@ export const ActionView: FC<ActionViewProps> = ({
             onOpenReview={(trip) => onOpenReviewForTrip?.(trip)}
             onGoSearch={() => routeNavigator.push("/trips/search")}
           />
-          <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
+           <TripDetailsPanelWrapper id={PANEL_TRIP_DETAILS} />
+           <RideRequestsPanel id={PANEL_RIDE_REQUESTS} onBack={() => routeNavigator.back()} />
         </View>
       </ViewErrorBoundary>
     </Suspense>

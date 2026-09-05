@@ -5,6 +5,7 @@ import {
   PANEL_SEARCH,
   PANEL_TRIPS_MANAGE,
   PANEL_TRIP_REQUESTS,
+  PANEL_RIDE_REQUESTS,
   PANEL_PASSENGER_BOOKINGS,
   PANEL_PASSENGER_HISTORY,
   PANEL_TRIP_DETAILS,
@@ -50,6 +51,11 @@ export const router = createHashRouter([
     path: "/trips/my/:tripId/requests",
     view: VIEW_ACTION,
     panel: PANEL_TRIP_REQUESTS,
+  },
+  {
+    path: "/ride-requests",
+    view: VIEW_ACTION,
+    panel: PANEL_RIDE_REQUESTS,
   },
   {
     path: "/bookings",
