@@ -5,7 +5,7 @@ import type { Prisma } from "../generated/prisma/client.js";
 import { completeOnboardingBodySchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
-import { serializeUser } from "../serializers/index.js";
+import { serializeUser, serializePublicUser } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter, profileUpdateLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { wsManager } from "../ws/manager.js";
@@ -33,11 +33,10 @@ export const usersRouter = new Hono<AuthEnv>();
 usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
   const user = c.get("user");
   const now = new Date();
-  const activeTrip = await db.trip.findFirst({ where: { driverId: user.id, status: "active" }, select: { id: true } });
-  const activeBooking = await db.booking.findFirst({ where: { passengerId: user.id, status: { in: ["pending", "confirmed"] }, trip: { status: "active", departureAt: { gt: now } } }, select: { id: true } });
-  if (activeTrip || activeBooking) return c.json({ code: "ACCOUNT_HAS_ACTIVE_OBLIGATIONS", message: "Resolve active trips and bookings first" }, 409);
-
-  await db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
+    const activeTrip = await tx.trip.findFirst({ where: { driverId: user.id, status: "active" }, select: { id: true } });
+    const activeBooking = await tx.booking.findFirst({ where: { passengerId: user.id, status: { in: ["pending", "confirmed"] }, trip: { status: "active", departureAt: { gt: now } } }, select: { id: true } });
+    if (activeTrip || activeBooking) return { kind: "obligations" as const };
     await tx.refreshToken.deleteMany({ where: { userId: user.id } });
     await tx.notification.deleteMany({ where: { userId: user.id } });
     await tx.feedback.deleteMany({ where: { userId: user.id } });
@@ -46,7 +45,9 @@ usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
     // Keep the signed VK identity as a tombstone: clearing it would allow the
     // next VK login to create a second account for the same person.
     await tx.user.update({ where: { id: user.id }, data: { deletedAt: now, name: "Удалённый пользователь", avatar: DEFAULT_AVATAR_URL, about: null, rating: 5, reviewsCount: 0, tripsCount: 0, onboardingVersion: null } });
+    return { kind: "deleted" as const };
   }, { isolationLevel: "Serializable" });
+  if (result.kind === "obligations") return c.json({ code: "ACCOUNT_HAS_ACTIVE_OBLIGATIONS", message: "Resolve active trips and bookings first" }, 409);
   wsManager.closeUserConnections(user.id, 4403, "Account deleted");
   await revokeAllActiveTokens(user.id);
   return c.json({ success: true });
@@ -194,5 +195,5 @@ usersRouter.get("/:id", publicReadLimiter, async (c) => {
     return c.json({ message: "User not found" }, 404);
   }
 
-  return c.json(serializeUser(user, { includePlate: false }));
+  return c.json(serializePublicUser(user));
 });

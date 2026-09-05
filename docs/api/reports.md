@@ -16,3 +16,5 @@ Reports require a relevant driver/passenger relationship. Self-reports and unrel
 - `PATCH /api/v1/admin/reports/:id/status` changes status to `in_review`, `resolved` or `rejected`, optionally with `resolutionNote`.
 
 The state machine is `pending -> in_review -> resolved|rejected`. Terminal reports cannot be changed. Admin actions record `adminActorType: "admin"` and a resolution timestamp.
+
+Open reports are protected by a database partial unique index for reporter, target and category. Concurrent duplicates return `409`. Admin status writes are conditional on a non-terminal current status and concurrent transitions return `409`.

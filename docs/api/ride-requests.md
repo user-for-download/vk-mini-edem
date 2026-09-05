@@ -13,4 +13,6 @@ All endpoints require a user access token.
 
 At most three non-expired `active`/`paused` requests are allowed per user. Cities must be different directory entries. The backend validates ownership, dates, expiry and city existence.
 
+Creation is performed in a serializable transaction. Concurrent quota conflicts return `409` rather than creating a fourth active request. Status, update and cancel writes use conditional ownership/status predicates and cannot resurrect a cancelled request.
+
 Matching is informational. The passenger must open the trip and submit the normal booking request explicitly.

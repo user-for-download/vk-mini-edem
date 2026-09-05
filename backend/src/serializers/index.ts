@@ -106,6 +106,21 @@ export function serializeUser(
   };
 }
 
+export function serializePublicUser(user: UserWithCar) {
+  return {
+    id: user.id,
+    name: user.deletedAt ? "Удалённый пользователь" : user.name,
+    avatar: user.deletedAt ? DEFAULT_AVATAR_URL : user.avatar || DEFAULT_AVATAR_URL,
+    rating: user.rating,
+    reviewsCount: user.reviewsCount,
+    tripsCount: user.tripsCount,
+    isVerified: user.isVerified,
+    car: user.deletedAt || !user.car ? undefined : { model: user.car.model, color: user.car.color },
+    about: user.deletedAt ? undefined : user.about ?? undefined,
+    createdAt: user.createdAt.toISOString(),
+  };
+}
+
 export function serializeTrip(
   trip: TripWithDriver,
   options?: {

@@ -1,8 +1,45 @@
 {
-  "id": "edem-liquidity-safety-21", "seq": "21", "title": "S5: выполнить security и privacy review", "status": "pending", "depends_on": ["19"], "parallel": true, "suggested_agent": "CodeReviewer",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/auth", "backend/src/middleware", "backend/src/admin", "backend/src/serializers", "backend/src/users", "backend/src/trips", "backend/src/bookings"],
-  "deliverables": ["OWASP-oriented review report", "Проверка authorization, rate limits, PII, deep links, deletion and reports", "Resolved high/critical findings"],
-  "acceptance_criteria": ["User tokens cannot access admin/report data", "Deleted user cannot authenticate or retain sessions contrary to policy", "Reports cannot be abused for enumeration/spam", "Private addresses/VK IDs are not over-disclosed"],
-  "commands": ["npm run typecheck", "npm test --workspace=backend"],
-  "risks": ["Security fixes may alter contracts late in the release"]
+  "id": "edem-liquidity-safety-21",
+  "seq": "21",
+  "title": "S5: выполнить security и privacy review",
+  "status": "completed",
+  "depends_on": [
+    "19"
+  ],
+  "parallel": true,
+  "suggested_agent": "CodeReviewer",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T14:43:43.122Z",
+  "completion_summary": "Security review completed; race, quota, deduplication, rate-limit and public PII issues hardened",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/src/auth",
+    "backend/src/middleware",
+    "backend/src/admin",
+    "backend/src/serializers",
+    "backend/src/users",
+    "backend/src/trips",
+    "backend/src/bookings"
+  ],
+  "deliverables": [
+    "OWASP-oriented review report",
+    "Проверка authorization, rate limits, PII, deep links, deletion and reports",
+    "Resolved high/critical findings"
+  ],
+  "acceptance_criteria": [
+    "User tokens cannot access admin/report data",
+    "Deleted user cannot authenticate or retain sessions contrary to policy",
+    "Reports cannot be abused for enumeration/spam",
+    "Private addresses/VK IDs are not over-disclosed"
+  ],
+  "commands": [
+    "npm run typecheck",
+    "npm test --workspace=backend"
+  ],
+  "risks": [
+    "Security fixes may alter contracts late in the release"
+  ]
 }

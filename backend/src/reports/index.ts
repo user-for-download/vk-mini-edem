@@ -1,14 +1,17 @@
 import { Hono } from "hono";
+import { Prisma } from "../generated/prisma/client.js";
 import { createReportDtoSchema, adminReportsQuerySchema, updateReportStatusDtoSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { getSanitizedBody, sanitizeValue } from "../middleware/sanitize.js";
-import { mutationLimiter, createUserRateLimiter, adminReadLimiter } from "../middleware/rateLimit.js";
+import { mutationLimiter, createUserRateLimiter, createRateLimiter, adminReadLimiter } from "../middleware/rateLimit.js";
 import { ERROR_CODES } from "../errors.js";
 import { adminGuard } from "../admin/guard.js";
 import { serializeAdminReport, serializeReport } from "./serializers.js";
 
 const reportLimiter = createUserRateLimiter({ windowMs: 60 * 60 * 1000, max: 10, keyPrefix: "report-create" });
+const reportReadLimiter = createUserRateLimiter({ windowMs: 60_000, max: 60, keyPrefix: "report-read" });
+const reportAdminMutationLimiter = createRateLimiter({ windowMs: 60_000, max: 60, keyPrefix: "report-admin-mutation" });
 const includeRelations = { reporter: true, adminActor: true } as const;
 
 export const reportsRouter = new Hono<AuthEnv>();
@@ -29,7 +32,7 @@ async function canReport(userId: string, targetType: string, targetId: string): 
   return false;
 }
 
-reportsRouter.get("/", async (c) => {
+reportsRouter.get("/", reportReadLimiter, async (c) => {
   const userId = c.get("user").id;
   const items = await db.report.findMany({ where: { reporterId: userId }, include: includeRelations, orderBy: { createdAt: "desc" } });
   return c.json(items.map(serializeReport));
@@ -41,9 +44,20 @@ reportsRouter.post("/", mutationLimiter, reportLimiter, async (c) => {
   const { targetType, targetId, category, description } = parsed.data;
   const userId = c.get("user").id;
   if (!(await canReport(userId, targetType, targetId))) return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Report is not allowed in this context" }, 403);
-  const duplicate = await db.report.findFirst({ where: { reporterId: userId, targetType, targetId, category, status: { in: ["pending", "in_review"] } }, select: { id: true } });
-  if (duplicate) return c.json({ code: ERROR_CODES.CONFLICT, message: "An open report already exists" }, 409);
-  const item = await db.report.create({ data: { reporterId: userId, targetType, targetId, category, description }, include: includeRelations });
+  let item;
+  try {
+    item = await db.$transaction(async (tx) => {
+    const duplicate = await tx.report.findFirst({ where: { reporterId: userId, targetType, targetId, category, status: { in: ["pending", "in_review"] } }, select: { id: true } });
+    if (duplicate) return null;
+    return tx.report.create({ data: { reporterId: userId, targetType, targetId, category, description }, include: includeRelations });
+    }, { isolationLevel: "Serializable" });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) {
+      return c.json({ code: ERROR_CODES.CONFLICT, message: "An open report already exists" }, 409);
+    }
+    throw error;
+  }
+  if (!item) return c.json({ code: ERROR_CODES.CONFLICT, message: "An open report already exists" }, 409);
   return c.json(serializeReport(item), 201);
 });
 
@@ -67,13 +81,16 @@ adminReportsRouter.get("/:id", adminReadLimiter, async (c) => {
   return c.json(serializeAdminReport(item));
 });
 
-adminReportsRouter.patch("/:id/status", async (c) => {
+adminReportsRouter.patch("/:id/status", reportAdminMutationLimiter, async (c) => {
   const id = c.req.param("id");
   const parsed = updateReportStatusDtoSchema.safeParse(await getSanitizedBody(c));
   if (!parsed.success) return c.json({ code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid report status payload" }, 400);
-  const current = await db.report.findUnique({ where: { id } });
+  const current = await db.report.findUnique({ where: { id }, select: { status: true } });
   if (!current) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Report not found" }, 404);
   if (current.status === "resolved" || current.status === "rejected") return c.json({ code: ERROR_CODES.CONFLICT, message: "Report is already terminal" }, 409);
-  const item = await db.report.update({ where: { id }, data: { status: parsed.data.status, resolutionNote: parsed.data.resolutionNote, resolvedAt: parsed.data.status === "resolved" || parsed.data.status === "rejected" ? new Date() : null, adminActorId: null, adminActorType: "admin" }, include: includeRelations });
-  return c.json(serializeAdminReport(item));
+  const item = await db.report.updateMany({ where: { id, status: { in: ["pending", "in_review"] } }, data: { status: parsed.data.status, resolutionNote: parsed.data.resolutionNote, resolvedAt: parsed.data.status === "resolved" || parsed.data.status === "rejected" ? new Date() : null, adminActorId: null, adminActorType: "admin" } });
+  if (item.count !== 1) return c.json({ code: ERROR_CODES.CONFLICT, message: "Report was just changed" }, 409);
+  const updated = await db.report.findUnique({ where: { id }, include: includeRelations });
+  if (!updated) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Report not found" }, 404);
+  return c.json(serializeAdminReport(updated));
 });
