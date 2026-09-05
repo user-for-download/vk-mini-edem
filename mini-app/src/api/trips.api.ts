@@ -12,7 +12,12 @@ import {
 // Все поля поиска (включая q) описаны в общем контракте tripFiltersDtoSchema.
 export type SearchTripsFilters = TripFiltersDto;
 
-export type UpdateTripDto = Partial<CreateTripDto>;
+// Зеркалит серверный updateTripDtoSchema (contracts/trip.dto.ts):
+// маршрут fromCity/fromCityId/toCity/toCityId запрещён к изменению,
+// .strict() отвергает эти поля с 400 — не отправляем их вовсе.
+export type UpdateTripDto = Partial<
+  Omit<CreateTripDto, "fromCity" | "fromCityId" | "toCity" | "toCityId">
+>;
 
 export type MyTrip = Trip & {
   bookedSeats?: number[];
@@ -20,7 +25,10 @@ export type MyTrip = Trip & {
 };
 
 export const tripsApi = {
-  getTrips: (filters?: SearchTripsFilters, signal?: AbortSignal): Promise<PaginatedTripsResponse> => {
+  getTrips: (
+    filters?: SearchTripsFilters,
+    signal?: AbortSignal,
+  ): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
 
     if (filters?.q) query.set("q", filters.q);
@@ -28,7 +36,8 @@ export const tripsApi = {
     if (filters?.toCity) query.set("toCity", filters.toCity);
     if (filters?.dateFrom) query.set("dateFrom", filters.dateFrom);
     if (filters?.dateTo) query.set("dateTo", filters.dateTo);
-    if (filters?.maxPrice !== undefined) query.set("maxPrice", filters.maxPrice.toString());
+    if (filters?.maxPrice !== undefined)
+      query.set("maxPrice", filters.maxPrice.toString());
     if (filters?.tags && filters.tags.length > 0) {
       query.set("tags", filters.tags.join(","));
     }
@@ -40,7 +49,7 @@ export const tripsApi = {
     return apiClient.request<PaginatedTripsResponse>(
       `/trips${queryString}`,
       { signal },
-      paginatedTripsResponseSchema
+      paginatedTripsResponseSchema,
     );
   },
 
@@ -51,15 +60,18 @@ export const tripsApi = {
         method: "PATCH",
         body: JSON.stringify(data),
       },
-      tripSchema
+      tripSchema,
     );
   },
 
-  getMyTrips: (options?: {
-    page?: number;
-    limit?: number;
-    status?: "active" | "archive";
-  }, signal?: AbortSignal): Promise<PaginatedTripsResponse> => {
+  getMyTrips: (
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: "active" | "archive";
+    },
+    signal?: AbortSignal,
+  ): Promise<PaginatedTripsResponse> => {
     const query = new URLSearchParams();
     if (options?.page) query.set("page", options.page.toString());
     if (options?.limit) query.set("limit", options.limit.toString());
@@ -68,30 +80,46 @@ export const tripsApi = {
     return apiClient.request<PaginatedTripsResponse>(
       `/trips/my${queryString}`,
       { signal },
-      paginatedTripsResponseSchema
+      paginatedTripsResponseSchema,
     );
   },
 
   getTripById: (id: string, signal?: AbortSignal): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}`, { signal }, tripSchema);
+    return apiClient.request<Trip>(
+      `/trips/${encodeURIComponent(id)}`,
+      { signal },
+      tripSchema,
+    );
   },
 
   createTrip: (data: CreateTripDto): Promise<Trip> => {
-    return apiClient.request<Trip>("/trips", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }, tripSchema);
+    return apiClient.request<Trip>(
+      "/trips",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      tripSchema,
+    );
   },
 
   cancelTrip: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}/cancel`, {
-      method: "PATCH",
-    }, tripSchema);
+    return apiClient.request<Trip>(
+      `/trips/${encodeURIComponent(id)}/cancel`,
+      {
+        method: "PATCH",
+      },
+      tripSchema,
+    );
   },
 
   completeTrip: (id: string): Promise<Trip> => {
-    return apiClient.request<Trip>(`/trips/${encodeURIComponent(id)}/complete`, {
-      method: "PATCH",
-    }, tripSchema);
+    return apiClient.request<Trip>(
+      `/trips/${encodeURIComponent(id)}/complete`,
+      {
+        method: "PATCH",
+      },
+      tripSchema,
+    );
   },
 };

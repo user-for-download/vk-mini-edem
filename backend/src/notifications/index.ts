@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
-import { notificationReadLimiter } from "../middleware/rateLimit.js";
+import {
+  notificationReadLimiter,
+  publicReadLimiter,
+} from "../middleware/rateLimit.js";
 import { z } from "zod";
 
 export const notificationsRouter = new Hono<AuthEnv>();
@@ -13,7 +16,7 @@ const notificationCursorSchema = z.object({
 
 notificationsRouter.use("*", requireUser);
 
-notificationsRouter.get("/my", async (c) => {
+notificationsRouter.get("/my", publicReadLimiter, async (c) => {
   const user = c.get("user");
   const cursorStr = c.req.query("cursor");
   const limitRaw = Number(c.req.query("limit") || 20);
@@ -23,8 +26,15 @@ notificationsRouter.get("/my", async (c) => {
 
   let cursor: { createdAt: Date; id: string } | undefined;
   if (cursorStr) {
+    // Cap base64-курсора до декодирования: отсекаем заведомо мусорные
+    // длинные строки до JSON.parse/Buffer (DoS-поверхность).
+    if (cursorStr.length > 512) {
+      return c.json({ message: "Invalid cursor" }, 400);
+    }
     try {
-      const parsed = JSON.parse(Buffer.from(cursorStr, "base64").toString("utf-8"));
+      const parsed = JSON.parse(
+        Buffer.from(cursorStr, "base64").toString("utf-8"),
+      );
       const validated = notificationCursorSchema.parse(parsed);
       cursor = { createdAt: new Date(validated.createdAt), id: validated.id };
     } catch {
@@ -46,7 +56,7 @@ notificationsRouter.get("/my", async (c) => {
   if (hasMore && items.length > 0) {
     const last = items[items.length - 1];
     nextCursor = Buffer.from(
-      JSON.stringify({ createdAt: last.createdAt.toISOString(), id: last.id })
+      JSON.stringify({ createdAt: last.createdAt.toISOString(), id: last.id }),
     ).toString("base64");
   }
 

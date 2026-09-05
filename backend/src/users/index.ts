@@ -6,7 +6,11 @@ import { completeOnboardingBodySchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeUser, serializePublicUser } from "../serializers/index.js";
-import { publicReadLimiter, mutationLimiter, profileUpdateLimiter } from "../middleware/rateLimit.js";
+import {
+  publicReadLimiter,
+  mutationLimiter,
+  profileUpdateLimiter,
+} from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { wsManager } from "../ws/manager.js";
 import { revokeAllActiveTokens } from "../auth/tokens.js";
@@ -33,21 +37,56 @@ export const usersRouter = new Hono<AuthEnv>();
 usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
   const user = c.get("user");
   const now = new Date();
-  const result = await db.$transaction(async (tx) => {
-    const activeTrip = await tx.trip.findFirst({ where: { driverId: user.id, status: "active" }, select: { id: true } });
-    const activeBooking = await tx.booking.findFirst({ where: { passengerId: user.id, status: { in: ["pending", "confirmed"] }, trip: { status: "active", departureAt: { gt: now } } }, select: { id: true } });
-    if (activeTrip || activeBooking) return { kind: "obligations" as const };
-    await tx.refreshToken.deleteMany({ where: { userId: user.id } });
-    await tx.notification.deleteMany({ where: { userId: user.id } });
-    await tx.feedback.deleteMany({ where: { userId: user.id } });
-    await tx.rideRequest.updateMany({ where: { userId: user.id, status: { in: ["active", "paused"] } }, data: { status: "cancelled" } });
-    await tx.car.deleteMany({ where: { userId: user.id } });
-    // Keep the signed VK identity as a tombstone: clearing it would allow the
-    // next VK login to create a second account for the same person.
-    await tx.user.update({ where: { id: user.id }, data: { deletedAt: now, name: "Удалённый пользователь", avatar: DEFAULT_AVATAR_URL, about: null, rating: 5, reviewsCount: 0, tripsCount: 0, onboardingVersion: null } });
-    return { kind: "deleted" as const };
-  }, { isolationLevel: "Serializable" });
-  if (result.kind === "obligations") return c.json({ code: "ACCOUNT_HAS_ACTIVE_OBLIGATIONS", message: "Resolve active trips and bookings first" }, 409);
+  const result = await db.$transaction(
+    async (tx) => {
+      const activeTrip = await tx.trip.findFirst({
+        where: { driverId: user.id, status: "active" },
+        select: { id: true },
+      });
+      const activeBooking = await tx.booking.findFirst({
+        where: {
+          passengerId: user.id,
+          status: { in: ["pending", "confirmed"] },
+          trip: { status: { not: "cancelled" } },
+        },
+        select: { id: true },
+      });
+      if (activeTrip || activeBooking) return { kind: "obligations" as const };
+      await tx.refreshToken.deleteMany({ where: { userId: user.id } });
+      await tx.notification.deleteMany({ where: { userId: user.id } });
+      await tx.feedback.deleteMany({ where: { userId: user.id } });
+      await tx.rideRequest.updateMany({
+        where: { userId: user.id, status: { in: ["active", "paused"] } },
+        data: { status: "cancelled" },
+      });
+      await tx.car.deleteMany({ where: { userId: user.id } });
+      // Keep the signed VK identity as a tombstone: clearing it would allow the
+      // next VK login to create a second account for the same person.
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          deletedAt: now,
+          name: "Удалённый пользователь",
+          avatar: DEFAULT_AVATAR_URL,
+          about: null,
+          rating: 5,
+          reviewsCount: 0,
+          tripsCount: 0,
+          onboardingVersion: null,
+        },
+      });
+      return { kind: "deleted" as const };
+    },
+    { isolationLevel: "Serializable" },
+  );
+  if (result.kind === "obligations")
+    return c.json(
+      {
+        code: ERROR_CODES.ACCOUNT_HAS_ACTIVE_OBLIGATIONS,
+        message: "Resolve active trips and bookings first",
+      },
+      409,
+    );
   wsManager.closeUserConnections(user.id, 4403, "Account deleted");
   await revokeAllActiveTokens(user.id);
   return c.json({ success: true });
@@ -62,23 +101,31 @@ usersRouter.get("/me", requireUser, async (c) => {
   return c.json(serializeUser(user));
 });
 
-usersRouter.patch("/me/notification-settings", requireUser, async (c) => {
-  const user = c.get("user");
-  const body = await getSanitizedBody(c);
-  const parseResult = updateNotificationSettingsSchema.safeParse(body);
+usersRouter.patch(
+  "/me/notification-settings",
+  requireUser,
+  profileUpdateLimiter,
+  async (c) => {
+    const user = c.get("user");
+    const body = await getSanitizedBody(c);
+    const parseResult = updateNotificationSettingsSchema.safeParse(body);
 
-  if (!parseResult.success) {
-    return c.json({ message: "Invalid payload" }, 400);
-  }
+    if (!parseResult.success) {
+      return c.json({ message: "Invalid payload" }, 400);
+    }
 
-  const updated = await db.user.update({
-    where: { id: user.id },
-    data: { notificationsEnabled: parseResult.data.notificationsEnabled ?? user.notificationsEnabled },
-    include: { car: true },
-  });
+    const updated = await db.user.update({
+      where: { id: user.id },
+      data: {
+        notificationsEnabled:
+          parseResult.data.notificationsEnabled ?? user.notificationsEnabled,
+      },
+      include: { car: true },
+    });
 
-  return c.json(serializeUser(updated));
-});
+    return c.json(serializeUser(updated));
+  },
+);
 
 /**
  * Завершение онбординга: сохраняем версию показанных слайдов.
@@ -116,7 +163,7 @@ usersRouter.patch("/me", requireUser, profileUpdateLimiter, async (c) => {
   if (!parseResult.success) {
     return c.json(
       { message: "Invalid payload", errors: z.formatError(parseResult.error) },
-      400
+      400,
     );
   }
 
@@ -146,7 +193,7 @@ async function upsertCar(c: Context<AuthEnv>) {
   if (!parseResult.success) {
     return c.json(
       { message: "Invalid payload", errors: z.formatError(parseResult.error) },
-      400
+      400,
     );
   }
 

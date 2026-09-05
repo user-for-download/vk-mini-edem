@@ -50,7 +50,10 @@ export async function processExpiredTrips() {
 
       if (expiredTrips.length === 0) break;
 
-      logger.info({ firstBatchSize: expiredTrips.length, cutoff }, "trip_worker_found_expired");
+      logger.info(
+        { firstBatchSize: expiredTrips.length, cutoff },
+        "trip_worker_found_expired",
+      );
 
       for (const trip of expiredTrips) {
         await processExpiredTrip(trip, cutoff);
@@ -70,24 +73,45 @@ export async function processExpiredTrips() {
 }
 
 async function expirePendingBookings(now: Date): Promise<void> {
-  const expired = await db.booking.findMany({
-    where: { status: "pending", expiresAt: { lte: now } },
-    select: { id: true, tripId: true, passengerId: true },
-    take: TRIP_WORKER_BATCH_SIZE,
-  });
-  for (const booking of expired) {
-    await db.$transaction(async (tx) => {
-      const claimed = await tx.booking.updateMany({
-        where: { id: booking.id, status: "pending", expiresAt: { lte: now } },
-        data: { status: "declined", cancelledAt: now, cancelledByType: "system", cancellationReason: "Booking request expired" },
-      });
-      if (claimed.count === 1) {
-        await tx.trip.updateMany({
-          where: { id: booking.tripId, status: "active" },
-          data: { seatsAvailable: { increment: 1 } },
-        });
-      }
-    }, { isolationLevel: "Serializable" });
+  // Полный часовой sweep: дренируем все просроченные pending пачками.
+  // orderBy детерминирует порядок выборки между итерациями; вышедшие из
+  // выборки (declined) строки повторно не читаются — цикл завершается,
+  // когда пачка неполная.
+  while (true) {
+    const expired = await db.booking.findMany({
+      where: { status: "pending", expiresAt: { lte: now } },
+      select: { id: true, tripId: true, passengerId: true },
+      orderBy: [{ expiresAt: "asc" }, { id: "asc" }],
+      take: TRIP_WORKER_BATCH_SIZE,
+    });
+    if (expired.length === 0) break;
+    for (const booking of expired) {
+      await db.$transaction(
+        async (tx) => {
+          const claimed = await tx.booking.updateMany({
+            where: {
+              id: booking.id,
+              status: "pending",
+              expiresAt: { lte: now },
+            },
+            data: {
+              status: "declined",
+              cancelledAt: now,
+              cancelledByType: "system",
+              cancellationReason: "Booking request expired",
+            },
+          });
+          if (claimed.count === 1) {
+            await tx.trip.updateMany({
+              where: { id: booking.tripId, status: "active" },
+              data: { seatsAvailable: { increment: 1 } },
+            });
+          }
+        },
+        { isolationLevel: "Serializable" },
+      );
+    }
+    if (expired.length < TRIP_WORKER_BATCH_SIZE) break;
   }
 }
 
@@ -95,80 +119,89 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
   try {
     // Транзакция — только изменение данных (без уведомлений, чтобы
     // не держать соединение из пула открытым дольше необходимого).
-    const { processed, confirmedPassengerIds, declinedPassengerIds } = await db.$transaction(
-      async (tx) => {
-        const claimed = await tx.trip.updateMany({
-          where: { id: trip.id, status: "active", departureAt: { lt: cutoff } },
-          data: { status: "completed", seatsAvailable: 0 },
-        });
-
-        if (claimed.count !== 1) {
-          return {
-            processed: false,
-            confirmedPassengerIds: [] as string[],
-            declinedPassengerIds: [] as string[],
-          };
-        }
-
-        // Перечитываем брони ВНУТРИ транзакции: в batch-запросе
-        // processExpiredTrips брони не грузятся, а бронь, созданная в
-        // промежутке, иначе осталась бы в статусе pending на завершённой
-        // поездке навсегда. Грузим только нужные поля.
-        const txBookings = await tx.booking.findMany({
-          where: { tripId: trip.id },
-          select: { id: true, status: true, passengerId: true },
-        });
-
-        const pendingBookingIds = txBookings
-          .filter((b) => b.status === "pending")
-          .map((b) => b.id);
-
-        if (pendingBookingIds.length > 0) {
-          await tx.booking.updateMany({
-            where: { id: { in: pendingBookingIds } },
-            data: {
-              status: "declined",
-              cancelledAt: new Date(),
-              cancelledByType: "system",
-              cancellationReason: "Trip completed",
+    const { processed, confirmedPassengerIds, declinedPassengerIds } =
+      await db.$transaction(
+        async (tx) => {
+          const claimed = await tx.trip.updateMany({
+            where: {
+              id: trip.id,
+              status: "active",
+              departureAt: { lt: cutoff },
             },
+            data: { status: "completed", seatsAvailable: 0 },
           });
-        }
 
-        await tx.user.update({
-          where: { id: trip.driverId },
-          data: { tripsCount: { increment: 1 } },
-        });
+          if (claimed.count !== 1) {
+            return {
+              processed: false,
+              confirmedPassengerIds: [] as string[],
+              declinedPassengerIds: [] as string[],
+            };
+          }
 
-        const confirmedPassengerIds = [
-          ...new Set(
-            txBookings
-              .filter((b) => b.status === "confirmed")
-              .map((b) => b.passengerId)
-          ),
-        ];
+          // Перечитываем брони ВНУТРИ транзакции: в batch-запросе
+          // processExpiredTrips брони не грузятся, а бронь, созданная в
+          // промежутке, иначе осталась бы в статусе pending на завершённой
+          // поездке навсегда. Грузим только нужные поля.
+          const txBookings = await tx.booking.findMany({
+            where: { tripId: trip.id },
+            select: { id: true, status: true, passengerId: true },
+          });
 
-        // Один батч-апдейт вместо N отдельных user.update — меньше
-        // round-trip'ов и памяти на поездках с большим числом пассажиров.
-        if (confirmedPassengerIds.length > 0) {
-          await tx.$executeRaw`
+          const pendingBookingIds = txBookings
+            .filter((b) => b.status === "pending")
+            .map((b) => b.id);
+
+          if (pendingBookingIds.length > 0) {
+            await tx.booking.updateMany({
+              where: { id: { in: pendingBookingIds } },
+              data: {
+                status: "declined",
+                cancelledAt: new Date(),
+                cancelledByType: "system",
+                cancellationReason: "Trip completed",
+              },
+            });
+          }
+
+          await tx.user.update({
+            where: { id: trip.driverId },
+            data: { tripsCount: { increment: 1 } },
+          });
+
+          const confirmedPassengerIds = [
+            ...new Set(
+              txBookings
+                .filter((b) => b.status === "confirmed")
+                .map((b) => b.passengerId),
+            ),
+          ];
+
+          // Один батч-апдейт вместо N отдельных user.update — меньше
+          // round-trip'ов и памяти на поездках с большим числом пассажиров.
+          if (confirmedPassengerIds.length > 0) {
+            await tx.$executeRaw`
             UPDATE "User" SET "tripsCount" = "tripsCount" + 1
             WHERE id IN (${Prisma.join(confirmedPassengerIds)})
           `;
-        }
+          }
 
-        const declinedPassengerIds = [
-          ...new Set(
-            txBookings
-              .filter((b) => b.status === "pending")
-              .map((b) => b.passengerId)
-          ),
-        ];
+          const declinedPassengerIds = [
+            ...new Set(
+              txBookings
+                .filter((b) => b.status === "pending")
+                .map((b) => b.passengerId),
+            ),
+          ];
 
-        return { processed: true, confirmedPassengerIds, declinedPassengerIds };
-      },
-      { isolationLevel: "Serializable" }
-    );
+          return {
+            processed: true,
+            confirmedPassengerIds,
+            declinedPassengerIds,
+          };
+        },
+        { isolationLevel: "Serializable" },
+      );
 
     if (!processed) {
       return;
@@ -192,7 +225,7 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
           "Поездка завершена",
           `Поездка ${trip.fromCity} → ${trip.toCity} завершена. Вы можете оставить отзыв.`,
           // Deep-link: тап по push открывает историю (где оставляется отзыв).
-          "/bookings/history"
+          "/bookings/history",
         ),
         wsManager.sendToUser(pId, {
           type: "trip:status_changed",
@@ -210,7 +243,7 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
           "Поездка завершена",
           `Поездка ${trip.fromCity} → ${trip.toCity} завершена, ваша заявка отклонена.`,
           // Deep-link: тап по push открывает историю броней.
-          "/bookings/history"
+          "/bookings/history",
         ),
         wsManager.sendToUser(pId, {
           type: "trip:status_changed",
@@ -228,7 +261,7 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
         "Поездка завершена",
         `Ваша поездка ${trip.fromCity} → ${trip.toCity} автоматически завершена.`,
         // Deep-link: тап по push открывает «Мои поездки» водителя.
-        "/trips/my"
+        "/trips/my",
       ),
       wsManager.sendToUser(trip.driverId, {
         type: "trip:status_changed",
@@ -243,7 +276,10 @@ async function processExpiredTrip(trip: ExpiredTrip, cutoff: Date) {
     const results = await Promise.allSettled(sideEffects);
     for (const result of results) {
       if (result.status === "rejected") {
-        logger.error({ tripId: trip.id, err: result.reason }, "trip_worker_notify_failed");
+        logger.error(
+          { tripId: trip.id, err: result.reason },
+          "trip_worker_notify_failed",
+        );
       }
     }
   } catch (err) {

@@ -23,6 +23,7 @@ import {
   MOCK_REFRESH_TOKEN_PREFIX,
 } from "./tokens.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
+import { getSanitizedBody } from "../middleware/sanitize.js";
 
 export const authRouter = new Hono();
 
@@ -39,7 +40,7 @@ const refreshLimiter = createRateLimiter({
 });
 
 authRouter.post("/vk", vkAuthLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = authRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -48,7 +49,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
         message: "Invalid request payload",
         errors: z.formatError(parseResult.error),
       },
-      400
+      400,
     );
   }
 
@@ -80,7 +81,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
       lastName: parseResult.data.lastName,
       photo: parseResult.data.photo,
     },
-    queryToVerify
+    queryToVerify,
   );
   const placeholderName = `Пользователь VK ${vkUserId}`;
 
@@ -111,11 +112,24 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
       },
       update: {
         // Аватар не редактируется через API — при каждом входе синхронизируем
-        // с актуальным фото из VK.
+        // с актуальным фото из VK. Tombstone удалённых не трогаем (проверка ниже).
         ...(vkAvatar ? { avatar: vkAvatar } : {}),
       },
       include: { car: true },
     });
+
+  // Tombstone удалённых хранит vkUserId для блокировки повторного входа:
+  // проверяем ДО upsert, чтобы отклонённый логин не мутировал запись.
+  const tombstone = await db.user.findUnique({
+    where: { vkUserId },
+    select: { id: true, deletedAt: true },
+  });
+  if (tombstone?.deletedAt) {
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+      403,
+    );
+  }
 
   let user;
   try {
@@ -153,7 +167,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     const revokedCount = await revokeAllActiveTokens(finalUser.id);
     logger.warn(
       { userId: finalUser.id, revokedCount },
-      "[Auth] VK login rejected — user is banned"
+      "[Auth] VK login rejected — user is banned",
     );
     return c.json(
       {
@@ -161,12 +175,15 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
         message: "Account is banned",
         banReason: finalUser.banReason ?? null,
       },
-      403
+      403,
     );
   }
 
   if (finalUser.deletedAt) {
-    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+      403,
+    );
   }
 
   const accessToken = await signAccessToken(finalUser.id);
@@ -181,7 +198,7 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
 });
 
 authRouter.post("/refresh", refreshLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = refreshRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
@@ -190,13 +207,16 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
 
   try {
     const { userId, jti } = await verifyRefreshToken(
-      parseResult.data.refreshToken
+      parseResult.data.refreshToken,
     );
 
     // DEV mock refresh: записи в БД нет (jti "dev-jti"), ротация невозможна.
     // Возвращаем свежий mock-токен с НОВЫМ exp (TTL DEV_MOCK_TOKEN_TTL_SECONDS),
     // чтобы dev-сессия не умирала по истечении access-токена.
-    if (env.ALLOW_DEV_AUTH && parseResult.data.refreshToken.startsWith(MOCK_REFRESH_TOKEN_PREFIX)) {
+    if (
+      env.ALLOW_DEV_AUTH &&
+      parseResult.data.refreshToken.startsWith(MOCK_REFRESH_TOKEN_PREFIX)
+    ) {
       const user = await db.user.findUnique({
         where: { id: userId },
         include: { car: true },
@@ -209,12 +229,15 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       // Единообразно с основной веткой: забаненному пользователю токены
       // не выдаём. Записи refresh-токена в БД нет (jti "dev-jti") —
       // отзываем только реальные токены, если они есть.
-       if (user.deletedAt) {
-         await revokeAllActiveTokens(user.id);
-         return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
-       }
+      if (user.deletedAt) {
+        await revokeAllActiveTokens(user.id);
+        return c.json(
+          { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+          403,
+        );
+      }
 
-       if (user.bannedAt) {
+      if (user.bannedAt) {
         await revokeAllActiveTokens(user.id);
         return c.json(
           {
@@ -222,14 +245,15 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
             message: "Account is banned",
             banReason: user.banReason ?? null,
           },
-          403
+          403,
         );
       }
 
       const accessToken = await signAccessToken(user.id);
       // Новый exp: mock refresh-токен несёт TTL (security-audit: mocks
       // с коротким TTL), бесконечно живой refresh больше не выдаётся.
-      const refreshExp = Math.floor(Date.now() / 1000) + env.DEV_MOCK_TOKEN_TTL_SECONDS;
+      const refreshExp =
+        Math.floor(Date.now() / 1000) + env.DEV_MOCK_TOKEN_TTL_SECONDS;
 
       return c.json({
         accessToken,
@@ -251,16 +275,19 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       return c.json({ message: "User not found" }, 401);
     }
 
-     if (user.deletedAt) {
-       await revokeAllActiveTokens(user.id);
-       return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
-     }
+    if (user.deletedAt) {
+      await revokeAllActiveTokens(user.id);
+      return c.json(
+        { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+        403,
+      );
+    }
 
-     if (user.bannedAt) {
+    if (user.bannedAt) {
       const revokedCount = await revokeAllActiveTokens(user.id);
       logger.warn(
         { userId: user.id, revokedCount },
-        "[Auth] Refresh rejected — user is banned"
+        "[Auth] Refresh rejected — user is banned",
       );
       return c.json(
         {
@@ -268,7 +295,7 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
           message: "Account is banned",
           banReason: user.banReason ?? null,
         },
-        403
+        403,
       );
     }
 
@@ -295,12 +322,12 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
         const revokedCount = await revokeAllActiveTokens(error.userId);
         logger.warn(
           { userId: error.userId, revokedCount },
-          "[Auth] Refresh token reuse detected — all active tokens revoked"
+          "[Auth] Refresh token reuse detected — all active tokens revoked",
         );
       } catch (revokeError) {
         logger.error(
           { userId: error.userId, err: revokeError },
-          "[Auth] Refresh token reuse detected — failed to revoke active tokens"
+          "[Auth] Refresh token reuse detected — failed to revoke active tokens",
         );
       }
     }
@@ -309,14 +336,18 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
 });
 
 authRouter.post("/logout", refreshLimiter, async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const body = await getSanitizedBody(c);
   const parseResult = refreshRequestSchema.safeParse(body);
 
   if (parseResult.success) {
     try {
-      const { jti } = await verifyRefreshToken(parseResult.data.refreshToken);
-      await db.refreshToken.update({
-        where: { tokenHash: hashToken(jti) },
+      // Предикат отзыва — (tokenHash, userId): та же привязка к владельцу,
+      // что в verifyRefreshToken/rotateRefreshToken. Чужой jti ничего не трогает.
+      const { jti, userId } = await verifyRefreshToken(
+        parseResult.data.refreshToken,
+      );
+      await db.refreshToken.updateMany({
+        where: { tokenHash: hashToken(jti), userId },
         data: { revokedAt: new Date() },
       });
     } catch {

@@ -1,6 +1,10 @@
 // backend/src/serializers/index.ts
 import type { Prisma } from "../generated/prisma/client.js";
-import type { BookingStatus, ReviewStatusValue, TripStatus } from "@edem/contracts";
+import type {
+  BookingStatus,
+  ReviewStatusValue,
+  TripStatus,
+} from "@edem/contracts";
 import { DEFAULT_AVATAR_URL } from "../constants.js";
 
 /**
@@ -74,14 +78,15 @@ export function formatTimeRu(date: Date): string {
 
 export function serializeUser(
   user: UserWithCar,
-  options?: { includePlate?: boolean; includeVkUserId?: boolean }
+  options?: { includePlate?: boolean; includeVkUserId?: boolean },
 ) {
   const isDeleted = Boolean(user.deletedAt);
   return {
     id: user.id,
     // VK ID отдаётся только по явному флагу (участники активной брони),
     // чтобы клиент мог построить ссылку на ЛС vk.com/im?sel=<id>.
-    ...(options?.includeVkUserId && user.vkUserId != null
+    // Удалённые пользователи никогда не раскрывают vkUserId (privacy).
+    ...(options?.includeVkUserId && !isDeleted && user.vkUserId != null
       ? { vkUserId: user.vkUserId }
       : {}),
     name: isDeleted ? "Удалённый пользователь" : user.name,
@@ -101,7 +106,7 @@ export function serializeUser(
           ...(options?.includePlate === false ? {} : { plate: user.car.plate }),
         }
       : undefined,
-    about: isDeleted ? undefined : user.about ?? undefined,
+    about: isDeleted ? undefined : (user.about ?? undefined),
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -110,13 +115,18 @@ export function serializePublicUser(user: UserWithCar) {
   return {
     id: user.id,
     name: user.deletedAt ? "Удалённый пользователь" : user.name,
-    avatar: user.deletedAt ? DEFAULT_AVATAR_URL : user.avatar || DEFAULT_AVATAR_URL,
+    avatar: user.deletedAt
+      ? DEFAULT_AVATAR_URL
+      : user.avatar || DEFAULT_AVATAR_URL,
     rating: user.rating,
     reviewsCount: user.reviewsCount,
     tripsCount: user.tripsCount,
     isVerified: user.isVerified,
-    car: user.deletedAt || !user.car ? undefined : { model: user.car.model, color: user.car.color },
-    about: user.deletedAt ? undefined : user.about ?? undefined,
+    car:
+      user.deletedAt || !user.car
+        ? undefined
+        : { model: user.car.model, color: user.car.color },
+    about: user.deletedAt ? undefined : (user.about ?? undefined),
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -136,17 +146,19 @@ export function serializeTrip(
     includePlate?: boolean;
     includePrivateDetails?: boolean;
     includeVkUserId?: boolean;
-  }
+  },
 ) {
   return {
     id: trip.id,
     fromCity: trip.fromCity,
     // В публичном режиме адреса встречи не отдаются: подстановка города
     // в поле адреса создавала дубли «Москва / Москва» на карточках.
-    fromAddress: options?.includePrivateDetails === false ? undefined : trip.fromAddress,
+    fromAddress:
+      options?.includePrivateDetails === false ? undefined : trip.fromAddress,
     fromCityId: trip.fromCityId ?? null,
     toCity: trip.toCity,
-    toAddress: options?.includePrivateDetails === false ? undefined : trip.toAddress,
+    toAddress:
+      options?.includePrivateDetails === false ? undefined : trip.toAddress,
     toCityId: trip.toCityId ?? null,
     date: formatDateRu(trip.departureAt),
     time: formatTimeRu(trip.departureAt),
@@ -181,7 +193,7 @@ export function serializeTrip(
 
 export function serializeBooking(
   booking: BookingWithRelations,
-  options?: { includeVkUserId?: boolean }
+  options?: { includeVkUserId?: boolean },
 ) {
   return {
     id: booking.id,

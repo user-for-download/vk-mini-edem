@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateRideRequestDto, UpdateRideRequestDto } from "@edem/contracts";
+import type {
+  CreateRideRequestDto,
+  UpdateRideRequestDto,
+} from "@edem/contracts";
 import { rideRequestsApi } from "@/api/rideRequests.api";
 
 export const RIDE_REQUEST_KEYS = {
@@ -15,24 +18,40 @@ export function useRideRequestsQuery(enabled = true) {
   });
 }
 
-function useRideRequestMutation<T>(mutationFn: (data: T) => Promise<unknown>) {
+function useRideRequestMutation<TData, TVariables>(
+  mutationFn: (data: TVariables) => Promise<TData>,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: RIDE_REQUEST_KEYS.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: RIDE_REQUEST_KEYS.all }),
   });
 }
 
 export function useCreateRideRequestMutation() {
-  return useRideRequestMutation((data: CreateRideRequestDto) => rideRequestsApi.create(data));
+  return useRideRequestMutation((data: CreateRideRequestDto) =>
+    rideRequestsApi.create(data),
+  );
 }
 
 export function useUpdateRideRequestMutation() {
-  return useRideRequestMutation(({ id, data }: { id: string; data: UpdateRideRequestDto }) => rideRequestsApi.update(id, data));
+  return useRideRequestMutation(
+    ({ id, data }: { id: string; data: UpdateRideRequestDto }) =>
+      rideRequestsApi.update(id, data),
+  );
 }
 
 export function useRideRequestStatusMutation() {
-  return useRideRequestMutation(({ id, status }: { id: string; status: "active" | "paused" | "fulfilled" | "cancelled" }) => rideRequestsApi.setStatus(id, status));
+  return useRideRequestMutation(
+    ({
+      id,
+      status,
+    }: {
+      id: string;
+      status: "active" | "paused" | "fulfilled" | "cancelled";
+    }) => rideRequestsApi.setStatus(id, status),
+  );
 }
 
 export function useCancelRideRequestMutation() {

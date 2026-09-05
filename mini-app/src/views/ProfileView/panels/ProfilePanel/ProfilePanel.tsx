@@ -1,5 +1,20 @@
 import { useState, type FC } from "react";
-import { Avatar, Button, Caption, Box, Flex, Group, Header, InfoRow, Panel, SimpleCell, SimpleGrid, Spacing, Text, Title } from "@vkontakte/vkui";
+import {
+  Avatar,
+  Button,
+  Caption,
+  Box,
+  Flex,
+  Group,
+  Header,
+  InfoRow,
+  Panel,
+  SimpleCell,
+  SimpleGrid,
+  Spacing,
+  Text,
+  Title,
+} from "@vkontakte/vkui";
 import {
   Icon24CarOutline,
   Icon24MessageStarsOutline,
@@ -19,8 +34,11 @@ import { resolveAvatar } from "@/helpers/avatar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
 import { usersApi } from "@/api/users.api";
+import { ApiError } from "@/api/client";
+import { getErrorMessage } from "@/helpers/errorMessages";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSnackbar } from "@/providers/SnackbarProvider";
+import { useConfirm } from "@/providers/ConfirmProvider";
 
 export interface ProfilePanelProps {
   id: string;
@@ -53,6 +71,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   const routeNavigator = useRouteNavigator();
   const [deleting, setDeleting] = useState(false);
   const { enqueue } = useSnackbar();
+  const confirm = useConfirm();
   const clearSession = useAuthStore((state) => state.clearSession);
 
   const {
@@ -67,25 +86,45 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     return (
       <Panel id={id}>
         <AppPanelHeader>Профиль</AppPanelHeader>
-        <Box padding="system"><Text>Загрузка профиля...</Text></Box>
+        <Box padding="system">
+          <Text>Загрузка профиля...</Text>
+        </Box>
       </Panel>
     );
   }
 
   const handleDeleteAccount = async () => {
-    if (!window.confirm("Удалить профиль? Аккаунт будет анонимизирован, а восстановление будет невозможно.")) return;
+    const first = await confirm({
+      title: "Удалить профиль?",
+      description:
+        "Аккаунт будет анонимизирован, поездки и отзывы сохранятся без вашего имени. Активные поездки и брони нужно завершить или отменить заранее.",
+      confirmTitle: "Продолжить",
+    });
+    if (!first) return;
+    const second = await confirm({
+      title: "Подтвердите удаление",
+      description:
+        "Восстановление будет невозможно. Удалить профиль окончательно?",
+      confirmTitle: "Удалить профиль",
+    });
+    if (!second) return;
     setDeleting(true);
     try {
       await usersApi.deleteCurrentUser();
       await clearSession("Account deleted");
     } catch (error) {
-      enqueue({ type: "error", title: error instanceof Error ? error.message : "Не удалось удалить профиль" });
+      const code = error instanceof ApiError ? error.code : undefined;
+      enqueue({
+        type: "error",
+        title: getErrorMessage(
+          code,
+          error instanceof Error ? error.message : "Не удалось удалить профиль",
+        ),
+      });
     } finally {
       setDeleting(false);
     }
   };
-
-
 
   return (
     <Panel id={id}>
@@ -97,8 +136,14 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           <Title level="2" weight="2">
             {currentUser.name}
           </Title>
-          <RatingBadge value={currentUser.rating} reviewsCount={currentUser.reviewsCount} />
-          <Caption level="1" style={{ color: "var(--vkui--color_text_secondary)" }}>
+          <RatingBadge
+            value={currentUser.rating}
+            reviewsCount={currentUser.reviewsCount}
+          />
+          <Caption
+            level="1"
+            style={{ color: "var(--vkui--color_text_secondary)" }}
+          >
             Личность подтверждена ВКонтакте
           </Caption>
           <Spacing size={4} />
@@ -110,7 +155,9 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
         <Box padding="system">
           <SimpleGrid columns={2} gap={12}>
-            <InfoRow header="Поездок совершено">{currentUser.tripsCount}</InfoRow>
+            <InfoRow header="Поездок совершено">
+              {currentUser.tripsCount}
+            </InfoRow>
             <InfoRow header="На сервисе с">
               {currentUser.createdAt
                 ? new Date(currentUser.createdAt).getFullYear()
@@ -150,7 +197,10 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 
       <Group header={<Header size="s">поездки для отзыва</Header>}>
         {availableReviewTripsLoading && (
-          <SimpleCell before={<Icon24StarsOutline />} subtitle="Ищем завершенные поездки">
+          <SimpleCell
+            before={<Icon24StarsOutline />}
+            subtitle="Ищем завершенные поездки"
+          >
             Загрузка...
           </SimpleCell>
         )}
@@ -167,7 +217,9 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
               <Button
                 size="s"
                 mode="tertiary"
-                onClick={() => { void refetchAvailableReviewTrips(); }}
+                onClick={() => {
+                  void refetchAvailableReviewTrips();
+                }}
               >
                 Попробовать снова
               </Button>
@@ -214,7 +266,11 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           <SimpleCell
             before={<Icon24DocumentOutline />}
             chevron="always"
-            onClick={() => (onOpenMyBookings ? onOpenMyBookings() : routeNavigator.push("/bookings"))}
+            onClick={() =>
+              onOpenMyBookings
+                ? onOpenMyBookings()
+                : routeNavigator.push("/bookings")
+            }
           >
             Мои брони
           </SimpleCell>
@@ -223,7 +279,11 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
           <SimpleCell
             before={<Icon24ServicesOutline />}
             chevron="always"
-            onClick={() => (onOpenHistory ? onOpenHistory() : routeNavigator.push("/bookings/history"))}
+            onClick={() =>
+              onOpenHistory
+                ? onOpenHistory()
+                : routeNavigator.push("/bookings/history")
+            }
           >
             История поездок
           </SimpleCell>
@@ -238,23 +298,44 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Group>
 
       <Group header={<Header size="s">настройки</Header>}>
-        <SimpleCell before={<Icon24NotificationOutline />} chevron="always" onClick={onOpenNotifications}>
+        <SimpleCell
+          before={<Icon24NotificationOutline />}
+          chevron="always"
+          onClick={onOpenNotifications}
+        >
           Уведомления
         </SimpleCell>
-        <SimpleCell before={<Icon24HelpOutline />} chevron="always" onClick={onOpenSupport}>
+        <SimpleCell
+          before={<Icon24HelpOutline />}
+          chevron="always"
+          onClick={onOpenSupport}
+        >
           Помощь и поддержка
         </SimpleCell>
-        <SimpleCell before={<Icon24InfoCircleOutline />} chevron="always" onClick={onOpenAbout}>
+        <SimpleCell
+          before={<Icon24InfoCircleOutline />}
+          chevron="always"
+          onClick={onOpenAbout}
+        >
           О сервисе
         </SimpleCell>
       </Group>
 
       <Group header={<Header size="s">опасная зона</Header>}>
         <Box padding="system">
-          <Button mode="tertiary" appearance="negative" loading={deleting} disabled={deleting} stretched onClick={() => void handleDeleteAccount()}>
+          <Button
+            mode="tertiary"
+            appearance="negative"
+            loading={deleting}
+            disabled={deleting}
+            stretched
+            onClick={() => void handleDeleteAccount()}
+          >
             Удалить профиль
           </Button>
-          <Caption level="1">Активные поездки и брони нужно завершить или отменить заранее.</Caption>
+          <Caption level="1">
+            Активные поездки и брони нужно завершить или отменить заранее.
+          </Caption>
         </Box>
       </Group>
 

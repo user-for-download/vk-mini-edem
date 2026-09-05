@@ -10,6 +10,17 @@ export interface DeepLinkParams {
 }
 
 /**
+ * Допустимый формат id поездки в deep link: opaque-строка без
+ * спецсимволов (иначе — инъекция маршрута/поиск по чужому id).
+ * Невалидное значение игнорируется (не прокидывается в запросы).
+ */
+export const TRIP_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+export function isValidTripId(value: string): boolean {
+  return TRIP_ID_PATTERN.test(value);
+}
+
+/**
  * Парсит параметры deep link из URL.
  *
  * VK Mini Apps передаёт параметры через:
@@ -21,7 +32,7 @@ export function parseDeepLink(search = window.location.search): DeepLinkParams {
 
   const searchParams = new URLSearchParams(search);
   const tripId = searchParams.get("tripId");
-  if (tripId) {
+  if (tripId && isValidTripId(tripId)) {
     params.tripId = tripId;
   }
   if (searchParams.get("openHistory") === "true") {

@@ -35,15 +35,20 @@ import type {
   AdminSessionResponse,
   AdminSettingsDto,
 } from "@edem/contracts";
-import {
-  cityNameNormalized,
-} from "@edem/contracts";
+import { cityNameNormalized } from "@edem/contracts";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { ERROR_CODES } from "../errors.js";
 import { getSanitizedBody, sanitizeValue } from "../middleware/sanitize.js";
-import { createRateLimiter, mutationLimiter, adminReadLimiter } from "../middleware/rateLimit.js";
-import { signAdminAccessToken, verifyAdminAccessToken } from "../auth/tokens.js";
+import {
+  createRateLimiter,
+  mutationLimiter,
+  adminReadLimiter,
+} from "../middleware/rateLimit.js";
+import {
+  signAdminAccessToken,
+  verifyAdminAccessToken,
+} from "../auth/tokens.js";
 import { wsManager } from "../ws/manager.js";
 import { tokensEqual } from "../utils/timingSafeEqual.js";
 import { getUniqueConstraintName } from "../utils/prisma-errors.js";
@@ -112,7 +117,7 @@ adminRouter.post("/auth/login", adminLoginLimiter, async (c) => {
   if (!env.ADMIN_TOKEN) {
     return c.json(
       { code: ERROR_CODES.FORBIDDEN, message: "Admin access disabled" },
-      403
+      403,
     );
   }
 
@@ -121,14 +126,14 @@ adminRouter.post("/auth/login", adminLoginLimiter, async (c) => {
   if (!parseResult.success) {
     return c.json(
       { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid payload" },
-      400
+      400,
     );
   }
 
   if (!tokensEqual(parseResult.data.token, env.ADMIN_TOKEN)) {
     return c.json(
       { code: ERROR_CODES.UNAUTHORIZED, message: "Invalid admin token" },
-      401
+      401,
     );
   }
 
@@ -201,7 +206,7 @@ function getSanitizedQuery(c: Context): Record<string, unknown> {
 function invalidQueryResponse(c: Context) {
   return c.json(
     { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid query" },
-    400
+    400,
   );
 }
 
@@ -211,15 +216,21 @@ function invalidQueryResponse(c: Context) {
 adminRouter.get("/dashboard", adminReadLimiter, async (c) => {
   const weekAgo = new Date(Date.now() - SEVEN_DAYS_MS);
 
-  const [totalUsers, totalTrips, activeTrips, totalBookings, totalReviews, newUsersLast7Days] =
-    await Promise.all([
-      db.user.count(),
-      db.trip.count(),
-      db.trip.count({ where: { status: "active" } }),
-      db.booking.count(),
-      db.review.count(),
-      db.user.count({ where: { createdAt: { gte: weekAgo } } }),
-    ]);
+  const [
+    totalUsers,
+    totalTrips,
+    activeTrips,
+    totalBookings,
+    totalReviews,
+    newUsersLast7Days,
+  ] = await Promise.all([
+    db.user.count(),
+    db.trip.count(),
+    db.trip.count({ where: { status: "active" } }),
+    db.booking.count(),
+    db.review.count(),
+    db.user.count({ where: { createdAt: { gte: weekAgo } } }),
+  ]);
 
   const payload: AdminDashboardDto = {
     totalUsers,
@@ -277,7 +288,9 @@ adminRouter.get("/trips", adminReadLimiter, async (c) => {
   }
 
   const query = parseResult.data;
-  const where: Prisma.TripWhereInput = query.status ? { status: query.status } : {};
+  const where: Prisma.TripWhereInput = query.status
+    ? { status: query.status }
+    : {};
 
   const [trips, total] = await Promise.all([
     db.trip.findMany({
@@ -310,7 +323,9 @@ adminRouter.get("/bookings", adminReadLimiter, async (c) => {
   }
 
   const query = parseResult.data;
-  const where: Prisma.BookingWhereInput = query.status ? { status: query.status } : {};
+  const where: Prisma.BookingWhereInput = query.status
+    ? { status: query.status }
+    : {};
 
   const [bookings, total] = await Promise.all([
     db.booking.findMany({
@@ -344,7 +359,9 @@ adminRouter.get("/reviews", adminReadLimiter, async (c) => {
   }
 
   const query = parseResult.data;
-  const where: Prisma.ReviewWhereInput = query.status ? { status: query.status } : {};
+  const where: Prisma.ReviewWhereInput = query.status
+    ? { status: query.status }
+    : {};
 
   const [reviews, total] = await Promise.all([
     db.review.findMany({
@@ -410,7 +427,10 @@ adminRouter.get("/feedback/:id", adminReadLimiter, async (c) => {
     include: { user: true },
   });
   if (!feedback) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" },
+      404,
+    );
   }
   return c.json(serializeAdminFeedback(feedback));
 });
@@ -420,7 +440,7 @@ adminRouter.get("/feedback/:id", adminReadLimiter, async (c) => {
  * уведомление пользователю. 404 если обращение не найдено; 400 если
  * уже есть ответ (используйте PUT для редактирования).
  */
-adminRouter.post("/feedback/:id/reply", async (c) => {
+adminRouter.post("/feedback/:id/reply", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const body = await getSanitizedBody(c);
@@ -432,13 +452,16 @@ adminRouter.post("/feedback/:id/reply", async (c) => {
         message: "Invalid payload",
         errors: z.formatError(parseResult.error),
       },
-      400
+      400,
     );
   }
 
   const existing = await db.feedback.findUnique({ where: { id } });
   if (!existing) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" },
+      404,
+    );
   }
   if (existing.reply !== null) {
     return c.json(
@@ -446,7 +469,7 @@ adminRouter.post("/feedback/:id/reply", async (c) => {
         code: ERROR_CODES.VALIDATION_FAILED,
         message: "Reply already exists; use PUT to update",
       },
-      400
+      400,
     );
   }
 
@@ -465,7 +488,7 @@ adminRouter.post("/feedback/:id/reply", async (c) => {
     "feedback_replied",
     "Ответ поддержки",
     truncateForNotification(updated.reply ?? ""),
-    "/profile?panel=support"
+    "/profile?panel=support",
   );
 
   logBusinessEvent("feedback.replied", {
@@ -481,7 +504,7 @@ adminRouter.post("/feedback/:id/reply", async (c) => {
  * двигает `repliedAt` (аудит «когда был дан ответ»). 404 если обращение
  * не найдено; 400 если ответа ещё нет (используйте POST).
  */
-adminRouter.put("/feedback/:id/reply", async (c) => {
+adminRouter.put("/feedback/:id/reply", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const body = await getSanitizedBody(c);
@@ -493,13 +516,16 @@ adminRouter.put("/feedback/:id/reply", async (c) => {
         message: "Invalid payload",
         errors: z.formatError(parseResult.error),
       },
-      400
+      400,
     );
   }
 
   const existing = await db.feedback.findUnique({ where: { id } });
   if (!existing) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Feedback not found" },
+      404,
+    );
   }
   if (existing.reply === null) {
     return c.json(
@@ -507,7 +533,7 @@ adminRouter.put("/feedback/:id/reply", async (c) => {
         code: ERROR_CODES.VALIDATION_FAILED,
         message: "No reply to update; use POST to create",
       },
-      400
+      400,
     );
   }
 
@@ -561,7 +587,7 @@ adminRouter.get("/settings", adminReadLimiter, async (c) => {
  * метку времени и перезаписывает причину. Открытые WS-соединения закрываем
  * сразу (код 4403). Поездки пользователя при этом НЕ отменяем (осознанно).
  */
-adminRouter.patch("/users/:id/ban", async (c) => {
+adminRouter.patch("/users/:id/ban", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const body = await getSanitizedBody(c);
@@ -573,13 +599,16 @@ adminRouter.patch("/users/:id/ban", async (c) => {
         message: "Invalid payload",
         errors: z.formatError(parseResult.error),
       },
-      400
+      400,
     );
   }
 
   const user = await db.user.findUnique({ where: { id } });
   if (!user) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "User not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "User not found" },
+      404,
+    );
   }
 
   const updated = await db.user.update({
@@ -589,7 +618,7 @@ adminRouter.patch("/users/:id/ban", async (c) => {
 
   // Уже установленные WS-сессии не знают о бане до истечения access-токена —
   // закрываем их немедленно.
-  wsManager.closeUserConnections(id, 4403, "Account is banned");
+  wsManager.closeUserConnections(updated.id, 4403, "Account is banned");
 
   return c.json(serializeAdminUser(updated));
 });
@@ -597,12 +626,15 @@ adminRouter.patch("/users/:id/ban", async (c) => {
 /**
  * Разбан пользователя: очищаем и bannedAt, и banReason.
  */
-adminRouter.patch("/users/:id/unban", async (c) => {
+adminRouter.patch("/users/:id/unban", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const user = await db.user.findUnique({ where: { id } });
   if (!user) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "User not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "User not found" },
+      404,
+    );
   }
 
   const updated = await db.user.update({
@@ -618,12 +650,15 @@ adminRouter.patch("/users/:id/unban", async (c) => {
  * При следующем запуске приложения пользователь снова увидит слайды.
  * Идемпотентно: сброс уже пустого флага просто возвращает пользователя.
  */
-adminRouter.patch("/users/:id/onboarding-reset", async (c) => {
+adminRouter.patch("/users/:id/onboarding-reset", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const user = await db.user.findUnique({ where: { id } });
   if (!user) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "User not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "User not found" },
+      404,
+    );
   }
 
   const updated = await db.user.update({
@@ -645,7 +680,7 @@ adminRouter.patch("/users/:id/onboarding-reset", async (c) => {
  * дважды декрементировать счётчики городов (F17): конфликтная транзакция
  * получит P2034 и ответит 409.
  */
-adminRouter.patch("/trips/:id/cancel", async (c) => {
+adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   type CancelResult =
@@ -690,7 +725,7 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
 
         return { kind: "ok" as const, trip: updated };
       },
-      { isolationLevel: "Serializable" }
+      { isolationLevel: "Serializable" },
     );
   } catch (error) {
     // Serializable: параллельная отмена той же поездки — конфликтная
@@ -700,15 +735,21 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Поездка только что изменилась, попробуйте ещё раз",
+        },
+        409,
       );
     }
     throw error;
   }
 
   if (result.kind === "not_found") {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Trip not found" },
+      404,
+    );
   }
   if (result.kind === "not_active") {
     return c.json(
@@ -716,7 +757,7 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
         code: ERROR_CODES.TRIP_NOT_ACTIVE,
         message: "Trip is already completed or cancelled",
       },
-      409
+      409,
     );
   }
 
@@ -732,7 +773,7 @@ adminRouter.patch("/trips/:id/cancel", async (c) => {
  * active → неактивный освобождает место, обратный переход — повторно
  * удерживает (с проверкой доступности и занятости места).
  */
-adminRouter.patch("/bookings/:id/status", async (c) => {
+adminRouter.patch("/bookings/:id/status", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const body = await getSanitizedBody(c);
@@ -740,7 +781,7 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
   if (!parseResult.success) {
     return c.json(
       { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid payload" },
-      400
+      400,
     );
   }
 
@@ -762,17 +803,26 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
 
         // Активная бронь становится неактивной — освобождаем место
         // (не выше seatsTotal: защита от рассинхрона счётчика).
-        if (isActiveBookingStatus(oldStatus) && !isActiveBookingStatus(newStatus)) {
+        if (
+          isActiveBookingStatus(oldStatus) &&
+          !isActiveBookingStatus(newStatus)
+        ) {
           await tx.trip.update({
             where: { id: trip.id },
             data: {
-              seatsAvailable: Math.min(trip.seatsAvailable + 1, trip.seatsTotal),
+              seatsAvailable: Math.min(
+                trip.seatsAvailable + 1,
+                trip.seatsTotal,
+              ),
             },
           });
         }
 
         // Неактивная бронь снова становится активной — повторно удерживаем место.
-        if (!isActiveBookingStatus(oldStatus) && isActiveBookingStatus(newStatus)) {
+        if (
+          !isActiveBookingStatus(oldStatus) &&
+          isActiveBookingStatus(newStatus)
+        ) {
           if (trip.seatsAvailable <= 0) {
             return {
               kind: "conflict",
@@ -786,7 +836,13 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
               tripId: trip.id,
               seat: booking.seat,
               status: { in: [...ACTIVE_BOOKING_STATUSES] },
-              OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+              OR: [
+                { status: "confirmed" },
+                {
+                  status: "pending",
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                },
+              ],
               id: { not: booking.id },
             },
           });
@@ -812,11 +868,14 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
 
         return { kind: "updated", booking: updated } as const;
       },
-      { isolationLevel: "Serializable" }
+      { isolationLevel: "Serializable" },
     );
 
     if (result.kind === "not_found") {
-      return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Booking not found" }, 404);
+      return c.json(
+        { code: ERROR_CODES.NOT_FOUND, message: "Booking not found" },
+        404,
+      );
     }
 
     if (result.kind === "conflict") {
@@ -837,7 +896,7 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
       if (constraintName === "active_seat_booking") {
         return c.json(
           { code: ERROR_CODES.SEAT_TAKEN, message: "Seat is already reserved" },
-          409
+          409,
         );
       }
 
@@ -847,13 +906,13 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
             code: ERROR_CODES.ALREADY_BOOKED,
             message: "Passenger already has an active booking for this trip",
           },
-          409
+          409,
         );
       }
 
       return c.json(
         { code: ERROR_CODES.BOOKING_CONFLICT, message: "Booking conflict" },
-        409
+        409,
       );
     }
 
@@ -864,8 +923,11 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Booking was just changed, please retry" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Booking was just changed, please retry",
+        },
+        409,
       );
     }
 
@@ -881,12 +943,15 @@ adminRouter.patch("/bookings/:id/status", async (c) => {
  * по оставшимся отзывам — та же логика, что при создании отзыва
  * (recomputeUserRating), в одной транзакции с удалением.
  */
-adminRouter.delete("/reviews/:id", async (c) => {
+adminRouter.delete("/reviews/:id", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const review = await db.review.findUnique({ where: { id } });
   if (!review) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Review not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Review not found" },
+      404,
+    );
   }
 
   await db.$transaction(async (tx) => {
@@ -906,12 +971,15 @@ adminRouter.delete("/reviews/:id", async (c) => {
  * 404 — отзыв не найден; 409 — статус не pending (повторное одобрение
  * или одобрение отклонённого отзыва запрещено).
  */
-adminRouter.patch("/reviews/:id/approve", async (c) => {
+adminRouter.patch("/reviews/:id/approve", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const review = await db.review.findUnique({ where: { id } });
   if (!review) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Review not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Review not found" },
+      404,
+    );
   }
   if (review.status !== "pending") {
     return c.json(
@@ -919,7 +987,7 @@ adminRouter.patch("/reviews/:id/approve", async (c) => {
         code: ERROR_CODES.CONFLICT,
         message: "Only pending reviews can be approved",
       },
-      409
+      409,
     );
   }
 
@@ -949,7 +1017,7 @@ adminRouter.patch("/reviews/:id/approve", async (c) => {
     "review_approved",
     "Отзыв опубликован",
     "Ваш отзыв опубликован",
-    "/profile?panel=reviews"
+    "/profile?panel=reviews",
   );
 
   return c.json(serializeAdminReview(updated));
@@ -963,12 +1031,15 @@ adminRouter.patch("/reviews/:id/approve", async (c) => {
  * агрегат получателя отклонением не меняется.
  * 404 — отзыв не найден; 409 — статус не pending.
  */
-adminRouter.patch("/reviews/:id/reject", async (c) => {
+adminRouter.patch("/reviews/:id/reject", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
   const review = await db.review.findUnique({ where: { id } });
   if (!review) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Review not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Review not found" },
+      404,
+    );
   }
   if (review.status !== "pending") {
     return c.json(
@@ -976,7 +1047,7 @@ adminRouter.patch("/reviews/:id/reject", async (c) => {
         code: ERROR_CODES.CONFLICT,
         message: "Only pending reviews can be rejected",
       },
-      409
+      409,
     );
   }
 
@@ -998,7 +1069,7 @@ adminRouter.patch("/reviews/:id/reject", async (c) => {
     "review_rejected",
     "Отзыв отклонён",
     "Ваш отзыв не был опубликован",
-    "/profile?panel=reviews"
+    "/profile?panel=reviews",
   );
 
   return c.json(serializeAdminReview(updated));
@@ -1080,7 +1151,10 @@ adminRouter.post("/cities", mutationLimiter, async (c) => {
     const created = await db.city.create({
       data: { name, nameNormalized },
     });
-    logBusinessEvent("city.created", { cityId: created.id, name: created.name });
+    logBusinessEvent("city.created", {
+      cityId: created.id,
+      name: created.name,
+    });
     return c.json(serializeAdminCity(created), 201);
   } catch (error) {
     if (
@@ -1115,7 +1189,10 @@ adminRouter.patch("/cities/:id", mutationLimiter, async (c) => {
 
   const existing = await db.city.findUnique({ where: { id } });
   if (!existing) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "City not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "City not found" },
+      404,
+    );
   }
 
   const { name } = parsed.data;
@@ -1162,7 +1239,10 @@ adminRouter.delete("/cities/:id", mutationLimiter, async (c) => {
 
   const existing = await db.city.findUnique({ where: { id } });
   if (!existing) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "City not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "City not found" },
+      404,
+    );
   }
 
   if (existing.tripsCount > 0) {
@@ -1190,10 +1270,14 @@ adminRouter.delete("/cities/:id", mutationLimiter, async (c) => {
  * в обход API, сид без синхронизированных счётчиков. Идемпотентен —
  * безопасно вызывать многократно.
  */
-adminRouter.post("/cities/recompute-trips-count", async (c) => {
-  const { updated } = await db.$transaction((tx) =>
-    recomputeCityTripsCount(tx)
-  );
-  logBusinessEvent("city.trips_count.recomputed", { updated });
-  return c.json({ ok: true, updated }, 200);
-});
+adminRouter.post(
+  "/cities/recompute-trips-count",
+  mutationLimiter,
+  async (c) => {
+    const { updated } = await db.$transaction((tx) =>
+      recomputeCityTripsCount(tx),
+    );
+    logBusinessEvent("city.trips_count.recomputed", { updated });
+    return c.json({ ok: true, updated }, 200);
+  },
+);

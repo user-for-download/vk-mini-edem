@@ -3,7 +3,12 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { Prisma } from "../generated/prisma/client.js";
-import { createTripDtoSchema, updateTripDtoSchema, TRIP_STATUS, ACTIVE_BOOKING_STATUSES } from "@edem/contracts";
+import {
+  createTripDtoSchema,
+  updateTripDtoSchema,
+  TRIP_STATUS,
+  ACTIVE_BOOKING_STATUSES,
+} from "@edem/contracts";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { logger } from "../logger.js";
@@ -28,7 +33,11 @@ import {
   incrementCityTripsCount,
 } from "../cities/counters.js";
 import { TripError, TripErrors } from "./errors.js";
-import { getTripRange, rangesOverlap, type TimeRange } from "../utils/overlap.js";
+import {
+  getTripRange,
+  rangesOverlap,
+  type TimeRange,
+} from "../utils/overlap.js";
 import { moscowDateBoundary } from "../utils/moscowTime.js";
 
 type TripWithDriver = Prisma.TripGetPayload<{
@@ -39,7 +48,7 @@ const MAX_SEARCH_LENGTH = 100;
 const MAX_PAGE = 10_000;
 
 async function getActiveBookingSeatsByTripIds(
-  tripIds: string[]
+  tripIds: string[],
 ): Promise<Map<string, number[]>> {
   const map = new Map<string, number[]>();
 
@@ -81,19 +90,25 @@ async function getActiveBookingSeatsByTripIds(
 async function assertPassengersHaveNoBookingOverlap(
   tx: Prisma.TransactionClient,
   tripId: string,
-  newRange: TimeRange
+  newRange: TimeRange,
 ): Promise<void> {
   const tripActiveBookings = await tx.booking.findMany({
     where: {
       tripId,
       status: { in: [...ACTIVE_BOOKING_STATUSES] },
-      OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+      OR: [
+        { status: "confirmed" },
+        {
+          status: "pending",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      ],
     },
     select: { passengerId: true },
   });
 
   const passengerIds = Array.from(
-    new Set(tripActiveBookings.map((booking) => booking.passengerId))
+    new Set(tripActiveBookings.map((booking) => booking.passengerId)),
   );
 
   if (passengerIds.length === 0) {
@@ -105,8 +120,14 @@ async function assertPassengersHaveNoBookingOverlap(
       passengerId: { in: passengerIds },
       // Брони на ЭТУ поездку исключаем: сравниваем только с ДРУГИМИ поездками.
       tripId: { not: tripId },
-       status: { in: [...ACTIVE_BOOKING_STATUSES] },
-       OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
+      status: { in: [...ACTIVE_BOOKING_STATUSES] },
+      OR: [
+        { status: "confirmed" },
+        {
+          status: "pending",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      ],
       trip: {
         status: "active",
         // Потенциально пересекаются только поездки, стартующие до конца
@@ -120,13 +141,16 @@ async function assertPassengersHaveNoBookingOverlap(
   });
 
   const hasOverlap = otherActiveBookings.some((booking) =>
-    rangesOverlap(newRange, getTripRange(booking.trip.departureAt, booking.trip.durationMinutes))
+    rangesOverlap(
+      newRange,
+      getTripRange(booking.trip.departureAt, booking.trip.durationMinutes),
+    ),
   );
 
   if (hasOverlap) {
     throw new TripError(
       TripErrors.passengerOverlap(),
-      "Новое время пересекается с другими активными бронями пассажиров"
+      "Новое время пересекается с другими активными бронями пассажиров",
     );
   }
 }
@@ -149,13 +173,25 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
 
   const page = Math.min(
     MAX_PAGE,
-    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1)
+    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1),
   );
-  const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
+  const limit = Math.min(
+    50,
+    Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20),
+  );
   const skip = (page - 1) * limit;
 
-  if ([q, fromCity, toCity].some((value) => value && value.length > MAX_SEARCH_LENGTH)) {
-    return c.json({ message: `Search parameters must not exceed ${MAX_SEARCH_LENGTH} characters` }, 400);
+  if (
+    [q, fromCity, toCity].some(
+      (value) => value && value.length > MAX_SEARCH_LENGTH,
+    )
+  ) {
+    return c.json(
+      {
+        message: `Search parameters must not exceed ${MAX_SEARCH_LENGTH} characters`,
+      },
+      400,
+    );
   }
 
   if (tagsParam && tagsParam.length > 600) {
@@ -247,16 +283,16 @@ tripsRouter.get("/", publicReadLimiter, async (c) => {
   ]);
 
   const bookedSeatsMap = await getActiveBookingSeatsByTripIds(
-    trips.map((trip) => trip.id)
+    trips.map((trip) => trip.id),
   );
 
   return c.json({
     items: trips.map((trip) =>
-    serializeTrip(trip, {
+      serializeTrip(trip, {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
         includePlate: false,
         includePrivateDetails: false,
-      })
+      }),
     ),
     pagination: {
       page,
@@ -279,9 +315,12 @@ tripsRouter.get("/my", requireUser, async (c) => {
   const statusParam = c.req.query("status"); // "active" | "archive"
   const page = Math.min(
     MAX_PAGE,
-    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1)
+    Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1),
   );
-  const limit = Math.min(50, Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20));
+  const limit = Math.min(
+    50,
+    Math.max(1, Number.parseInt(limitParam ?? "20", 10) || 20),
+  );
   const skip = (page - 1) * limit;
 
   // Фильтр по статусу для пагинации на клиенте (вкладки "Активные"/"Архив").
@@ -343,14 +382,14 @@ tripsRouter.get("/my", requireUser, async (c) => {
     if (booking.status === "pending") {
       pendingCountMap.set(
         booking.tripId,
-        (pendingCountMap.get(booking.tripId) ?? 0) + 1
+        (pendingCountMap.get(booking.tripId) ?? 0) + 1,
       );
     }
 
     if (booking.status === "confirmed") {
       confirmedCountMap.set(
         booking.tripId,
-        (confirmedCountMap.get(booking.tripId) ?? 0) + 1
+        (confirmedCountMap.get(booking.tripId) ?? 0) + 1,
       );
     }
 
@@ -367,7 +406,7 @@ tripsRouter.get("/my", requireUser, async (c) => {
         bookedSeats: bookedSeatsMap.get(trip.id) ?? [],
         pendingRequestsCount: pendingCountMap.get(trip.id) ?? 0,
         confirmedBookingsCount: confirmedCountMap.get(trip.id) ?? 0,
-      })
+      }),
     ),
     pagination: {
       page,
@@ -399,7 +438,10 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
   });
 
   if (!trip) {
-    return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Trip not found" }, 404);
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Trip not found" },
+      404,
+    );
   }
 
   const activeBookings = await db.booking.findMany({
@@ -454,181 +496,205 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
       // VK ID водителя видят только участники (водитель/активная бронь) —
       // для кнопки «Написать» в ЛС.
       includeVkUserId: canSeePrivateDetails,
-    })
+    }),
   );
 });
 
 /**
  * Создание поездки текущим пользователем.
  */
-tripsRouter.post("/", requireUser, mutationLimiter, createTripLimiter, async (c) => {
-  const body = await getSanitizedBody(c);
-  const parseResult = createTripDtoSchema.safeParse(body);
+tripsRouter.post(
+  "/",
+  requireUser,
+  mutationLimiter,
+  createTripLimiter,
+  async (c) => {
+    const body = await getSanitizedBody(c);
+    const parseResult = createTripDtoSchema.safeParse(body);
 
-  if (!parseResult.success) {
-    return c.json(
-      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
-      400
-    );
-  }
+    if (!parseResult.success) {
+      return c.json(
+        {
+          message: "Invalid payload",
+          errors: z.formatError(parseResult.error),
+        },
+        400,
+      );
+    }
 
-  const dto = parseResult.data;
-  const driver = c.get("user")!;
+    const dto = parseResult.data;
+    const driver = c.get("user")!;
 
-  // Водитель должен иметь автомобиль
-  if (!driver.car) {
-    return c.json(
-      { code: ERROR_CODES.NO_CAR, message: "You must add a car before creating a trip" },
-      400
-    );
-  }
+    // Водитель должен иметь автомобиль
+    if (!driver.car) {
+      return c.json(
+        {
+          code: ERROR_CODES.NO_CAR,
+          message: "You must add a car before creating a trip",
+        },
+        400,
+      );
+    }
 
-  // Валидация: поездка не может быть в прошлом
-  const departureDate = new Date(dto.departureAt);
-  if (departureDate <= new Date()) {
-    return c.json(
-      { code: ERROR_CODES.TRIP_IN_PAST, message: "Departure time must be in the future" },
-      400
-    );
-  }
+    // Валидация: поездка не может быть в прошлом
+    const departureDate = new Date(dto.departureAt);
+    if (departureDate <= new Date()) {
+      return c.json(
+        {
+          code: ERROR_CODES.TRIP_IN_PAST,
+          message: "Departure time must be in the future",
+        },
+        400,
+      );
+    }
 
-  let created: TripWithDriver;
-  try {
-    // Проверка пересечения с другими active-поездками водителя и создание —
-    // в одной Serializable-транзакции: между проверкой и insert не может
-    // пройти параллельная поездка на пересекающееся время (иначе две
-    // вкладки создали бы два пересекающихся рейса).
-    created = await db.$transaction(
-      async (tx) => {
-        const newRange = getTripRange(departureDate, dto.durationMinutes);
+    let created: TripWithDriver;
+    try {
+      // Проверка пересечения с другими active-поездками водителя и создание —
+      // в одной Serializable-транзакции: между проверкой и insert не может
+      // пройти параллельная поездка на пересекающееся время (иначе две
+      // вкладки создали бы два пересекающихся рейса).
+      created = await db.$transaction(
+        async (tx) => {
+          const newRange = getTripRange(departureDate, dto.durationMinutes);
 
-        const driverActiveTrips = await tx.trip.findMany({
-          where: {
-            driverId: driver.id,
-            status: "active",
-            // Потенциально пересекаются только поездки, стартующие до конца
-            // новой: остальные гарантированно не пересекаются.
-            departureAt: { lt: newRange.end },
-          },
-          select: { departureAt: true, durationMinutes: true },
-        });
+          const driverActiveTrips = await tx.trip.findMany({
+            where: {
+              driverId: driver.id,
+              status: "active",
+              // Потенциально пересекаются только поездки, стартующие до конца
+              // новой: остальные гарантированно не пересекаются.
+              departureAt: { lt: newRange.end },
+            },
+            select: { departureAt: true, durationMinutes: true },
+          });
 
-        const hasOverlap = driverActiveTrips.some((t) =>
-          rangesOverlap(newRange, getTripRange(t.departureAt, t.durationMinutes))
-        );
-
-        if (hasOverlap) {
-          throw new TripError(
-            TripErrors.overlap(),
-            "У вас уже есть поездка на это время"
+          const hasOverlap = driverActiveTrips.some((t) =>
+            rangesOverlap(
+              newRange,
+              getTripRange(t.departureAt, t.durationMinutes),
+            ),
           );
-        }
 
-        // Справочник городов: fromCityId/toCityId обязательны на уровне
-        // DTO. Здесь подтверждаем существование и заполняем снимки
-        // fromCity/toCity (UI/поиск/уведомления работают по строкам).
-        // Уникальность и trim имён — ответственность справочника
-        // (см. cityNameBodySchema). Снимки кладём в той же транзакции,
-        // что и поездку: консистентно с ON DELETE SET NULL.
-        const [fromCityRow, toCityRow] = await Promise.all([
-          tx.city.findUnique({
-            where: { id: dto.fromCityId },
-            select: { id: true, name: true },
-          }),
-          tx.city.findUnique({
-            where: { id: dto.toCityId },
-            select: { id: true, name: true },
-          }),
-        ]);
-        if (!fromCityRow) {
-          throw new TripError(
-            TripErrors.cityNotFound(),
-            "Город отправления не найден в справочнике",
-          );
-        }
-        if (!toCityRow) {
-          throw new TripError(
-            TripErrors.cityNotFound(),
-            "Город назначения не найден в справочнике",
-          );
-        }
+          if (hasOverlap) {
+            throw new TripError(
+              TripErrors.overlap(),
+              "У вас уже есть поездка на это время",
+            );
+          }
 
-        // Денормализованный счётчик поездок на городе: единая точка
-        // изменения — cities/counters.ts (F17). Параллельное
-        // создание/отмена поездок в одной tx безопасно: serializable
-        // уровень изоляции (см. опции $transaction ниже) сериализует
-        // записи по (City.id) на уровне predicate locks.
-        await incrementCityTripsCount(tx, fromCityRow.id, toCityRow.id);
+          // Справочник городов: fromCityId/toCityId обязательны на уровне
+          // DTO. Здесь подтверждаем существование и заполняем снимки
+          // fromCity/toCity (UI/поиск/уведомления работают по строкам).
+          // Уникальность и trim имён — ответственность справочника
+          // (см. cityNameBodySchema). Снимки кладём в той же транзакции,
+          // что и поездку: консистентно с ON DELETE SET NULL.
+          const [fromCityRow, toCityRow] = await Promise.all([
+            tx.city.findUnique({
+              where: { id: dto.fromCityId },
+              select: { id: true, name: true },
+            }),
+            tx.city.findUnique({
+              where: { id: dto.toCityId },
+              select: { id: true, name: true },
+            }),
+          ]);
+          if (!fromCityRow) {
+            throw new TripError(
+              TripErrors.cityNotFound(),
+              "Город отправления не найден в справочнике",
+            );
+          }
+          if (!toCityRow) {
+            throw new TripError(
+              TripErrors.cityNotFound(),
+              "Город назначения не найден в справочнике",
+            );
+          }
 
-        return tx.trip.create({
-          data: {
-            driverId: driver.id,
-            fromCity: fromCityRow.name,
-            fromAddress: dto.fromAddress,
-            toCity: toCityRow.name,
-            toAddress: dto.toAddress,
-            fromCityId: fromCityRow.id,
-            toCityId: toCityRow.id,
-            departureAt: new Date(dto.departureAt),
-            durationMinutes: dto.durationMinutes,
-            distanceKm: dto.distanceKm,
-            price: dto.price,
-            seatsTotal: dto.seatsTotal,
-            seatsAvailable: dto.seatsTotal,
-            tags: dto.tags,
-            comment: dto.comment,
-          },
-          include: {
-            driver: {
-              include: {
-                car: true,
+          // Денормализованный счётчик поездок на городе: единая точка
+          // изменения — cities/counters.ts (F17). Параллельное
+          // создание/отмена поездок в одной tx безопасно: serializable
+          // уровень изоляции (см. опции $transaction ниже) сериализует
+          // записи по (City.id) на уровне predicate locks.
+          await incrementCityTripsCount(tx, fromCityRow.id, toCityRow.id);
+
+          return tx.trip.create({
+            data: {
+              driverId: driver.id,
+              fromCity: fromCityRow.name,
+              fromAddress: dto.fromAddress,
+              toCity: toCityRow.name,
+              toAddress: dto.toAddress,
+              fromCityId: fromCityRow.id,
+              toCityId: toCityRow.id,
+              departureAt: new Date(dto.departureAt),
+              durationMinutes: dto.durationMinutes,
+              distanceKm: dto.distanceKm,
+              price: dto.price,
+              seatsTotal: dto.seatsTotal,
+              seatsAvailable: dto.seatsTotal,
+              tags: dto.tags,
+              comment: dto.comment,
+            },
+            include: {
+              driver: {
+                include: {
+                  car: true,
+                },
               },
             },
+          });
+        },
+        { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 },
+      );
+    } catch (error) {
+      if (error instanceof TripError) {
+        return c.json(
+          { code: error.code, message: error.message },
+          error.status as ContentfulStatusCode,
+        );
+      }
+      // Serializable: параллельное создание поездки на пересекающееся время —
+      // клиент получает 409 и может повторить запрос.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034"
+      ) {
+        return c.json(
+          {
+            code: ERROR_CODES.CONFLICT,
+            message: "Поездка только что изменилась, попробуйте ещё раз",
           },
-        });
-      },
-      { isolationLevel: "Serializable", maxWait: 5000, timeout: 10000 }
+          409,
+        );
+      }
+      throw error;
+    }
+
+    logBusinessEvent("trip.created", {
+      tripId: created.id,
+      driverId: driver.id,
+      fromCity: dto.fromCity,
+      toCity: dto.toCity,
+    });
+
+    void notifyMatchingRideRequests(created).catch((error) => {
+      logger.error(
+        { err: error, tripId: created.id },
+        "ride_request_match_notify_failed",
+      );
+    });
+
+    return c.json(
+      serializeTrip(created, {
+        bookedSeats: [],
+        pendingRequestsCount: 0,
+      }),
+      201,
     );
-  } catch (error) {
-    if (error instanceof TripError) {
-      return c.json(
-        { code: error.code, message: error.message },
-        error.status as ContentfulStatusCode
-      );
-    }
-    // Serializable: параллельное создание поездки на пересекающееся время —
-    // клиент получает 409 и может повторить запрос.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2034"
-    ) {
-      return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
-        409
-      );
-    }
-    throw error;
-  }
-
-  logBusinessEvent("trip.created", {
-    tripId: created.id,
-    driverId: driver.id,
-    fromCity: dto.fromCity,
-    toCity: dto.toCity,
-  });
-
-  void notifyMatchingRideRequests(created).catch((error) => {
-    logger.error({ err: error, tripId: created.id }, "ride_request_match_notify_failed");
-  });
-
-  return c.json(
-    serializeTrip(created, {
-      bookedSeats: [],
-      pendingRequestsCount: 0,
-    }),
-    201
-  );
-});
+  },
+);
 
 tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const id = c.req.param("id");
@@ -637,7 +703,10 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
 
   const parseResult = updateTripDtoSchema.safeParse(body);
   if (!parseResult.success) {
-    return c.json({ message: "Invalid payload", errors: z.formatError(parseResult.error) }, 400);
+    return c.json(
+      { message: "Invalid payload", errors: z.formatError(parseResult.error) },
+      400,
+    );
   }
 
   const dto = parseResult.data;
@@ -663,7 +732,10 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
         // Поездка уже уехала — редактирование запрещено (точка невозврата,
         // консистентно с созданием/отменой брони и confirm/decline водителя).
         if (trip.departureAt <= new Date()) {
-          throw new TripError(TripErrors.departed(), "Trip has already departed");
+          throw new TripError(
+            TripErrors.departed(),
+            "Trip has already departed",
+          );
         }
 
         // Маршрут (fromCity/fromCityId/toCity/toCityId) ЗАБЛОКИРОВАН для
@@ -673,25 +745,35 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
         // маршрут, водитель должен отменить поездку и создать новую.
         const updateData: Prisma.TripUpdateInput = {};
 
-        if (dto.departureAt !== undefined && new Date(dto.departureAt) <= new Date()) {
+        if (
+          dto.departureAt !== undefined &&
+          new Date(dto.departureAt) <= new Date()
+        ) {
           throw new TripError(
             TripErrors.notStarted(),
-            "Departure time must be in the future"
+            "Departure time must be in the future",
           );
         }
 
         // updateData уже объявлен выше. Маршрут заблокирован
         // (см. комментарий выше).
-        if (dto.fromAddress !== undefined) updateData.fromAddress = dto.fromAddress;
+        if (dto.fromAddress !== undefined)
+          updateData.fromAddress = dto.fromAddress;
         if (dto.toAddress !== undefined) updateData.toAddress = dto.toAddress;
-        if (dto.departureAt !== undefined) updateData.departureAt = new Date(dto.departureAt);
-        if (dto.durationMinutes !== undefined) updateData.durationMinutes = dto.durationMinutes;
-        if (dto.distanceKm !== undefined) updateData.distanceKm = dto.distanceKm;
+        if (dto.departureAt !== undefined)
+          updateData.departureAt = new Date(dto.departureAt);
+        if (dto.durationMinutes !== undefined)
+          updateData.durationMinutes = dto.durationMinutes;
+        if (dto.distanceKm !== undefined)
+          updateData.distanceKm = dto.distanceKm;
         if (dto.price !== undefined) updateData.price = dto.price;
         if (dto.tags !== undefined) updateData.tags = dto.tags;
         if (dto.comment !== undefined) updateData.comment = dto.comment;
 
-        if (dto.departureAt !== undefined || dto.durationMinutes !== undefined) {
+        if (
+          dto.departureAt !== undefined ||
+          dto.durationMinutes !== undefined
+        ) {
           const newDeparture =
             dto.departureAt !== undefined
               ? new Date(dto.departureAt)
@@ -715,13 +797,16 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
           });
 
           const hasOverlap = otherActiveTrips.some((t) =>
-            rangesOverlap(newRange, getTripRange(t.departureAt, t.durationMinutes))
+            rangesOverlap(
+              newRange,
+              getTripRange(t.departureAt, t.durationMinutes),
+            ),
           );
 
           if (hasOverlap) {
             throw new TripError(
               TripErrors.overlap(),
-              "Новое время пересекается с другой вашей поездкой"
+              "Новое время пересекается с другой вашей поездкой",
             );
           }
 
@@ -738,7 +823,17 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
 
         if (dto.seatsTotal !== undefined) {
           const activeBookingsForSeats = await tx.booking.findMany({
-             where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] }, OR: [{ status: "confirmed" }, { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }] },
+            where: {
+              tripId: trip.id,
+              status: { in: [...ACTIVE_BOOKING_STATUSES] },
+              OR: [
+                { status: "confirmed" },
+                {
+                  status: "pending",
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                },
+              ],
+            },
             select: { seat: true },
           });
           const maxTakenSeat = activeBookingsForSeats.reduce(
@@ -758,7 +853,10 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
             );
           }
           updateData.seatsTotal = dto.seatsTotal;
-          updateData.seatsAvailable = Math.max(0, dto.seatsTotal - activeBookingsForSeats.length);
+          updateData.seatsAvailable = Math.max(
+            0,
+            dto.seatsTotal - activeBookingsForSeats.length,
+          );
         }
 
         const updated = await tx.trip.update({
@@ -769,13 +867,13 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
 
         return { previous: trip, updated };
       },
-      { isolationLevel: "Serializable" }
+      { isolationLevel: "Serializable" },
     );
   } catch (error) {
     if (error instanceof TripError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.status as ContentfulStatusCode
+        error.status as ContentfulStatusCode,
       );
     }
     // Serializable: параллельное изменение поездки/брони — клиент
@@ -785,8 +883,11 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Поездка только что изменилась, попробуйте ещё раз",
+        },
+        409,
       );
     }
     throw error;
@@ -805,7 +906,8 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
   const importantFieldsChanged =
     (dto.departureAt !== undefined &&
       trip.departureAt.toISOString() !== updated.departureAt.toISOString()) ||
-    (dto.fromAddress !== undefined && trip.fromAddress !== updated.fromAddress) ||
+    (dto.fromAddress !== undefined &&
+      trip.fromAddress !== updated.fromAddress) ||
     (dto.toAddress !== undefined && trip.toAddress !== updated.toAddress) ||
     (dto.price !== undefined && trip.price !== updated.price);
 
@@ -822,7 +924,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
           booking.passengerId,
           "trip_details_changed",
           "Детали поездки изменены",
-          `Водитель изменил детали поездки ${updated.fromCity} → ${updated.toCity}. Проверьте время и место встречи.`
+          `Водитель изменил детали поездки ${updated.fromCity} → ${updated.toCity}. Проверьте время и место встречи.`,
         );
 
         wsManager.sendToUser(booking.passengerId, {
@@ -834,7 +936,7 @@ tripsRouter.patch("/:id", requireUser, mutationLimiter, async (c) => {
           type: "notification:new",
           payload: { id: "refresh" },
         });
-      })
+      }),
     );
   }
 
@@ -915,6 +1017,7 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
             cancelledAt: new Date(),
             cancelledByType: "user",
             cancelledByUserId: user.id,
+            cancellationReason: "Trip cancelled by driver",
           },
           include: {
             driver: {
@@ -933,16 +1036,18 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
 
         return {
           updated,
-          uniquePassengers: Array.from(new Set(activeBookings.map((b) => b.passengerId))),
+          uniquePassengers: Array.from(
+            new Set(activeBookings.map((b) => b.passengerId)),
+          ),
         };
       },
-      { isolationLevel: "Serializable" }
+      { isolationLevel: "Serializable" },
     );
   } catch (error) {
     if (error instanceof TripError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.status as ContentfulStatusCode
+        error.status as ContentfulStatusCode,
       );
     }
     // Serializable: параллельное изменение поездки/брони — клиент
@@ -952,8 +1057,11 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Поездка только что изменилась, попробуйте ещё раз",
+        },
+        409,
       );
     }
     throw error;
@@ -970,7 +1078,7 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
         "Поездка отменена",
         `Водитель отменил поездку ${updated.fromCity} → ${updated.toCity}`,
         // Deep-link: тап по push открывает «Мои брони».
-        "/bookings"
+        "/bookings",
       );
 
       wsManager.sendToUser(pid, {
@@ -981,7 +1089,7 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
         type: "notification:new",
         payload: { id: "refresh" },
       });
-    })
+    }),
   );
 
   logBusinessEvent("trip.cancelled", {
@@ -993,7 +1101,7 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
     serializeTrip(updated, {
       bookedSeats: [],
       pendingRequestsCount: 0,
-    })
+    }),
   );
 });
 
@@ -1013,210 +1121,221 @@ tripsRouter.patch("/:id/cancel", requireUser, cancelTripLimiter, async (c) => {
  * перезаписать статус «из-под» нас (P2034 → 409, tripsCount начисляется ровно
  * один раз).
  */
-tripsRouter.patch("/:id/complete", requireUser, completeTripLimiter, async (c) => {
-  const id = c.req.param("id");
-  const user = c.get("user")!;
-  // force=1 доступен ТОЛЬКО в development/test. В production игнорируем
-  // параметр — иначе любой водитель мог бы накручивать tripsCount,
-  // завершая поездки до времени отправления.
-  const force = !env.isProduction && c.req.query("force") === "1";
+tripsRouter.patch(
+  "/:id/complete",
+  requireUser,
+  completeTripLimiter,
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user")!;
+    // force=1 доступен ТОЛЬКО в development/test. В production игнорируем
+    // параметр — иначе любой водитель мог бы накручивать tripsCount,
+    // завершая поездки до времени отправления.
+    const force = !env.isProduction && c.req.query("force") === "1";
 
-  let result: {
-    updated: TripWithDriver;
-    passengerIds: string[];
-    declinedPassengerIds: string[];
-  };
-  try {
-    result = await db.$transaction(
-      async (tx) => {
-        const trip = await tx.trip.findUnique({
-          where: { id },
-          include: {
-            driver: {
-              include: {
-                car: true,
+    let result: {
+      updated: TripWithDriver;
+      passengerIds: string[];
+      declinedPassengerIds: string[];
+    };
+    try {
+      result = await db.$transaction(
+        async (tx) => {
+          const trip = await tx.trip.findUnique({
+            where: { id },
+            include: {
+              driver: {
+                include: {
+                  car: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        if (!trip) {
-          throw new TripError(TripErrors.notFound(), "Trip not found");
-        }
-        if (trip.driverId !== user.id) {
-          throw new TripError(TripErrors.forbidden(), "Forbidden");
-        }
-        if (trip.status !== "active") {
-          throw new TripError(TripErrors.notActive(), "Trip is not active");
-        }
-        if (!force && trip.departureAt > new Date()) {
-          throw new TripError(TripErrors.notStarted(), "Trip has not started yet");
-        }
+          if (!trip) {
+            throw new TripError(TripErrors.notFound(), "Trip not found");
+          }
+          if (trip.driverId !== user.id) {
+            throw new TripError(TripErrors.forbidden(), "Forbidden");
+          }
+          if (trip.status !== "active") {
+            throw new TripError(TripErrors.notActive(), "Trip is not active");
+          }
+          if (!force && trip.departureAt > new Date()) {
+            throw new TripError(
+              TripErrors.notStarted(),
+              "Trip has not started yet",
+            );
+          }
 
-        // 1. Decline all pending bookings.
-        // Пассажиров собираем ДО updateMany: после перевода заявок в declined
-        // выборка по pending вернёт пустой массив (паттерн из tripWorker.ts).
-        const pendingBookings = await tx.booking.findMany({
-          where: {
-            tripId: trip.id,
-            status: "pending",
-          },
-          select: {
-            passengerId: true,
-          },
-        });
-
-        await tx.booking.updateMany({
-          where: {
-            tripId: trip.id,
-            status: "pending",
-          },
-          data: {
-            status: "declined",
-            cancelledAt: new Date(),
-            cancelledByType: "system",
-            cancellationReason: "Trip completed",
-          },
-        });
-
-        const declinedPassengerIds = Array.from(
-          new Set(pendingBookings.map((booking) => booking.passengerId))
-        );
-
-        // 2. Find confirmed passengers
-        const confirmedBookings = await tx.booking.findMany({
-          where: {
-            tripId: trip.id,
-            status: "confirmed",
-          },
-          select: {
-            passengerId: true,
-          },
-        });
-
-        const passengerIds = Array.from(
-          new Set(confirmedBookings.map((booking) => booking.passengerId))
-        );
-
-        // 3. Driver +1 tripsCount
-        await tx.user.update({
-          where: { id: trip.driverId },
-          data: {
-            tripsCount: {
-              increment: 1,
+          // 1. Decline all pending bookings.
+          // Пассажиров собираем ДО updateMany: после перевода заявок в declined
+          // выборка по pending вернёт пустой массив (паттерн из tripWorker.ts).
+          const pendingBookings = await tx.booking.findMany({
+            where: {
+              tripId: trip.id,
+              status: "pending",
             },
-          },
-        });
+            select: {
+              passengerId: true,
+            },
+          });
 
-        // 4. Each confirmed passenger +1 tripsCount
-        for (const passengerId of passengerIds) {
+          await tx.booking.updateMany({
+            where: {
+              tripId: trip.id,
+              status: "pending",
+            },
+            data: {
+              status: "declined",
+              cancelledAt: new Date(),
+              cancelledByType: "system",
+              cancellationReason: "Trip completed",
+            },
+          });
+
+          const declinedPassengerIds = Array.from(
+            new Set(pendingBookings.map((booking) => booking.passengerId)),
+          );
+
+          // 2. Find confirmed passengers
+          const confirmedBookings = await tx.booking.findMany({
+            where: {
+              tripId: trip.id,
+              status: "confirmed",
+            },
+            select: {
+              passengerId: true,
+            },
+          });
+
+          const passengerIds = Array.from(
+            new Set(confirmedBookings.map((booking) => booking.passengerId)),
+          );
+
+          // 3. Driver +1 tripsCount
           await tx.user.update({
-            where: { id: passengerId },
+            where: { id: trip.driverId },
             data: {
               tripsCount: {
                 increment: 1,
               },
             },
           });
-        }
 
-        // 5. Update trip status
-        const updated = await tx.trip.update({
-          where: { id: trip.id },
-          data: {
-            status: "completed",
-            seatsAvailable: 0,
-          },
-          include: {
-            driver: {
-              include: {
-                car: true,
+          // 4. Each confirmed passenger +1 tripsCount
+          for (const passengerId of passengerIds) {
+            await tx.user.update({
+              where: { id: passengerId },
+              data: {
+                tripsCount: {
+                  increment: 1,
+                },
+              },
+            });
+          }
+
+          // 5. Update trip status
+          const updated = await tx.trip.update({
+            where: { id: trip.id },
+            data: {
+              status: "completed",
+              seatsAvailable: 0,
+            },
+            include: {
+              driver: {
+                include: {
+                  car: true,
+                },
               },
             },
+          });
+
+          return { updated, passengerIds, declinedPassengerIds };
+        },
+        { isolationLevel: "Serializable" },
+      );
+    } catch (error) {
+      if (error instanceof TripError) {
+        return c.json(
+          { code: error.code, message: error.message },
+          error.status as ContentfulStatusCode,
+        );
+      }
+      // Serializable: параллельное завершение той же поездки — одна из
+      // транзакций не сможет подтвердиться (write conflict). Возвращаем
+      // 409 вместо 500: tripsCount при этом начислен ровно один раз.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034"
+      ) {
+        return c.json(
+          {
+            code: ERROR_CODES.CONFLICT,
+            message: "Поездка только что изменилась, попробуйте ещё раз",
           },
-        });
-
-        return { updated, passengerIds, declinedPassengerIds };
-      },
-      { isolationLevel: "Serializable" }
-    );
-  } catch (error) {
-    if (error instanceof TripError) {
-      return c.json(
-        { code: error.code, message: error.message },
-        error.status as ContentfulStatusCode
-      );
+          409,
+        );
+      }
+      throw error;
     }
-    // Serializable: параллельное завершение той же поездки — одна из
-    // транзакций не сможет подтвердиться (write conflict). Возвращаем
-    // 409 вместо 500: tripsCount при этом начислен ровно один раз.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2034"
-    ) {
-      return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Поездка только что изменилась, попробуйте ещё раз" },
-        409
+
+    const { updated, passengerIds, declinedPassengerIds } = result;
+
+    logBusinessEvent("trip.completed", {
+      tripId: updated.id,
+      driverId: user.id,
+      passengersCount: passengerIds.length,
+    });
+
+    // Персистентные уведомления + WS-события пассажирам (ВНЕ транзакции,
+    // паттерн как в автозавершении воркером).
+    for (const pid of passengerIds) {
+      await createNotification(
+        pid,
+        "trip_status_changed",
+        "Поездка завершена",
+        `Поездка ${updated.fromCity} → ${updated.toCity} завершена. Вы можете оставить отзыв.`,
+        // Deep-link: тап по push открывает историю (где оставляется отзыв).
+        "/bookings/history",
       );
+      wsManager.sendToUser(pid, {
+        type: "trip:status_changed",
+        payload: { tripId: updated.id, status: "completed" },
+      });
+      wsManager.sendToUser(pid, {
+        type: "notification:new",
+        payload: { id: "refresh" },
+      });
     }
-    throw error;
-  }
 
-  const { updated, passengerIds, declinedPassengerIds } = result;
+    // Pending-пассажиры, отклонённые при завершении: уведомляем их так же,
+    // как это делает воркер автозавершения (tripWorker.ts), иначе заявка
+    // исчезала бы молча.
+    for (const pid of declinedPassengerIds) {
+      await createNotification(
+        pid,
+        "trip_status_changed",
+        "Поездка завершена",
+        `Поездка ${updated.fromCity} → ${updated.toCity} завершена, ваша заявка отклонена.`,
+        // Deep-link: тап по push открывает историю броней.
+        "/bookings/history",
+      );
+      wsManager.sendToUser(pid, {
+        type: "trip:status_changed",
+        payload: { tripId: updated.id, status: "completed" },
+      });
+      wsManager.sendToUser(pid, {
+        type: "notification:new",
+        payload: { id: "refresh" },
+      });
+    }
 
-  logBusinessEvent("trip.completed", {
-    tripId: updated.id,
-    driverId: user.id,
-    passengersCount: passengerIds.length,
-  });
-
-  // Персистентные уведомления + WS-события пассажирам (ВНЕ транзакции,
-  // паттерн как в автозавершении воркером).
-  for (const pid of passengerIds) {
-    await createNotification(
-      pid,
-      "trip_status_changed",
-      "Поездка завершена",
-      `Поездка ${updated.fromCity} → ${updated.toCity} завершена. Вы можете оставить отзыв.`,
-      // Deep-link: тап по push открывает историю (где оставляется отзыв).
-      "/bookings/history"
+    return c.json(
+      serializeTrip(updated, {
+        bookedSeats: [],
+        pendingRequestsCount: 0,
+      }),
     );
-    wsManager.sendToUser(pid, {
-      type: "trip:status_changed",
-      payload: { tripId: updated.id, status: "completed" },
-    });
-    wsManager.sendToUser(pid, {
-      type: "notification:new",
-      payload: { id: "refresh" },
-    });
-  }
-
-  // Pending-пассажиры, отклонённые при завершении: уведомляем их так же,
-  // как это делает воркер автозавершения (tripWorker.ts), иначе заявка
-  // исчезала бы молча.
-  for (const pid of declinedPassengerIds) {
-    await createNotification(
-      pid,
-      "trip_status_changed",
-      "Поездка завершена",
-      `Поездка ${updated.fromCity} → ${updated.toCity} завершена, ваша заявка отклонена.`,
-      // Deep-link: тап по push открывает историю броней.
-      "/bookings/history"
-    );
-    wsManager.sendToUser(pid, {
-      type: "trip:status_changed",
-      payload: { tripId: updated.id, status: "completed" },
-    });
-    wsManager.sendToUser(pid, {
-      type: "notification:new",
-      payload: { id: "refresh" },
-    });
-  }
-
-  return c.json(
-    serializeTrip(updated, {
-      bookedSeats: [],
-      pendingRequestsCount: 0,
-    })
-  );
-});
+  },
+);

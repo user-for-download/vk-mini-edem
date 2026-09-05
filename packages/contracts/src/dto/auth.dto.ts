@@ -31,7 +31,7 @@ export const authResponseSchema = z.object({
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 
 export const refreshRequestSchema = z.object({
-  refreshToken: z.string(),
+  refreshToken: z.string().min(1).max(4096),
 });
 
 export type RefreshRequest = z.infer<typeof refreshRequestSchema>;

@@ -27,10 +27,17 @@ import { TRIP_TAGS } from "@/consts/tags";
 import { TagsScroll } from "@/components/TagsScroll";
 import { CityPickerField } from "@/components/CityPickerField/CityPickerField";
 import { useSnackbar } from "@/providers/SnackbarProvider";
-import { useCancelTripMutation, useUpdateTripMutation } from "@/queries/useTripsQuery";
+import { useConfirm } from "@/providers/ConfirmProvider";
+import {
+  useCancelTripMutation,
+  useUpdateTripMutation,
+} from "@/queries/useTripsQuery";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { clearDraft, readDraft, writeDraft } from "@/helpers/draftStorage";
-import { formatMoscowDateTime, moscowWallClockToIso } from "@/helpers/moscowTime";
+import {
+  formatMoscowDateTime,
+  moscowWallClockToIso,
+} from "@/helpers/moscowTime";
 import {
   type TripFormValues,
   type TripFormErrors,
@@ -40,7 +47,10 @@ import {
   isTripFormDraft,
 } from "./CreateTripModal/validation";
 
-export type EditTripModalProps = CustomModalProps<OpenModalPageProps, { trip: Trip }>;
+export type EditTripModalProps = CustomModalProps<
+  OpenModalPageProps,
+  { trip: Trip }
+>;
 
 export const EditTripModal: FC<EditTripModalProps> = ({
   modalProps,
@@ -48,9 +58,11 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   trip,
 }) => {
   const currentUser = useCurrentUser();
-  const draftKey = currentUser ? `edit-trip:${currentUser.id}:${trip.id}` : null;
+  const draftKey = currentUser
+    ? `edit-trip:${currentUser.id}:${trip.id}`
+    : null;
   const [initialDraft] = useState(() =>
-    draftKey ? readDraft<TripFormDraft>(draftKey, isTripFormDraft) : null
+    draftKey ? readDraft<TripFormDraft>(draftKey, isTripFormDraft) : null,
   );
   // Время в пути храним в минутах (trip.durationMinutes); водителю показываем
   // целые часы. Конвертация часы→минуты при сохранении применяется, только если
@@ -59,7 +71,9 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   const initialDurationHours = Math.round(trip.durationMinutes / 60).toString();
   const [durationChanged, setDurationChanged] = useState(
     // Восстановленный черновик с другим значением поля — его уже меняли ранее.
-    () => initialDraft !== null && initialDraft.values.durationHours !== initialDurationHours
+    () =>
+      initialDraft !== null &&
+      initialDraft.values.durationHours !== initialDurationHours,
   );
   const [values, setValues] = useState<TripFormValues>(() => {
     if (initialDraft) return initialDraft.values;
@@ -108,7 +122,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     Partial<Record<keyof TripFormValues, boolean>>
   >({});
   const [selectedTags, setSelectedTags] = useState<TripTag[]>(
-    initialDraft?.selectedTags ?? (trip.tags as TripTag[])
+    initialDraft?.selectedTags ?? (trip.tags as TripTag[]),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -124,15 +138,18 @@ export const EditTripModal: FC<EditTripModalProps> = ({
   // Единый объект даты+времени для DateInput: values.date/time — московские
   // wall-clock поля, поэтому момент строим через moscowWallClockToIso
   // (Europe/Moscow), а не через new Date("...T...") в локальном поясе устройства.
-  const [departureDateTime, setDepartureDateTime] = useState<Date | null>(() => {
-    if (values.date && values.time) {
-      const iso = moscowWallClockToIso(values.date, values.time);
-      return iso ? new Date(iso) : null;
-    }
-    return null;
-  });
+  const [departureDateTime, setDepartureDateTime] = useState<Date | null>(
+    () => {
+      if (values.date && values.time) {
+        const iso = moscowWallClockToIso(values.date, values.time);
+        return iso ? new Date(iso) : null;
+      }
+      return null;
+    },
+  );
 
   const { enqueue: enqueueSnackbar } = useSnackbar();
+  const confirm = useConfirm();
   const updateTrip = useUpdateTripMutation();
   const cancelTrip = useCancelTripMutation();
 
@@ -144,9 +161,16 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     (trip.pendingRequestsCount ?? 0) === 0 &&
     (trip.confirmedBookingsCount ?? 0) === 0;
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!canDelete) return;
     if (isDeletingRef.current) return;
+    const confirmed = await confirm({
+      title: "Удалить поездку?",
+      description:
+        "Поездка станет недоступна пассажирам. Это действие нельзя отменить.",
+      confirmTitle: "Удалить поездку",
+    });
+    if (!confirmed) return;
     isDeletingRef.current = true;
     setIsCancelling(true);
     cancelTrip.mutate(trip.id, {
@@ -174,7 +198,15 @@ export const EditTripModal: FC<EditTripModalProps> = ({
         });
       },
     });
-  }, [canDelete, cancelTrip, trip.id, enqueueSnackbar, close, draftKey]);
+  }, [
+    canDelete,
+    cancelTrip,
+    trip.id,
+    enqueueSnackbar,
+    close,
+    draftKey,
+    confirm,
+  ]);
 
   useEffect(() => {
     if (draftKey && hasChanges && persistDraftRef.current) {
@@ -198,7 +230,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
         setErrors(validateTripForm(next));
       }
     },
-    [touched, values]
+    [touched, values],
   );
 
   const handleBlur = useCallback(
@@ -206,7 +238,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
       setTouched((prev) => ({ ...prev, [field]: true }));
       setErrors(validateTripForm(values));
     },
-    [values]
+    [values],
   );
 
   const handleDateTimeChange = useCallback((date: Date | null) => {
@@ -288,31 +320,34 @@ export const EditTripModal: FC<EditTripModalProps> = ({
     isPublishingRef.current = true;
     setIsSubmitting(true);
 
-    updateTrip.mutate({ id: trip.id, data: payload }, {
-      onSettled: () => {
-        isPublishingRef.current = false;
-        setIsSubmitting(false);
-      },
-      onSuccess: () => {
-        enqueueSnackbar({
-          type: "success",
-          title: "Изменения сохранены",
-          dedupeKey: "edit_trip_success",
-        });
+    updateTrip.mutate(
+      { id: trip.id, data: payload },
+      {
+        onSettled: () => {
+          isPublishingRef.current = false;
+          setIsSubmitting(false);
+        },
+        onSuccess: () => {
+          enqueueSnackbar({
+            type: "success",
+            title: "Изменения сохранены",
+            dedupeKey: "edit_trip_success",
+          });
 
-        persistDraftRef.current = false;
-        if (draftKey) clearDraft(draftKey);
-        close();
+          persistDraftRef.current = false;
+          if (draftKey) clearDraft(draftKey);
+          close();
+        },
+        onError: (error) => {
+          enqueueSnackbar({
+            type: "error",
+            title: "Не удалось сохранить",
+            subtitle: error instanceof Error ? error.message : undefined,
+            dedupeKey: "edit_trip_error",
+          });
+        },
       },
-      onError: (error) => {
-        enqueueSnackbar({
-          type: "error",
-          title: "Не удалось сохранить",
-          subtitle: error instanceof Error ? error.message : undefined,
-          dedupeKey: "edit_trip_error",
-        });
-      },
-    });
+    );
   }, [
     values,
     selectedTags,
@@ -438,7 +473,9 @@ export const EditTripModal: FC<EditTripModalProps> = ({
         <FormLayoutGroup>
           <FormItem
             top="Дата и время отправления"
-            status={showError("date") || showError("time") ? "error" : "default"}
+            status={
+              showError("date") || showError("time") ? "error" : "default"
+            }
             bottom={
               showError("date") || showError("time") ? (
                 <Caption
@@ -669,7 +706,7 @@ export const EditTripModal: FC<EditTripModalProps> = ({
                 level="1"
                 style={{ color: "var(--vkui--color_text_secondary)" }}
               >
-                {(trip.status !== "active")
+                {trip.status !== "active"
                   ? "Удалить можно только активную поездку."
                   : "У поездки есть активные брони — отмените или завершите её, чтобы освободить маршрут."}
               </Caption>
@@ -678,7 +715,8 @@ export const EditTripModal: FC<EditTripModalProps> = ({
                 level="1"
                 style={{ color: "var(--vkui--color_text_secondary)" }}
               >
-                Поездка будет отменена. Пассажиров на ней нет — уведомлений не будет.
+                Поездка будет отменена. Пассажиров на ней нет — уведомлений не
+                будет.
               </Caption>
             )
           }

@@ -14,7 +14,12 @@ import {
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { logger } from "../logger.js";
-import { serializeBooking, serializeUser, formatDateRu, formatTimeRu } from "../serializers/index.js";
+import {
+  serializeBooking,
+  serializeUser,
+  formatDateRu,
+  formatTimeRu,
+} from "../serializers/index.js";
 import {
   mutationLimiter,
   createBookingLimiter,
@@ -32,7 +37,11 @@ class BookingError extends Error {
   statusCode: HttpStatus;
   code: string;
 
-  constructor(message: string, statusCode: HttpStatus = 400, code: string = ERROR_CODES.VALIDATION_FAILED) {
+  constructor(
+    message: string,
+    statusCode: HttpStatus = 400,
+    code: string = ERROR_CODES.VALIDATION_FAILED,
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
@@ -59,7 +68,8 @@ type CreateResult =
  * Пагинация заявок на поездку (GET /bookings/trip/:tripId).
  * nextCursor — id последней заявки страницы; null означает конец списка.
  */
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_BOOKINGS_LIMIT = 50;
 const MAX_BOOKINGS_LIMIT = 50;
 const PENDING_BOOKING_TTL_MS = 24 * 60 * 60 * 1000;
@@ -68,15 +78,28 @@ function activeBookingWhere(now = new Date()): Prisma.BookingWhereInput {
   return {
     OR: [
       { status: "confirmed" },
-      { status: "pending", OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      {
+        status: "pending",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
     ],
   };
 }
 
-async function releaseExpiredBookings(tx: Prisma.TransactionClient, now: Date): Promise<void> {
+// Ограниченный in-tx добор просроченных pending при создании брони:
+// не держим Serializable-транзакцию дольше необходимого — полный sweep
+// просрочек делает воркер tripWorker раз в час (см. expirePendingBookings).
+const IN_TX_EXPIRY_SWEEP_LIMIT = 20;
+
+async function releaseExpiredBookings(
+  tx: Prisma.TransactionClient,
+  now: Date,
+): Promise<void> {
   const expired = await tx.booking.findMany({
     where: { status: "pending", expiresAt: { lte: now } },
     select: { id: true, tripId: true },
+    orderBy: [{ expiresAt: "asc" }, { id: "asc" }],
+    take: IN_TX_EXPIRY_SWEEP_LIMIT,
   });
 
   for (const booking of expired) {
@@ -159,7 +182,7 @@ bookingsRouter.get("/my", async (c) => {
   const reviewedTripIds = new Set(
     reviews
       .map((review) => review.tripId)
-      .filter((tripId): tripId is string => Boolean(tripId))
+      .filter((tripId): tripId is string => Boolean(tripId)),
   );
 
   const now = new Date();
@@ -292,7 +315,7 @@ bookingsRouter.get("/history", async (c) => {
   const reviewedTripIds = new Set(
     reviews
       .map((review) => review.tripId)
-      .filter((tripId): tripId is string => Boolean(tripId))
+      .filter((tripId): tripId is string => Boolean(tripId)),
   );
 
   const formatted = history.map((b) => {
@@ -310,7 +333,10 @@ bookingsRouter.get("/history", async (c) => {
     let historyCategory: "completed" | "cancelled" | "other" = "other";
     if (b.trip.status === "cancelled" || b.status === "declined") {
       historyCategory = "cancelled";
-    } else if (b.status === "confirmed" && (b.trip.status === "completed" || tripIsCompleted)) {
+    } else if (
+      b.status === "confirmed" &&
+      (b.trip.status === "completed" || tripIsCompleted)
+    ) {
       historyCategory = "completed";
     } else if (b.status === "pending" && tripIsCompleted) {
       historyCategory = "cancelled"; // Не состоялась
@@ -391,7 +417,7 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
   if (cursor !== undefined && !UUID_REGEX.test(cursor)) {
     return c.json(
       { code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid cursor format" },
-      400
+      400,
     );
   }
 
@@ -420,7 +446,9 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
 
   const response = {
     // VK ID пассажира виден водителю его поездки — для кнопки «Написать».
-    items: items.map((booking) => serializeBooking(booking, { includeVkUserId: true })),
+    items: items.map((booking) =>
+      serializeBooking(booking, { includeVkUserId: true }),
+    ),
     pagination: { nextCursor, hasMore, limit },
   };
 
@@ -428,7 +456,7 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
   if (!validation.success) {
     logger.error(
       { issues: validation.error.issues, tripId },
-      "bookings_pagination_response_validation_failed"
+      "bookings_pagination_response_validation_failed",
     );
     return c.json({ message: "Internal response validation failed" }, 500);
   }
@@ -448,7 +476,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
   if (!parseResult.success) {
     return c.json(
       { message: "Invalid payload", errors: z.formatError(parseResult.error) },
-      400
+      400,
     );
   }
 
@@ -463,173 +491,205 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
           where: { id: tripId },
         });
 
-      if (!trip) {
-        throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
-      }
+        if (!trip) {
+          throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
+        }
 
-      if (trip.status !== "active") {
-        throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
-      }
+        if (trip.status !== "active") {
+          throw new BookingError(
+            "Trip is not active",
+            400,
+            ERROR_CODES.TRIP_NOT_ACTIVE,
+          );
+        }
 
-      // Запрещаем бронировать уже уехавшие поездки.
-      // Авто-завершение воркером происходит только через 24 часа — без этой
-      // проверки пассажир мог бы забронировать место в уже уехавшей поездке.
-      if (trip.departureAt <= new Date()) {
-        throw new BookingError("Trip has already departed", 400, ERROR_CODES.TRIP_IN_PAST);
-      }
+        // Запрещаем бронировать уже уехавшие поездки.
+        // Авто-завершение воркером происходит только через 24 часа — без этой
+        // проверки пассажир мог бы забронировать место в уже уехавшей поездке.
+        if (trip.departureAt <= new Date()) {
+          throw new BookingError(
+            "Trip has already departed",
+            400,
+            ERROR_CODES.TRIP_IN_PAST,
+          );
+        }
 
-      if (trip.driverId === passenger.id) {
-        throw new BookingError("Driver cannot book own trip", 400, ERROR_CODES.FORBIDDEN);
-      }
+        if (trip.driverId === passenger.id) {
+          throw new BookingError(
+            "Driver cannot book own trip",
+            400,
+            ERROR_CODES.FORBIDDEN,
+          );
+        }
 
-      // Запрещаем бронировать поездку, пересекающуюся по времени с другой
-      // активной броней пассажира (pending/confirmed на active-поездку).
-      const newRange = getTripRange(trip.departureAt, trip.durationMinutes);
+        // Запрещаем бронировать поездку, пересекающуюся по времени с другой
+        // активной броней пассажира (pending/confirmed на active-поездку).
+        const newRange = getTripRange(trip.departureAt, trip.durationMinutes);
 
-      const passengerActiveBookings = await tx.booking.findMany({
-        where: {
-          passengerId: passenger.id,
-          // Исключаем брони на ЭТУ поездку: они обрабатываются ниже
-          // (идемпотентный retry / ALREADY_BOOKED).
-          tripId: { not: tripId },
-           ...activeBookingWhere(),
-          trip: {
-            status: "active",
-            departureAt: { lt: newRange.end },
+        const passengerActiveBookings = await tx.booking.findMany({
+          where: {
+            passengerId: passenger.id,
+            // Исключаем брони на ЭТУ поездку: они обрабатываются ниже
+            // (идемпотентный retry / ALREADY_BOOKED).
+            tripId: { not: tripId },
+            ...activeBookingWhere(),
+            trip: {
+              status: "active",
+              departureAt: { lt: newRange.end },
+            },
           },
-        },
-        include: {
-          trip: { select: { departureAt: true, durationMinutes: true } },
-        },
-      });
+          include: {
+            trip: { select: { departureAt: true, durationMinutes: true } },
+          },
+        });
 
-      const hasOverlap = passengerActiveBookings.some((b) =>
-        rangesOverlap(newRange, getTripRange(b.trip.departureAt, b.trip.durationMinutes))
-      );
-
-      if (hasOverlap) {
-        throw new BookingError(
-          "У вас уже есть бронь на поездку в это время",
-          409,
-          ERROR_CODES.PASSENGER_BOOKING_OVERLAP
+        const hasOverlap = passengerActiveBookings.some((b) =>
+          rangesOverlap(
+            newRange,
+            getTripRange(b.trip.departureAt, b.trip.durationMinutes),
+          ),
         );
-      }
 
-      if (seat < 1 || seat > trip.seatsTotal) {
-        throw new BookingError("Seat is out of range", 400, ERROR_CODES.VALIDATION_FAILED);
-      }
+        if (hasOverlap) {
+          throw new BookingError(
+            "У вас уже есть бронь на поездку в это время",
+            409,
+            ERROR_CODES.PASSENGER_BOOKING_OVERLAP,
+          );
+        }
 
-      if (trip.seatsAvailable <= 0) {
-        throw new BookingError("Not enough available seats", 409, ERROR_CODES.CONFLICT);
-      }
+        if (seat < 1 || seat > trip.seatsTotal) {
+          throw new BookingError(
+            "Seat is out of range",
+            400,
+            ERROR_CODES.VALIDATION_FAILED,
+          );
+        }
 
-      // Слот занят, только если на нём висит активная бронь.
-      // declined/cancelled слот освобождают и повторной подаче не мешают —
-      // предикат обязан совпадать с partial-индексом active_seat_booking
-      // (F15), поэтому используем общий ACTIVE_BOOKING_STATUSES, а не
-      // захардкоженные литералы.
-      const seatConflict = await tx.booking.findFirst({
-        where: {
-          tripId,
-          seat,
-           ...activeBookingWhere(),
-        },
-        select: { id: true, passengerId: true },
-      });
+        if (trip.seatsAvailable <= 0) {
+          throw new BookingError(
+            "Not enough available seats",
+            409,
+            ERROR_CODES.CONFLICT,
+          );
+        }
 
-      if (seatConflict) {
-        // Псевдо-идемпотентность: конфликт на НАШЕМ же месте — клиент
-        // повторил запрос после таймаута, а бронь уже создалась.
-        // Возвращаем существующую бронь с 200 вместо 409.
-        if (seatConflict.passengerId === passenger.id) {
-          const existing = await tx.booking.findUnique({
-            where: { id: seatConflict.id },
-            include: {
-              trip: {
-                include: {
-                  driver: {
-                    include: {
-                      car: true,
+        // Слот занят, только если на нём висит активная бронь.
+        // declined/cancelled слот освобождают и повторной подаче не мешают —
+        // предикат обязан совпадать с partial-индексом active_seat_booking
+        // (F15), поэтому используем общий ACTIVE_BOOKING_STATUSES, а не
+        // захардкоженные литералы.
+        const seatConflict = await tx.booking.findFirst({
+          where: {
+            tripId,
+            seat,
+            ...activeBookingWhere(),
+          },
+          select: { id: true, passengerId: true },
+        });
+
+        if (seatConflict) {
+          // Псевдо-идемпотентность: конфликт на НАШЕМ же месте — клиент
+          // повторил запрос после таймаута, а бронь уже создалась.
+          // Возвращаем существующую бронь с 200 вместо 409.
+          if (seatConflict.passengerId === passenger.id) {
+            const existing = await tx.booking.findUnique({
+              where: { id: seatConflict.id },
+              include: {
+                trip: {
+                  include: {
+                    driver: {
+                      include: {
+                        car: true,
+                      },
                     },
                   },
                 },
-              },
-              passenger: {
-                include: {
-                  car: true,
+                passenger: {
+                  include: {
+                    car: true,
+                  },
                 },
               },
-            },
-          });
-          if (existing) {
-            return { kind: "idempotent", booking: existing };
+            });
+            if (existing) {
+              return { kind: "idempotent", booking: existing };
+            }
           }
+
+          throw new BookingError(
+            "Seat is already reserved",
+            409,
+            ERROR_CODES.SEAT_TAKEN,
+          );
         }
 
-        throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
-      }
+        // Одна активная бронь на поездку (F15: declined/cancelled не в счёт —
+        // предикат совпадает с partial-индексом active_passenger_booking).
+        const passengerConflict = await tx.booking.findFirst({
+          where: {
+            tripId,
+            passengerId: passenger.id,
+            ...activeBookingWhere(),
+          },
+        });
 
-      // Одна активная бронь на поездку (F15: declined/cancelled не в счёт —
-      // предикат совпадает с partial-индексом active_passenger_booking).
-      const passengerConflict = await tx.booking.findFirst({
-        where: {
-          tripId,
-          passengerId: passenger.id,
-           ...activeBookingWhere(),
-        },
-      });
+        if (passengerConflict) {
+          throw new BookingError(
+            "You already have an active booking for this trip",
+            409,
+            ERROR_CODES.ALREADY_BOOKED,
+          );
+        }
 
-      if (passengerConflict) {
-        throw new BookingError(
-          "You already have an active booking for this trip",
-          409,
-          ERROR_CODES.ALREADY_BOOKED
-        );
-      }
+        await tx.trip.update({
+          where: { id: tripId },
+          data: {
+            seatsAvailable: trip.seatsAvailable - 1,
+          },
+        });
 
-      await tx.trip.update({
-        where: { id: tripId },
-        data: {
-          seatsAvailable: trip.seatsAvailable - 1,
-        },
-      });
-
-      const created = await tx.booking.create({
-        data: {
-          tripId,
-          passengerId: passenger.id,
-          seat,
-          comment,
-          status: "pending",
-          expiresAt: new Date(Date.now() + PENDING_BOOKING_TTL_MS),
-        },
-        include: {
-          trip: {
-            include: {
-              driver: {
-                include: {
-                  car: true,
+        const created = await tx.booking.create({
+          data: {
+            tripId,
+            passengerId: passenger.id,
+            seat,
+            comment,
+            status: "pending",
+            expiresAt: new Date(Date.now() + PENDING_BOOKING_TTL_MS),
+          },
+          include: {
+            trip: {
+              include: {
+                driver: {
+                  include: {
+                    car: true,
+                  },
                 },
               },
             },
-          },
-          passenger: {
-            include: {
-              car: true,
+            passenger: {
+              include: {
+                car: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      return { kind: "created", booking: created };
+        return { kind: "created", booking: created };
       },
-      { isolationLevel: "Serializable" }
+      { isolationLevel: "Serializable" },
     );
 
     if (result.kind === "idempotent") {
       logger.info(
-        { bookingId: result.booking.id, tripId, seat, passengerId: passenger.id },
-        "booking_idempotent_return"
+        {
+          bookingId: result.booking.id,
+          tripId,
+          seat,
+          passengerId: passenger.id,
+        },
+        "booking_idempotent_return",
       );
       return c.json(serializeBooking(result.booking), 200);
     }
@@ -647,7 +707,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
       booking.trip.driverId,
       "booking_created",
       "Новая заявка",
-      `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`
+      `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`,
     );
 
     // Отправляем водителю личное сообщение ВКонтакте от имени сообщества.
@@ -656,7 +716,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
     if (booking.trip.driver.vkUserId) {
       void sendVkMessage(
         booking.trip.driver.vkUserId,
-        `🚗 Новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}.\nОткрыть приложение «Едем» и рассмотреть заявку.`
+        `🚗 Новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}.\nОткрыть приложение «Едем» и рассмотреть заявку.`,
       );
     }
 
@@ -686,7 +746,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
 
       logger.info(
         { constraintName, tripId, seat, passengerId: passenger.id },
-        "booking_p2002_conflict"
+        "booking_p2002_conflict",
       );
 
       // Случай 1: конфликт на active_seat_booking (tripId, seat).
@@ -711,14 +771,14 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         if (existingBooking) {
           logger.info(
             { bookingId: existingBooking.id, tripId, seat },
-            "booking_idempotent_return"
+            "booking_idempotent_return",
           );
           return c.json(serializeBooking(existingBooking), 200);
         }
 
         return c.json(
           { code: ERROR_CODES.SEAT_TAKEN, message: "Seat just taken" },
-          409
+          409,
         );
       }
 
@@ -730,18 +790,18 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
             code: ERROR_CODES.ALREADY_BOOKED,
             message: "You already have an active booking for this trip",
           },
-          409
+          409,
         );
       }
 
       // Случай 3: неизвестный индекс — общий конфликт (логируем как ошибку).
       logger.error(
         { constraintName, tripId, seat, passengerId: passenger.id },
-        "booking_p2002_unknown_target"
+        "booking_p2002_unknown_target",
       );
       return c.json(
         { code: ERROR_CODES.BOOKING_CONFLICT, message: "Booking conflict" },
-        409
+        409,
       );
     }
 
@@ -754,14 +814,14 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
     ) {
       return c.json(
         { code: ERROR_CODES.SEAT_TAKEN, message: "Место только что заняли" },
-        409
+        409,
       );
     }
 
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.statusCode as ContentfulStatusCode
+        error.statusCode as ContentfulStatusCode,
       );
     }
 
@@ -770,7 +830,7 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
         err: error,
         endpoint: "POST /api/bookings",
       },
-      "booking_create_failed"
+      "booking_create_failed",
     );
 
     return c.json({ message: "Internal server error" }, 500);
@@ -802,175 +862,211 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
   // Водитель может только подтвердить или отклонить.
   // «cancelled» устанавливается пассажиром или при отмене поездки.
   if (newStatus !== "confirmed" && newStatus !== "declined") {
-    return c.json({ message: "Driver can only confirm or decline bookings" }, 400);
+    return c.json(
+      { message: "Driver can only confirm or decline bookings" },
+      400,
+    );
   }
 
   let oldStatus = "";
   let passengerId = "";
 
   try {
-    const updated = await db.$transaction(async (tx) => {
-      const booking = await tx.booking.findUnique({
-        where: { id },
-        include: {
-          trip: {
-            include: {
-              driver: {
-                include: {
-                  car: true,
+    const updated = await db.$transaction(
+      async (tx) => {
+        const booking = await tx.booking.findUnique({
+          where: { id },
+          include: {
+            trip: {
+              include: {
+                driver: {
+                  include: {
+                    car: true,
+                  },
                 },
               },
             },
-          },
-          passenger: {
-            include: {
-              car: true,
-            },
-          },
-        },
-      });
-
-      if (!booking) {
-        throw new BookingError("Booking not found", 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      if (booking.trip.driverId !== user.id) {
-        throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
-      }
-
-      oldStatus = booking.status;
-      passengerId = booking.passengerId;
-
-      if (booking.status === newStatus) {
-        return { booking, changed: false };
-      }
-
-      if (booking.status !== "pending") {
-        throw new BookingError(
-          "Only pending bookings can be confirmed or declined",
-          409,
-          ERROR_CODES.CONFLICT
-        );
-      }
-
-      if (booking.expiresAt && booking.expiresAt <= new Date()) {
-        throw new BookingError("Booking request has expired", 409, ERROR_CODES.CONFLICT);
-      }
-
-      const trip = await tx.trip.findUnique({
-        where: { id: booking.tripId },
-      });
-
-      if (!trip) {
-        throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      if (trip.status !== "active" || trip.departureAt <= new Date()) {
-        throw new BookingError("Trip can no longer be changed", 409, ERROR_CODES.TRIP_NOT_ACTIVE);
-      }
-
-      /**
-       * Если бронь становится confirmed, проверяем,
-       * что на этом месте нет другого подтверждённого пассажира.
-       */
-      if (newStatus === "confirmed") {
-        const confirmedConflict = await tx.booking.findFirst({
-          where: {
-            tripId: booking.tripId,
-            seat: booking.seat,
-            status: "confirmed",
-            id: {
-              not: booking.id,
+            passenger: {
+              include: {
+                car: true,
+              },
             },
           },
         });
 
-        if (confirmedConflict) {
+        if (!booking) {
           throw new BookingError(
-            "Another passenger is already confirmed for this seat",
-            409,
-            ERROR_CODES.SEAT_TAKEN
+            "Booking not found",
+            404,
+            ERROR_CODES.NOT_FOUND,
           );
         }
-      }
 
-      /**
-       * Если бронь переходит из неактивного состояния в активное,
-       * нужно снова удержать место.
-       */
-      if (isActiveBookingStatus(newStatus) && !isActiveBookingStatus(oldStatus)) {
-        if (trip.status !== "active") {
-          throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
+        if (booking.trip.driverId !== user.id) {
+          throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
         }
 
-        if (trip.seatsAvailable <= 0) {
-          throw new BookingError("Not enough available seats", 409, ERROR_CODES.CONFLICT);
+        oldStatus = booking.status;
+        passengerId = booking.passengerId;
+
+        if (booking.status === newStatus) {
+          return { booking, changed: false };
         }
 
-        const activeConflict = await tx.booking.findFirst({
-          where: {
-            tripId: booking.tripId,
-            seat: booking.seat,
-             ...activeBookingWhere(),
-            id: {
-              not: booking.id,
+        if (booking.status !== "pending") {
+          throw new BookingError(
+            "Only pending bookings can be confirmed or declined",
+            409,
+            ERROR_CODES.CONFLICT,
+          );
+        }
+
+        if (booking.expiresAt && booking.expiresAt <= new Date()) {
+          throw new BookingError(
+            "Booking request has expired",
+            409,
+            ERROR_CODES.CONFLICT,
+          );
+        }
+
+        const trip = await tx.trip.findUnique({
+          where: { id: booking.tripId },
+        });
+
+        if (!trip) {
+          throw new BookingError("Trip not found", 404, ERROR_CODES.NOT_FOUND);
+        }
+
+        if (trip.status !== "active" || trip.departureAt <= new Date()) {
+          throw new BookingError(
+            "Trip can no longer be changed",
+            409,
+            ERROR_CODES.TRIP_NOT_ACTIVE,
+          );
+        }
+
+        /**
+         * Если бронь становится confirmed, проверяем,
+         * что на этом месте нет другого подтверждённого пассажира.
+         */
+        if (newStatus === "confirmed") {
+          const confirmedConflict = await tx.booking.findFirst({
+            where: {
+              tripId: booking.tripId,
+              seat: booking.seat,
+              status: "confirmed",
+              id: {
+                not: booking.id,
+              },
             },
-          },
-        });
+          });
 
-        if (activeConflict) {
-          throw new BookingError("Seat is already reserved", 409, ERROR_CODES.SEAT_TAKEN);
+          if (confirmedConflict) {
+            throw new BookingError(
+              "Another passenger is already confirmed for this seat",
+              409,
+              ERROR_CODES.SEAT_TAKEN,
+            );
+          }
         }
 
-        await tx.trip.update({
-          where: { id: booking.tripId },
-          data: {
-            seatsAvailable: trip.seatsAvailable - 1,
-          },
-        });
-      }
+        /**
+         * Если бронь переходит из неактивного состояния в активное,
+         * нужно снова удержать место.
+         */
+        if (
+          isActiveBookingStatus(newStatus) &&
+          !isActiveBookingStatus(oldStatus)
+        ) {
+          if (trip.status !== "active") {
+            throw new BookingError(
+              "Trip is not active",
+              400,
+              ERROR_CODES.TRIP_NOT_ACTIVE,
+            );
+          }
 
-      /**
-       * Если активная бронь становится неактивной,
-       * освобождаем место.
-       */
-      if (!isActiveBookingStatus(newStatus) && isActiveBookingStatus(oldStatus)) {
-        await tx.trip.update({
-          where: { id: booking.tripId },
-          data: {
-            seatsAvailable: Math.min(
-              trip.seatsAvailable + 1,
-              trip.seatsTotal
-            ),
-          },
-        });
-      }
+          if (trip.seatsAvailable <= 0) {
+            throw new BookingError(
+              "Not enough available seats",
+              409,
+              ERROR_CODES.CONFLICT,
+            );
+          }
 
-      const updatedBooking = await tx.booking.update({
-        where: { id: booking.id },
-        data: {
-          status: newStatus,
-        },
-        include: {
-          trip: {
-            include: {
-              driver: {
-                include: {
-                  car: true,
+          const activeConflict = await tx.booking.findFirst({
+            where: {
+              tripId: booking.tripId,
+              seat: booking.seat,
+              ...activeBookingWhere(),
+              id: {
+                not: booking.id,
+              },
+            },
+          });
+
+          if (activeConflict) {
+            throw new BookingError(
+              "Seat is already reserved",
+              409,
+              ERROR_CODES.SEAT_TAKEN,
+            );
+          }
+
+          await tx.trip.update({
+            where: { id: booking.tripId },
+            data: {
+              seatsAvailable: { decrement: 1 },
+            },
+          });
+        }
+
+        /**
+         * Если активная бронь становится неактивной,
+         * освобождаем место.
+         */
+        if (
+          !isActiveBookingStatus(newStatus) &&
+          isActiveBookingStatus(oldStatus)
+        ) {
+          await tx.trip.update({
+            where: { id: booking.tripId },
+            data: {
+              seatsAvailable: Math.min(
+                trip.seatsAvailable + 1,
+                trip.seatsTotal,
+              ),
+            },
+          });
+        }
+
+        const updatedBooking = await tx.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: newStatus,
+          },
+          include: {
+            trip: {
+              include: {
+                driver: {
+                  include: {
+                    car: true,
+                  },
                 },
               },
             },
-          },
-          passenger: {
-            include: {
-              car: true,
+            passenger: {
+              include: {
+                car: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      return { booking: updatedBooking, changed: true };
-    }, { isolationLevel: "Serializable" });
+        return { booking: updatedBooking, changed: true };
+      },
+      { isolationLevel: "Serializable" },
+    );
 
     if (!updated.changed) {
       return c.json(serializeBooking(updated.booking));
@@ -990,12 +1086,16 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
       newStatus === "confirmed" ? "Заявка подтверждена" : "Заявка отклонена",
       `Водитель ${newStatus === "confirmed" ? "подтвердил" : "отклонил"} вашу заявку в поездке ${updated.booking.trip.fromCity} → ${updated.booking.trip.toCity}`,
       // Deep-link: тап по push открывает «Мои брони».
-      "/bookings"
+      "/bookings",
     );
 
     wsManager.sendToUser(passengerId, {
       type: "booking:status_changed",
-      payload: { bookingId: id, tripId: updated.booking.tripId, status: newStatus },
+      payload: {
+        bookingId: id,
+        tripId: updated.booking.tripId,
+        status: newStatus,
+      },
     });
 
     wsManager.sendToUser(passengerId, {
@@ -1008,7 +1108,7 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.statusCode as ContentfulStatusCode
+        error.statusCode as ContentfulStatusCode,
       );
     }
 
@@ -1020,7 +1120,7 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
     ) {
       return c.json(
         { code: ERROR_CODES.BOOKING_CONFLICT, message: "Booking conflict" },
-        409
+        409,
       );
     }
 
@@ -1031,8 +1131,11 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Бронь только что изменилась, попробуйте ещё раз" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Бронь только что изменилась, попробуйте ещё раз",
+        },
+        409,
       );
     }
 
@@ -1041,7 +1144,7 @@ bookingsRouter.patch("/:id/status", bookingDecisionLimiter, async (c) => {
         err: error,
         endpoint: "PATCH /api/bookings/:id/status",
       },
-      "booking_status_update_failed"
+      "booking_status_update_failed",
     );
 
     return c.json({ message: "Internal server error" }, 500);
@@ -1062,60 +1165,75 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
   const id = c.req.param("id");
 
   try {
-    const txResult = await db.$transaction(async (tx) => {
-      const booking = await tx.booking.findUnique({
-        where: { id },
-        include: {
-          trip: true,
-        },
-      });
+    const txResult = await db.$transaction(
+      async (tx) => {
+        const booking = await tx.booking.findUnique({
+          where: { id },
+          include: {
+            trip: true,
+          },
+        });
 
-      if (!booking) {
-        throw new BookingError("Booking not found", 404, ERROR_CODES.NOT_FOUND);
-      }
+        if (!booking) {
+          throw new BookingError(
+            "Booking not found",
+            404,
+            ERROR_CODES.NOT_FOUND,
+          );
+        }
 
-      if (booking.passengerId !== user.id) {
-        throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
-      }
+        if (booking.passengerId !== user.id) {
+          throw new BookingError("Forbidden", 403, ERROR_CODES.FORBIDDEN);
+        }
 
-      if (booking.status !== "pending" && booking.status !== "confirmed") {
-        throw new BookingError("Booking is already cancelled", 400, ERROR_CODES.CONFLICT);
-      }
+        if (booking.status !== "pending" && booking.status !== "confirmed") {
+          throw new BookingError(
+            "Booking is already cancelled",
+            400,
+            ERROR_CODES.CONFLICT,
+          );
+        }
 
-      if (booking.trip.status !== "active") {
-        throw new BookingError("Trip is not active", 400, ERROR_CODES.TRIP_NOT_ACTIVE);
-      }
+        if (booking.trip.status !== "active") {
+          throw new BookingError(
+            "Trip is not active",
+            400,
+            ERROR_CODES.TRIP_NOT_ACTIVE,
+          );
+        }
 
-      if (booking.trip.departureAt <= new Date()) {
-        throw new BookingError(
-          "Cannot cancel booking after trip departure",
-          400,
-          ERROR_CODES.TRIP_IN_PAST
-        );
-      }
+        if (booking.trip.departureAt <= new Date()) {
+          throw new BookingError(
+            "Cannot cancel booking after trip departure",
+            400,
+            ERROR_CODES.TRIP_IN_PAST,
+          );
+        }
 
-      await tx.trip.update({
-        where: { id: booking.tripId },
-        data: {
-          seatsAvailable: Math.min(
-            booking.trip.seatsAvailable + 1,
-            booking.trip.seatsTotal
-          ),
-        },
-      });
+        await tx.trip.update({
+          where: { id: booking.tripId },
+          data: {
+            seatsAvailable: Math.min(
+              booking.trip.seatsAvailable + 1,
+              booking.trip.seatsTotal,
+            ),
+          },
+        });
 
-      await tx.booking.update({
-        where: { id: booking.id },
+        await tx.booking.update({
+          where: { id: booking.id },
           data: {
             status: "cancelled",
             cancelledAt: new Date(),
             cancelledByType: "user",
             cancelledByUserId: user.id,
           },
-      });
+        });
 
-      return { tripId: booking.tripId, driverId: booking.trip.driverId };
-    }, { isolationLevel: "Serializable" });
+        return { tripId: booking.tripId, driverId: booking.trip.driverId };
+      },
+      { isolationLevel: "Serializable" },
+    );
 
     logBusinessEvent("booking.cancelled", {
       bookingId: id,
@@ -1132,7 +1250,7 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
     if (error instanceof BookingError) {
       return c.json(
         { code: error.code, message: error.message },
-        error.statusCode as ContentfulStatusCode
+        error.statusCode as ContentfulStatusCode,
       );
     }
 
@@ -1144,8 +1262,11 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
       error.code === "P2034"
     ) {
       return c.json(
-        { code: ERROR_CODES.CONFLICT, message: "Бронь только что изменилась, попробуйте ещё раз" },
-        409
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Бронь только что изменилась, попробуйте ещё раз",
+        },
+        409,
       );
     }
 
@@ -1154,7 +1275,7 @@ bookingsRouter.patch("/:id/cancel", cancelBookingLimiter, async (c) => {
         err: error,
         endpoint: "PATCH /api/bookings/:id/cancel",
       },
-      "booking_cancel_failed"
+      "booking_cancel_failed",
     );
 
     return c.json({ message: "Internal server error" }, 500);
