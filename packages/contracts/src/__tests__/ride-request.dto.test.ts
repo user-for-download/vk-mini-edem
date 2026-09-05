@@ -14,6 +14,10 @@ describe("RideRequest contracts", () => {
     expect(createRideRequestDtoSchema.parse(base).seats).toBe(1);
   });
 
+  it("accepts legacy opaque city IDs", () => {
+    expect(createRideRequestDtoSchema.parse({ ...base, fromCityId: "city-moscow", toCityId: "city-tula" }).fromCityId).toBe("city-moscow");
+  });
+
   it("rejects equal cities and reversed time window", () => {
     const result = createRideRequestDtoSchema.safeParse({
       ...base,

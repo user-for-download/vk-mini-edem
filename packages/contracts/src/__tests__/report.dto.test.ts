@@ -13,6 +13,10 @@ describe("Report contracts", () => {
     expect(createReportDtoSchema.parse({ ...valid, description: "  Жалоба  " }).description).toBe("Жалоба");
   });
 
+  it("accepts legacy opaque target IDs", () => {
+    expect(createReportDtoSchema.parse({ ...valid, targetId: "t-1" }).targetId).toBe("t-1");
+  });
+
   it("rejects invalid target/category and blank description", () => {
     expect(createReportDtoSchema.safeParse({ ...valid, targetType: "car", category: "abuse", description: " " }).success).toBe(false);
   });

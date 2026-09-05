@@ -82,7 +82,7 @@ rideRequestsRouter.get("/matching", async (c) => {
   const toCityId = c.req.query("toCityId");
   const earliestAt = c.req.query("earliestAt");
   const latestAt = c.req.query("latestAt");
-  if (!fromCityId || !toCityId || !earliestAt || !latestAt || !z.string().uuid().safeParse(fromCityId).success || !z.string().uuid().safeParse(toCityId).success) {
+  if (!fromCityId || !toCityId || !earliestAt || !latestAt) {
     return c.json({ code: ERROR_CODES.VALIDATION_FAILED, message: "Invalid matching query" }, 400);
   }
   const start = new Date(earliestAt);

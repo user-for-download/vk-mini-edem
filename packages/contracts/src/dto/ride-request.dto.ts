@@ -5,8 +5,9 @@ import { rideRequestStatusSchema } from "../schemas/ride-request.schema.js";
 const dateTime = z.string().datetime();
 
 export const createRideRequestDtoSchema = z.object({
-  fromCityId: z.string().uuid(),
-  toCityId: z.string().uuid(),
+  // City IDs are opaque strings because legacy records do not use UUIDs.
+  fromCityId: z.string().trim().min(1),
+  toCityId: z.string().trim().min(1),
   earliestAt: dateTime,
   latestAt: dateTime,
   seats: z.number().int().min(1).max(MAX_SEATS).default(1),

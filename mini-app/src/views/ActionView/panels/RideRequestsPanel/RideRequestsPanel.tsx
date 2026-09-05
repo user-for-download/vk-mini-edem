@@ -22,7 +22,14 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({ id, onBack }) =>
 
   const submit = async () => {
     try {
-      await create.mutateAsync({ fromCityId, toCityId, earliestAt: new Date(earliestAt).toISOString(), latestAt: new Date(latestAt).toISOString(), expiresAt: new Date(expiresAt).toISOString(), seats: 1 });
+      const earliest = new Date(earliestAt);
+      const latest = new Date(latestAt);
+      const expires = new Date(expiresAt);
+      if (![earliest, latest, expires].every((date) => Number.isFinite(date.getTime())) || earliest >= latest || expires <= new Date()) {
+        notify({ type: "error", title: "Проверьте время запроса", subtitle: "Срок действия должен быть в будущем, а окно отправления — корректным" });
+        return;
+      }
+      await create.mutateAsync({ fromCityId, toCityId, earliestAt: earliest.toISOString(), latestAt: latest.toISOString(), expiresAt: expires.toISOString(), seats: 1 });
       setFromCityId(""); setToCityId(""); setEarliestAt(""); setLatestAt(""); setExpiresAt("");
       notify({ type: "success", title: "Запрос опубликован" });
     } catch (error) { notify({ type: "error", title: error instanceof Error ? error.message : "Не удалось создать запрос" }); }

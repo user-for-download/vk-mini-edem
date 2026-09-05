@@ -20,7 +20,7 @@ export type ReportTargetType = z.infer<typeof reportTargetTypeSchema>;
 export const reportSchema = z.object({
   id: z.string().uuid(),
   targetType: reportTargetTypeSchema,
-  targetId: z.string().uuid(),
+  targetId: z.string().min(1),
   category: reportCategorySchema,
   description: z.string().min(1).max(2000),
   status: reportStatusSchema,
