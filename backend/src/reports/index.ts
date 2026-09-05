@@ -1,11 +1,5 @@
 import { Hono } from "hono";
-import {
-  createReportDtoSchema,
-  reportStatusSchema,
-  reportTargetTypeSchema,
-  adminReportsQuerySchema,
-  updateReportStatusDtoSchema,
-} from "@edem/contracts";
+import { createReportDtoSchema, adminReportsQuerySchema, updateReportStatusDtoSchema } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { getSanitizedBody, sanitizeValue } from "../middleware/sanitize.js";
@@ -67,6 +61,12 @@ adminReportsRouter.get("/", adminReadLimiter, async (c) => {
   return c.json({ items: items.map(serializeAdminReport), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize), hasMore: page * pageSize < total } });
 });
 
+adminReportsRouter.get("/:id", adminReadLimiter, async (c) => {
+  const item = await db.report.findUnique({ where: { id: c.req.param("id") }, include: includeRelations });
+  if (!item) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Report not found" }, 404);
+  return c.json(serializeAdminReport(item));
+});
+
 adminReportsRouter.patch("/:id/status", async (c) => {
   const id = c.req.param("id");
   const parsed = updateReportStatusDtoSchema.safeParse(await getSanitizedBody(c));
@@ -74,6 +74,6 @@ adminReportsRouter.patch("/:id/status", async (c) => {
   const current = await db.report.findUnique({ where: { id } });
   if (!current) return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Report not found" }, 404);
   if (current.status === "resolved" || current.status === "rejected") return c.json({ code: ERROR_CODES.CONFLICT, message: "Report is already terminal" }, 409);
-  const item = await db.report.update({ where: { id }, data: { status: parsed.data.status, resolutionNote: parsed.data.resolutionNote, resolvedAt: parsed.data.status === "resolved" || parsed.data.status === "rejected" ? new Date() : null, adminActorId: null }, include: includeRelations });
+  const item = await db.report.update({ where: { id }, data: { status: parsed.data.status, resolutionNote: parsed.data.resolutionNote, resolvedAt: parsed.data.status === "resolved" || parsed.data.status === "rejected" ? new Date() : null, adminActorId: null, adminActorType: "admin" }, include: includeRelations });
   return c.json(serializeAdminReport(item));
 });

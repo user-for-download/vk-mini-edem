@@ -25,6 +25,7 @@ export function serializeAdminReport(report: ReportWithRelations) {
     reporterId: report.reporterId,
     reporterName: report.reporter.name,
     adminActorId: report.adminActorId,
+    adminActorType: report.adminActorType,
     adminActorName: report.adminActor?.name ?? null,
   };
 }

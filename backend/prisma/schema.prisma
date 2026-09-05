@@ -201,6 +201,7 @@ model Report {
   status          String   @default("pending") // pending, in_review, resolved, rejected
   resolutionNote  String?
   adminActorId    String?
+  adminActorType  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   resolvedAt      DateTime?
