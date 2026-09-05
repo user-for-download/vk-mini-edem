@@ -32,7 +32,7 @@ export async function optionalAuth(
           include: { car: true },
         });
         // Забаненный пользователь неотличим от гостя: user не прикрепляем.
-        if (user && !user.bannedAt) {
+        if (user && !user.bannedAt && !user.deletedAt) {
           c.set("user", user);
         }
       } catch {

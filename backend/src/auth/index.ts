@@ -165,6 +165,10 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     );
   }
 
+  if (finalUser.deletedAt) {
+    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
+  }
+
   const accessToken = await signAccessToken(finalUser.id);
   const refreshToken = await signRefreshToken(finalUser.id); // Создаёт запись в БД
 
@@ -205,7 +209,12 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       // Единообразно с основной веткой: забаненному пользователю токены
       // не выдаём. Записи refresh-токена в БД нет (jti "dev-jti") —
       // отзываем только реальные токены, если они есть.
-      if (user.bannedAt) {
+       if (user.deletedAt) {
+         await revokeAllActiveTokens(user.id);
+         return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
+       }
+
+       if (user.bannedAt) {
         await revokeAllActiveTokens(user.id);
         return c.json(
           {
@@ -242,7 +251,12 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
       return c.json({ message: "User not found" }, 401);
     }
 
-    if (user.bannedAt) {
+     if (user.deletedAt) {
+       await revokeAllActiveTokens(user.id);
+       return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
+     }
+
+     if (user.bannedAt) {
       const revokedCount = await revokeAllActiveTokens(user.id);
       logger.warn(
         { userId: user.id, revokedCount },

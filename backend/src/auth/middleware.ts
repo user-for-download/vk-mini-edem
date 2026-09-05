@@ -52,6 +52,10 @@ export async function requireAuth(c: Context<AuthEnv>, next: Next) {
     return c.json({ code: ERROR_CODES.UNAUTHORIZED, message: "Unauthorized" }, 401);
   }
 
+  if (user.deletedAt) {
+    return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" }, 403);
+  }
+
   if (user.bannedAt) {
     return c.json({ code: ERROR_CODES.FORBIDDEN, message: "Account is banned" }, 403);
   }

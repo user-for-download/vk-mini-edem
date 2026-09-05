@@ -1,8 +1,46 @@
 {
-  "id": "edem-liquidity-safety-16", "seq": "16", "title": "S4: реализовать transactional profile deletion", "status": "pending", "depends_on": ["15"], "parallel": false, "suggested_agent": "CoderAgent",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/src/auth/index.ts", "backend/src/auth/tokens.ts", "backend/src/auth/middleware.ts", "backend/src/services/wsManager.ts", "backend/src/users/index.ts", "backend/prisma/schema.prisma"],
-  "deliverables": ["deletedAt/deletion state migration if approved", "Delete endpoint/service", "Anonymization, token revocation, WS close, cache invalidation"],
-  "acceptance_criteria": ["Операция atomic/transactional и idempotent", "Access/refresh sessions после deletion не работают", "WS connections close with documented reason", "Banned/deleted/active-obligation behavior соответствует S0", "VK auth не создаёт неожиданный duplicate profile"],
-  "commands": ["npm run db:generate", "npm test --workspace=backend", "npm run typecheck"],
-  "risks": ["Частичная анонимизация оставит PII в serializer или notification payload"]
+  "id": "edem-liquidity-safety-16",
+  "seq": "16",
+  "title": "S4: реализовать transactional profile deletion",
+  "status": "completed",
+  "depends_on": [
+    "15"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T14:04:47.611Z",
+  "completion_summary": "Implemented transactional profile deletion, anonymization, obligation guard and auth invalidation",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/src/auth/index.ts",
+    "backend/src/auth/tokens.ts",
+    "backend/src/auth/middleware.ts",
+    "backend/src/services/wsManager.ts",
+    "backend/src/users/index.ts",
+    "backend/prisma/schema.prisma"
+  ],
+  "deliverables": [
+    "deletedAt/deletion state migration if approved",
+    "Delete endpoint/service",
+    "Anonymization, token revocation, WS close, cache invalidation"
+  ],
+  "acceptance_criteria": [
+    "Операция atomic/transactional и idempotent",
+    "Access/refresh sessions после deletion не работают",
+    "WS connections close with documented reason",
+    "Banned/deleted/active-obligation behavior соответствует S0",
+    "VK auth не создаёт неожиданный duplicate profile"
+  ],
+  "commands": [
+    "npm run db:generate",
+    "npm test --workspace=backend",
+    "npm run typecheck"
+  ],
+  "risks": [
+    "Частичная анонимизация оставит PII в serializer или notification payload"
+  ]
 }

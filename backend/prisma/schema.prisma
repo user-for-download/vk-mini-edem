@@ -32,6 +32,7 @@ model User {
   // Версия онбординга (слайдов), показанного пользователю; null — ещё не показан.
   // Админка может сбросить (PATCH /admin/users/:id/onboarding-reset).
   onboardingVersion    String?
+  deletedAt            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

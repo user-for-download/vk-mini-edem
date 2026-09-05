@@ -76,6 +76,7 @@ export function serializeUser(
   user: UserWithCar,
   options?: { includePlate?: boolean; includeVkUserId?: boolean }
 ) {
+  const isDeleted = Boolean(user.deletedAt);
   return {
     id: user.id,
     // VK ID отдаётся только по явному флагу (участники активной брони),
@@ -83,8 +84,8 @@ export function serializeUser(
     ...(options?.includeVkUserId && user.vkUserId != null
       ? { vkUserId: user.vkUserId }
       : {}),
-    name: user.name,
-    avatar: user.avatar || DEFAULT_AVATAR_URL,
+    name: isDeleted ? "Удалённый пользователь" : user.name,
+    avatar: DEFAULT_AVATAR_URL,
     rating: user.rating,
     reviewsCount: user.reviewsCount,
     tripsCount: user.tripsCount,
@@ -100,7 +101,7 @@ export function serializeUser(
           ...(options?.includePlate === false ? {} : { plate: user.car.plate }),
         }
       : undefined,
-    about: user.about ?? undefined,
+    about: isDeleted ? undefined : user.about ?? undefined,
     createdAt: user.createdAt.toISOString(),
   };
 }

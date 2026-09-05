@@ -8,6 +8,10 @@ import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { serializeUser } from "../serializers/index.js";
 import { publicReadLimiter, mutationLimiter, profileUpdateLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
+import { wsManager } from "../ws/manager.js";
+import { revokeAllActiveTokens } from "../auth/tokens.js";
+import { ERROR_CODES } from "../errors.js";
+import { DEFAULT_AVATAR_URL } from "../constants.js";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -25,6 +29,28 @@ const updateNotificationSettingsSchema = z.object({
 });
 
 export const usersRouter = new Hono<AuthEnv>();
+
+usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
+  const user = c.get("user");
+  const now = new Date();
+  const activeTrip = await db.trip.findFirst({ where: { driverId: user.id, status: "active" }, select: { id: true } });
+  const activeBooking = await db.booking.findFirst({ where: { passengerId: user.id, status: { in: ["pending", "confirmed"] }, trip: { status: "active", departureAt: { gt: now } } }, select: { id: true } });
+  if (activeTrip || activeBooking) return c.json({ code: "ACCOUNT_HAS_ACTIVE_OBLIGATIONS", message: "Resolve active trips and bookings first" }, 409);
+
+  await db.$transaction(async (tx) => {
+    await tx.refreshToken.deleteMany({ where: { userId: user.id } });
+    await tx.notification.deleteMany({ where: { userId: user.id } });
+    await tx.feedback.deleteMany({ where: { userId: user.id } });
+    await tx.rideRequest.updateMany({ where: { userId: user.id, status: { in: ["active", "paused"] } }, data: { status: "cancelled" } });
+    await tx.car.deleteMany({ where: { userId: user.id } });
+    // Keep the signed VK identity as a tombstone: clearing it would allow the
+    // next VK login to create a second account for the same person.
+    await tx.user.update({ where: { id: user.id }, data: { deletedAt: now, name: "Удалённый пользователь", avatar: DEFAULT_AVATAR_URL, about: null, rating: 5, reviewsCount: 0, tripsCount: 0, onboardingVersion: null } });
+  }, { isolationLevel: "Serializable" });
+  wsManager.closeUserConnections(user.id, 4403, "Account deleted");
+  await revokeAllActiveTokens(user.id);
+  return c.json({ success: true });
+});
 
 /**
  * Текущий пользователь.
