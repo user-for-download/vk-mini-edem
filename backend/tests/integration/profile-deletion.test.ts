@@ -51,4 +51,22 @@ describe("DELETE /api/v1/users/me", () => {
       await db.trip.delete({ where: { id: ownTrip.id } });
     }
   });
+
+  it("does not recreate a deleted account on the same VK identity", async () => {
+    const vkUserId = (await db.user.findUnique({ where: { id: userId }, select: { vkUserId: true } }))?.vkUserId;
+    expect(vkUserId).not.toBeNull();
+    const deletion = await app.request("/api/v1/users/me", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${devMockAccessToken(userId)}` },
+    });
+    expect(deletion.status).toBe(200);
+    const response = await app.request("/api/v1/auth/vk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ searchParams: `vk_user_id=${vkUserId}&sign=dev-sign` }),
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).message).toBe("Account is deleted");
+    expect(await db.user.count({ where: { vkUserId: vkUserId! } })).toBe(1);
+  });
 });
