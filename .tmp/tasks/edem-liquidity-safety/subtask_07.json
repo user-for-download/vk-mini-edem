@@ -1,8 +1,44 @@
 {
-  "id": "edem-liquidity-safety-07", "seq": "07", "title": "S2: добавить модель и contracts RideRequest", "status": "pending", "depends_on": ["03", "04"], "parallel": false, "suggested_agent": "CoderAgent",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md"], "reference_files": ["backend/prisma/schema.prisma", "packages/contracts/src/dto/trip.dto.ts", "packages/contracts/src/schemas/city.schema.ts", "packages/contracts/src/index.ts"],
-  "deliverables": ["Prisma RideRequest model/migration", "Zod DTOs и response schemas", "Статусы, indexes, limits и expiry fields"],
-  "acceptance_criteria": ["Направление использует City FK/IDs", "Есть active/paused/fulfilled/expired/cancelled semantics", "Ограничены seats, date window, TTL и число активных запросов", "Нет автоматического booking"],
-  "commands": ["npm run prisma:validate", "npm run db:generate", "npm test --workspace=packages/contracts"],
-  "risks": ["Неверные indexes ухудшат matching и позволят дубликаты"]
+  "id": "edem-liquidity-safety-07",
+  "seq": "07",
+  "title": "S2: добавить модель и contracts RideRequest",
+  "status": "completed",
+  "depends_on": [
+    "03",
+    "04"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T13:17:24.039Z",
+  "completion_summary": "Added RideRequest Prisma model, migration, statuses and Zod contracts",
+  "context_files": [
+    "MEMORY.md"
+  ],
+  "reference_files": [
+    "backend/prisma/schema.prisma",
+    "packages/contracts/src/dto/trip.dto.ts",
+    "packages/contracts/src/schemas/city.schema.ts",
+    "packages/contracts/src/index.ts"
+  ],
+  "deliverables": [
+    "Prisma RideRequest model/migration",
+    "Zod DTOs и response schemas",
+    "Статусы, indexes, limits и expiry fields"
+  ],
+  "acceptance_criteria": [
+    "Направление использует City FK/IDs",
+    "Есть active/paused/fulfilled/expired/cancelled semantics",
+    "Ограничены seats, date window, TTL и число активных запросов",
+    "Нет автоматического booking"
+  ],
+  "commands": [
+    "npm run prisma:validate",
+    "npm run db:generate",
+    "npm test --workspace=packages/contracts"
+  ],
+  "risks": [
+    "Неверные indexes ухудшат matching и позволят дубликаты"
+  ]
 }

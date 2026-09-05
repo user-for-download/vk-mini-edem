@@ -8,6 +8,7 @@ export * from "./schemas/ws.schema.js";
 export * from "./schemas/common.schema.js";
 export * from "./schemas/admin.schema.js";
 export * from "./schemas/city.schema.js";
+export * from "./schemas/ride-request.schema.js";
 
 // DTO
 export * from "./dto/auth.dto.js";
@@ -17,4 +18,5 @@ export * from "./dto/review.dto.js";
 export * from "./dto/feedback.dto.js";
 export * from "./dto/admin.dto.js";
 export * from "./dto/city.dto.js";
+export * from "./dto/ride-request.dto.js";
 export * from "./ws.js";
