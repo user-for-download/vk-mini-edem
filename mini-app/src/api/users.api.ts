@@ -13,6 +13,9 @@ export const usersApi = {
     return apiClient.request<User>("/users/me", { signal }, userSchema);
   },
 
+  deleteCurrentUser: (): Promise<{ success: boolean }> =>
+    apiClient.request<{ success: boolean }>("/users/me", { method: "DELETE" }),
+
   getUserById: (id: string, signal?: AbortSignal): Promise<User> => {
     return apiClient.request<User>(`/users/${encodeURIComponent(id)}`, { signal }, userSchema);
   },

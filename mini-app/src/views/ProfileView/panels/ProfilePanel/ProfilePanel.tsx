@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import { useState, type FC } from "react";
 import { Avatar, Button, Caption, Box, Flex, Group, Header, InfoRow, Panel, SimpleCell, SimpleGrid, Spacing, Text, Title } from "@vkontakte/vkui";
 import {
   Icon24CarOutline,
@@ -18,6 +18,9 @@ import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { resolveAvatar } from "@/helpers/avatar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAvailableReviewTripsQuery } from "@/queries/useReviewsQuery";
+import { usersApi } from "@/api/users.api";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useSnackbar } from "@/providers/SnackbarProvider";
 
 export interface ProfilePanelProps {
   id: string;
@@ -48,6 +51,9 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
 }) => {
   const currentUser = useCurrentUser();
   const routeNavigator = useRouteNavigator();
+  const [deleting, setDeleting] = useState(false);
+  const { enqueue } = useSnackbar();
+  const clearSession = useAuthStore((state) => state.clearSession);
 
   const {
     data: availableReviewTrips,
@@ -65,6 +71,19 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       </Panel>
     );
   }
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Удалить профиль? Аккаунт будет анонимизирован, а восстановление будет невозможно.")) return;
+    setDeleting(true);
+    try {
+      await usersApi.deleteCurrentUser();
+      await clearSession("Account deleted");
+    } catch (error) {
+      enqueue({ type: "error", title: error instanceof Error ? error.message : "Не удалось удалить профиль" });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
 
 
@@ -228,6 +247,15 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         <SimpleCell before={<Icon24InfoCircleOutline />} chevron="always" onClick={onOpenAbout}>
           О сервисе
         </SimpleCell>
+      </Group>
+
+      <Group header={<Header size="s">опасная зона</Header>}>
+        <Box padding="system">
+          <Button mode="tertiary" appearance="negative" loading={deleting} disabled={deleting} stretched onClick={() => void handleDeleteAccount()}>
+            Удалить профиль
+          </Button>
+          <Caption level="1">Активные поездки и брони нужно завершить или отменить заранее.</Caption>
+        </Box>
       </Group>
 
       <Spacing size={24} />
