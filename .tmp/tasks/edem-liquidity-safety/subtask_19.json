@@ -1,8 +1,47 @@
 {
-  "id": "edem-liquidity-safety-19", "seq": "19", "title": "S5: собрать миграции и обновить API documentation", "status": "pending", "depends_on": ["05", "06", "10", "14", "18"], "parallel": false, "suggested_agent": "DocWriter",
-  "agent_id": null, "started_at": null, "completed_at": null, "completion_summary": null, "context_files": ["MEMORY.md", "README.md", "docs/api/admin.md"], "reference_files": ["backend/prisma/migrations", "packages/contracts/src/index.ts", "backend/src/app.ts"],
-  "deliverables": ["Production migrations", "API docs for RideRequest/Reports/delete/share", "Updated README/MEMORY and env/ops notes"],
-  "acceptance_criteria": ["Документация совпадает с implementation", "Migration deploy и generate работают на чистой и существующей БД", "Описаны statuses, auth, limits, privacy и rollback concerns"],
-  "commands": ["npm run prisma:validate", "npm run db:generate", "npm run format:check"],
-  "risks": ["Документация может отстать от финальных defaults"]
+  "id": "edem-liquidity-safety-19",
+  "seq": "19",
+  "title": "S5: собрать миграции и обновить API documentation",
+  "status": "completed",
+  "depends_on": [
+    "05",
+    "06",
+    "10",
+    "14",
+    "18"
+  ],
+  "parallel": false,
+  "suggested_agent": "DocWriter",
+  "agent_id": null,
+  "started_at": null,
+  "completed_at": "2026-09-05T14:18:05.655Z",
+  "completion_summary": "Updated README, MEMORY and API docs for lifecycle, RideRequest, reports and deletion",
+  "context_files": [
+    "MEMORY.md",
+    "README.md",
+    "docs/api/admin.md"
+  ],
+  "reference_files": [
+    "backend/prisma/migrations",
+    "packages/contracts/src/index.ts",
+    "backend/src/app.ts"
+  ],
+  "deliverables": [
+    "Production migrations",
+    "API docs for RideRequest/Reports/delete/share",
+    "Updated README/MEMORY and env/ops notes"
+  ],
+  "acceptance_criteria": [
+    "Документация совпадает с implementation",
+    "Migration deploy и generate работают на чистой и существующей БД",
+    "Описаны statuses, auth, limits, privacy и rollback concerns"
+  ],
+  "commands": [
+    "npm run prisma:validate",
+    "npm run db:generate",
+    "npm run format:check"
+  ],
+  "risks": [
+    "Документация может отстать от финальных defaults"
+  ]
 }

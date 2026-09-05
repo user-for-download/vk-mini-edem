@@ -1,6 +1,6 @@
 # Edem Current Memory
 
-Updated: 2026-09-04
+Updated: 2026-09-05
 
 ## Project
 
@@ -237,3 +237,12 @@ The production frontend passes the enforced initial and per-chunk gzip budgets; 
 ## Documentation Rules
 
 When behavior changes, update this file and the relevant README/API document in the same change. Keep commands and ports synchronized with the root `package.json`, and document security-sensitive behavior from the implementation rather than old plans.
+
+## Liquidity Safety Features (2026-09-05)
+
+- Pending bookings now receive a 24-hour `expiresAt`. Expired pending rows are excluded from active checks, atomically released before a new booking is accepted, and materialized as `declined` by the worker with `cancelledByType: "system"` and a reason. The existing partial active-booking indexes remain unchanged.
+- Trip and booking cancellation audit fields are stored (`cancelledAt`, `cancelledByType`, optional actor ID/reason). Driver/admin/system transitions populate them without changing the existing trip state machine.
+- Trip sharing uses `VKWebAppShare` with a route-only hash URL and browser fallback. The backend remains the privacy boundary for exact meeting addresses.
+- RideRequest MVP is implemented under `/api/v1/ride-requests`: city route, time window, seats, expiry, active/paused/fulfilled/expired/cancelled states, three-active-request limit, matching query and no automatic booking. Matching trips produce deduplicated in-app notifications with a `/trips/:id` deep link.
+- Reports are implemented under `/api/v1/reports` and `/api/v1/admin/reports`. Targets are user/trip/booking; creation requires a relevant driver/passenger relationship, is rate-limited and deduplicated, and admin states are pending/in_review/resolved/rejected. The mini-app exposes trip reporting and the webapp has moderation controls.
+- Profile deletion is `DELETE /api/v1/users/me`. It is transactional, blocked by active driver trips or future active bookings, cancels owned RideRequests, deletes refresh tokens/notifications/feedback/car, anonymizes the user, keeps `vkUserId` as a tombstone, and closes WebSockets. Required auth rejects the deleted account and repeat VK login cannot recreate it.

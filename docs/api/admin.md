@@ -1,5 +1,7 @@
 # Admin API
 
+Reports are available at `GET /api/v1/admin/reports`, `GET /api/v1/admin/reports/:id` and `PATCH /api/v1/admin/reports/:id/status`; see `docs/api/reports.md` for filters, state transitions and authorization.
+
 Админ-API занимает префикс `/api/v1/admin` и управляется отдельной
 админ-сессией (не пользовательской). Источник истины по коду:
 `backend/src/admin/` (роутер, guard, сериализаторы) и
