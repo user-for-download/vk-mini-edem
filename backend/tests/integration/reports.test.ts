@@ -50,6 +50,7 @@ describe("Reports API", () => {
   });
 
   it("rejects a report from an unrelated user", async () => {
+
     const unrelated = await db.user.create({ data: { name: "Unrelated", vkUserId: 5300000 + Math.floor(Math.random() * 100000), avatar: "" } });
     try {
       const response = await app.request("/api/v1/reports", { method: "POST", headers: headers(unrelated.id), body: JSON.stringify({ targetType: "trip", targetId: tripId, category: "spam", description: "Не связан с поездкой" }) });
@@ -57,5 +58,33 @@ describe("Reports API", () => {
     } finally {
       await db.user.delete({ where: { id: unrelated.id } });
     }
+  });
+
+  it("rejects a second report with a different category on the same target", async () => {
+    const base = { targetType: "trip", targetId: tripId, description: "Проблема в поездке" };
+    const first = await app.request("/api/v1/reports", { method: "POST", headers: headers(passengerId), body: JSON.stringify({ ...base, category: "safety" }) });
+    expect(first.status).toBe(201);
+    const second = await app.request("/api/v1/reports", { method: "POST", headers: headers(passengerId), body: JSON.stringify({ ...base, category: "fraud" }) });
+    expect(second.status).toBe(409);
+    expect((await second.json()).code).toBe("CONFLICT");
+  });
+
+  it("rejects a repeat report after the first one was resolved", async () => {
+    const payload = { targetType: "trip", targetId: tripId, category: "safety", description: "Проблема в поездке" };
+    const first = await app.request("/api/v1/reports", { method: "POST", headers: headers(passengerId), body: JSON.stringify(payload) });
+    expect(first.status).toBe(201);
+    await db.report.updateMany({ where: { reporterId: passengerId, targetType: "trip", targetId: tripId }, data: { status: "resolved", resolvedAt: new Date() } });
+    const repeat = await app.request("/api/v1/reports", { method: "POST", headers: headers(passengerId), body: JSON.stringify({ ...payload, category: "spam" }) });
+    expect(repeat.status).toBe(409);
+  });
+
+  it("allows only one report under concurrent creates (unique guard)", async () => {
+    const payload = { targetType: "booking", targetId: bookingId, category: "spam", description: "Гонка жалоб" };
+    const [a, b] = await Promise.all([
+      app.request("/api/v1/reports", { method: "POST", headers: headers(driverId), body: JSON.stringify(payload) }),
+      app.request("/api/v1/reports", { method: "POST", headers: headers(driverId), body: JSON.stringify(payload) }),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
+    expect(await db.report.count({ where: { reporterId: driverId, targetType: "booking", targetId: bookingId } })).toBe(1);
   });
 });

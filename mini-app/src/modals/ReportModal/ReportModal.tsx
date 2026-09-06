@@ -17,7 +17,7 @@ import type { CustomModalProps, OpenModalPageProps } from "@vkontakte/vkui";
 import { Icon24Cancel } from "@vkontakte/icons";
 import type { ReportTargetType } from "@edem/contracts";
 import { REPORT_CATEGORIES } from "@edem/contracts";
-import { useCreateReportMutation } from "@/queries/useReportsQuery";
+import { useCreateReportMutation, useMyReportsQuery } from "@/queries/useReportsQuery";
 import { useSnackbar } from "@/providers/SnackbarProvider";
 import { ApiError } from "@/api/client";
 import { getErrorMessage, getRateLimitMessage } from "@/helpers/errorMessages";
@@ -57,7 +57,7 @@ function reportSubmitError(error: unknown): {
     return {
       title: "Жалоба уже отправлена",
       subtitle:
-        "Открытая жалоба на этот объект уже существует. Дождитесь рассмотрения.",
+        "Жалоба на этот объект уже отправлена. Повторная отправка недоступна.",
     };
   }
   if (
@@ -89,6 +89,13 @@ export const ReportModal: FC<ReportModalProps> = ({
   const [description, setDescription] = useState("");
   const create = useCreateReportMutation();
   const { enqueue } = useSnackbar();
+  // Клиентский хинт лимита «1 жалоба навсегда»: сервер — источник правды
+  // (409), здесь лишь гасим кнопку, чтобы не гонять форму впустую.
+  const { data: myReports } = useMyReportsQuery(true);
+  const alreadyReported =
+    myReports?.some(
+      (report) => report.targetType === targetType && report.targetId === targetId,
+    ) ?? false;
   const submit = () => {
     const value = description.trim();
     if (!value) {
@@ -149,12 +156,19 @@ export const ReportModal: FC<ReportModalProps> = ({
         </Box>
       </Group>
       <Box padding="system">
+        {alreadyReported && (
+          <Box paddingBlockEnd={8}>
+            <Caption aria-live="polite">
+              Вы уже отправляли жалобу на этот объект. Повторная отправка недоступна.
+            </Caption>
+          </Box>
+        )}
         <Button
           size="l"
           stretched
           mode="primary"
           loading={create.isPending}
-          disabled={create.isPending}
+          disabled={create.isPending || alreadyReported}
           onClick={submit}
         >
           Отправить жалобу

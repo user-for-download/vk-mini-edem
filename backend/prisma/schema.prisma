@@ -212,7 +212,11 @@ model Report {
 
   @@index([status, createdAt(sort: Desc)])
   @@index([targetType, targetId, status])
-  @@index([reporterId, targetType, targetId, category])
+  // Одна жалоба навсегда на связку (автор, объект): категория и статус
+  // не входят в ключ — повтор невозможен даже после рассмотрения.
+  // Заменяет частичный индекс Report_open_unique_idx (см. миграцию
+  // *report_open_unique — удалён миграцией *report_one_per_reporter_target).
+  @@unique([reporterId, targetType, targetId])
 }
 
 model Booking {

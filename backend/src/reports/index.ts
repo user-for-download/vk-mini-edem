@@ -120,14 +120,11 @@ reportsRouter.post("/", mutationLimiter, reportLimiter, async (c) => {
   try {
     item = await db.$transaction(
       async (tx) => {
+        // Лимит «1 жалоба навсегда»: любая жалоба этой тройки
+        // (категория и статус не важны) блокирует повтор. Гонки
+        // закрывает @@unique + catch P2002 ниже.
         const duplicate = await tx.report.findFirst({
-          where: {
-            reporterId: userId,
-            targetType,
-            targetId,
-            category,
-            status: { in: ["pending", "in_review"] },
-          },
+          where: { reporterId: userId, targetType, targetId },
           select: { id: true },
         });
         if (duplicate) return null;
@@ -152,7 +149,7 @@ reportsRouter.post("/", mutationLimiter, reportLimiter, async (c) => {
       return c.json(
         {
           code: ERROR_CODES.CONFLICT,
-          message: "An open report already exists",
+          message: "A report for this target already exists",
         },
         409,
       );
@@ -161,7 +158,10 @@ reportsRouter.post("/", mutationLimiter, reportLimiter, async (c) => {
   }
   if (!item)
     return c.json(
-      { code: ERROR_CODES.CONFLICT, message: "An open report already exists" },
+      {
+        code: ERROR_CODES.CONFLICT,
+        message: "A report for this target already exists",
+      },
       409,
     );
   return c.json(serializeReport(item), 201);
