@@ -39,13 +39,24 @@ interface SeedUser {
   notificationsEnabled?: boolean;
   about?: string;
   car?: SeedCar;
+  // Демо админ-флоу: забаненный пользователь (bannedAt + обязательный
+  // banReason, как требует рантайм при бане через админку).
+  bannedAtDaysAgo?: number;
+  banReason?: string;
+  // Демо мягкого удаления: пользователь с deletedAt (auth его не пускает).
+  deletedAtDaysAgo?: number;
+  // Версия показанного онбординга (для проверки reset-флоу в админке).
+  onboardingVersion?: string;
 }
 
 interface SeedBooking {
   passengerId: string;
   seat: number;
-  status: "pending" | "confirmed" | "declined";
+  status: "pending" | "confirmed" | "declined" | "cancelled";
   comment?: string;
+  // Только для cancelled: кто отменил и почему (как пишет рантайм).
+  cancelledByType?: "passenger" | "driver";
+  cancellationReason?: string;
 }
 
 interface SeedTrip {
@@ -80,6 +91,37 @@ interface SeedReview {
   // показывал отзывы (публичный список и рейтинг учитывают только
   // published, см. backend/src/reviews/).
   status?: "pending" | "published" | "rejected";
+}
+
+interface SeedRideRequest {
+  id: string;
+  userId: string;
+  fromCity: string;
+  toCity: string;
+  daysFromNowEarliest: number;
+  daysFromNowLatest: number;
+  seats?: number;
+  status?: "active" | "paused" | "fulfilled" | "expired" | "cancelled";
+  // Сколько дней запрос живёт с момента сида (expiresAt = now + N).
+  expiresInDays?: number;
+}
+
+interface SeedReport {
+  id: string;
+  reporterId: string;
+  targetType: "user" | "trip" | "booking";
+  // Ссылка на сид-поездку (для targetType trip/booking резолвится
+  // в реальный id поездки/брони) либо произвольный targetId для user.
+  tripRef?: string;
+  bookingRef?: { tripId: string; passengerId: string };
+  targetUserId?: string;
+  category: "safety" | "fraud" | "harassment" | "spam" | "inaccurate_info" | "other";
+  description: string;
+  status?: "pending" | "in_review" | "resolved" | "rejected";
+  resolutionNote?: string;
+  // Кто рассмотрел (для in_review/resolved/rejected): adminActorType
+  // всегда "admin", как проставляет рантайм (reports/index.ts).
+  adminActorId?: string;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -438,6 +480,33 @@ const users: SeedUser[] = [
     isVerified: true,
     about: "Езжу к семье по выходным.",
   },
+  // Демо админ-флоу бана: забанен 2 дня назад с обязательной причиной.
+  {
+    id: "u-23",
+    vkUserId: 100023,
+    name: "Игорь Забаненный",
+    avatar: DEFAULT_AVATAR_URL,
+    rating: 2.1,
+    reviewsCount: 1,
+    tripsCount: 2,
+    isVerified: false,
+    about: "Демо-пользователь для проверки бана в админке.",
+    bannedAtDaysAgo: 2,
+    banReason: "Спам в комментариях к бронированиям (демо-бан для стенда).",
+  },
+  // Демо мягкого удаления: аккаунт удалён 5 дней назад.
+  {
+    id: "u-24",
+    vkUserId: 100024,
+    name: "Удалённый Аккаунт",
+    avatar: DEFAULT_AVATAR_URL,
+    rating: 4.0,
+    reviewsCount: 0,
+    tripsCount: 0,
+    isVerified: false,
+    about: "Демо-пользователь для проверки soft-delete в админке.",
+    deletedAtDaysAgo: 5,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -470,6 +539,15 @@ const trips: SeedTrip[] = [
         comment: "Спасибо за поездку!",
       },
       { passengerId: "u-15", seat: 2, status: "confirmed" },
+      // Демо отмены пассажиром: место освободилось (partial unique
+      // не покрывает cancelled — повторная подача разрешена).
+      {
+        passengerId: "u-20",
+        seat: 3,
+        status: "cancelled",
+        cancelledByType: "passenger",
+        cancellationReason: "Поменялись планы, поеду в другой день.",
+      },
     ],
   },
   {
@@ -1362,6 +1440,116 @@ const reviews: SeedReview[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────────
+// Заявки на поездку (пассажиры ищут попутку)
+// ─────────────────────────────────────────────────────────────
+const rideRequests: SeedRideRequest[] = [
+  {
+    id: "rr-1",
+    userId: "u-14",
+    fromCity: "Вологда",
+    toCity: "Череповец",
+    daysFromNowEarliest: 1,
+    daysFromNowLatest: 2,
+    seats: 1,
+    status: "active",
+    expiresInDays: 7,
+  },
+  {
+    id: "rr-2",
+    userId: "u-16",
+    fromCity: "Череповец",
+    toCity: "Вологда",
+    daysFromNowEarliest: 3,
+    daysFromNowLatest: 5,
+    seats: 2,
+    status: "active",
+    expiresInDays: 10,
+  },
+  {
+    id: "rr-3",
+    userId: "u-18",
+    fromCity: "Вологда",
+    toCity: "Грязовец",
+    daysFromNowEarliest: 1,
+    daysFromNowLatest: 1,
+    seats: 1,
+    status: "paused",
+    expiresInDays: 7,
+  },
+  {
+    id: "rr-4",
+    userId: "u-21",
+    fromCity: "Сокол",
+    toCity: "Вологда",
+    daysFromNowEarliest: -10,
+    daysFromNowLatest: -9,
+    seats: 1,
+    status: "fulfilled",
+    expiresInDays: 1,
+  },
+  {
+    id: "rr-5",
+    userId: "u-22",
+    fromCity: "Кадуй",
+    toCity: "Череповец",
+    daysFromNowEarliest: -5,
+    daysFromNowLatest: -4,
+    seats: 1,
+    status: "expired",
+    expiresInDays: -1,
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
+// Жалобы (модерация в админке). Тройки (автор, тип, объект) уникальны —
+// лимит «1 жалоба навсегда» (@@unique в схеме). Статусы покрывают все
+// состояния модерации: pending → in_review → resolved / rejected.
+// ─────────────────────────────────────────────────────────────
+const reports: SeedReport[] = [
+  {
+    id: "rep-1",
+    reporterId: "u-4",
+    targetType: "trip",
+    tripRef: "t-past-1",
+    category: "safety",
+    description: "Водитель резко тормозил и разговаривал по телефону за рулём.",
+    status: "pending",
+  },
+  {
+    id: "rep-2",
+    reporterId: "u-15",
+    targetType: "user",
+    targetUserId: "u-1",
+    category: "harassment",
+    description: "Водитель грубил в переписке перед поездкой.",
+    status: "in_review",
+    adminActorId: "u-2",
+  },
+  {
+    id: "rep-3",
+    reporterId: "u-19",
+    targetType: "trip",
+    tripRef: "t-past-3",
+    category: "inaccurate_info",
+    description: "В объявлении было указано другое время отправления.",
+    status: "resolved",
+    resolutionNote: "Водитель предупреждён, время в объявлении исправлено.",
+    adminActorId: "u-2",
+  },
+  {
+    id: "rep-4",
+    reporterId: "u-8",
+    targetType: "booking",
+    bookingRef: { tripId: "t-past-3", passengerId: "u-21" },
+    category: "spam",
+    description: "Кажется, бронь создана для накрутки счётчика поездок.",
+    status: "rejected",
+    resolutionNote: "Проверка не подтвердила нарушение: бронь реальная.",
+    adminActorId: "u-2",
+  },
+];
+
 function validateSeedData(): void {
   const userIds = new Set(users.map((user) => user.id));
   const tripById = new Map(trips.map((trip) => [trip.id, trip]));
@@ -1446,6 +1634,108 @@ function validateSeedData(): void {
     }
     reviewKeys.add(key);
   }
+
+  const cityNames = new Set(SEED_CITIES.map(normalizeCityName));
+  const deletedUsers = new Set(
+    users.filter((u) => u.deletedAtDaysAgo !== undefined).map((u) => u.id),
+  );
+  const referencedUsers = new Set<string>();
+  for (const trip of trips) {
+    referencedUsers.add(trip.driverId);
+    for (const booking of trip.bookings) {
+      referencedUsers.add(booking.passengerId);
+      // Отменённая бронь обязана иметь причину (как пишет рантайм).
+      if (booking.status === "cancelled" && !booking.cancellationReason) {
+        throw new Error(`Cancelled seed booking in ${trip.id} без причины`);
+      }
+    }
+  }
+  for (const review of reviews) {
+    referencedUsers.add(review.authorId);
+    referencedUsers.add(review.targetUserId);
+  }
+  for (const user of users) {
+    // Забаненный обязан иметь причину (рантайм требует 1..500 символов).
+    if (user.bannedAtDaysAgo !== undefined && !user.banReason) {
+      throw new Error(`Banned seed user ${user.id} без причины`);
+    }
+  }
+
+  for (const rr of rideRequests) {
+    if (!userIds.has(rr.userId) || deletedUsers.has(rr.userId)) {
+      throw new Error(`Invalid user in seed ride request ${rr.id}`);
+    }
+    referencedUsers.add(rr.userId);
+    if (
+      !cityNames.has(normalizeCityName(rr.fromCity)) ||
+      !cityNames.has(normalizeCityName(rr.toCity))
+    ) {
+      throw new Error(`Unknown city in seed ride request ${rr.id}`);
+    }
+    if (normalizeCityName(rr.fromCity) === normalizeCityName(rr.toCity)) {
+      throw new Error(`Same from/to city in seed ride request ${rr.id}`);
+    }
+    if (rr.daysFromNowEarliest > rr.daysFromNowLatest) {
+      throw new Error(`Inverted window in seed ride request ${rr.id}`);
+    }
+    if (rr.seats !== undefined && (rr.seats < 1 || rr.seats > MAX_SEATS)) {
+      throw new Error(`Invalid seats in seed ride request ${rr.id}`);
+    }
+  }
+
+  const reportKeys = new Set<string>();
+  for (const report of reports) {
+    if (!userIds.has(report.reporterId) || deletedUsers.has(report.reporterId)) {
+      throw new Error(`Invalid reporter in seed report ${report.id}`);
+    }
+    referencedUsers.add(report.reporterId);
+    if (report.adminActorId) {
+      if (!userIds.has(report.adminActorId)) {
+        throw new Error(`Unknown admin actor in seed report ${report.id}`);
+      }
+      referencedUsers.add(report.adminActorId);
+    }
+    let targetKey: string;
+    if (report.targetType === "trip") {
+      if (!report.tripRef || !tripById.has(report.tripRef)) {
+        throw new Error(`Unknown trip ref in seed report ${report.id}`);
+      }
+      targetKey = report.tripRef;
+    } else if (report.targetType === "booking") {
+      const ref = report.bookingRef;
+      const trip = ref ? tripById.get(ref.tripId) : undefined;
+      if (!trip || !trip.bookings.some((b) => b.passengerId === ref!.passengerId)) {
+        throw new Error(`Unknown booking ref in seed report ${report.id}`);
+      }
+      targetKey = `${ref!.tripId}:${ref!.passengerId}`;
+    } else {
+      if (!report.targetUserId || !userIds.has(report.targetUserId)) {
+        throw new Error(`Unknown target user in seed report ${report.id}`);
+      }
+      referencedUsers.add(report.targetUserId);
+      targetKey = report.targetUserId;
+    }
+    // Лимит «1 жалоба навсегда»: тройка обязана быть уникальной.
+    const triple = `${report.reporterId}:${report.targetType}:${targetKey}`;
+    if (reportKeys.has(triple)) {
+      throw new Error(`Duplicate seed report ${triple}`);
+    }
+    reportKeys.add(triple);
+    // Рассмотренная жалоба обязана иметь резолюцию и автора рассмотрения.
+    if (
+      (report.status === "resolved" || report.status === "rejected") &&
+      (!report.resolutionNote || !report.adminActorId)
+    ) {
+      throw new Error(`Terminal seed report ${report.id} без резолюции/автора`);
+    }
+  }
+
+  // Удалённый пользователь нигде не должен участвовать (auth его не пустит).
+  for (const id of referencedUsers) {
+    if (deletedUsers.has(id)) {
+      throw new Error(`Deleted seed user ${id} используется в данных`);
+    }
+  }
 }
 
 async function main() {
@@ -1464,8 +1754,10 @@ async function main() {
   // Clean old records
   await prisma.notification.deleteMany();
   await prisma.feedback.deleteMany();
+  await prisma.report.deleteMany();
   await prisma.review.deleteMany();
   await prisma.booking.deleteMany();
+  await prisma.rideRequest.deleteMany();
   await prisma.trip.deleteMany();
   await prisma.car.deleteMany();
   await prisma.user.deleteMany();
@@ -1485,6 +1777,16 @@ async function main() {
         notificationsEnabled: u.notificationsEnabled ?? true,
         verifiedAt: u.isVerified ? new Date(Date.now() - 60 * dayMs) : null,
         about: u.about,
+        bannedAt:
+          u.bannedAtDaysAgo !== undefined
+            ? new Date(Date.now() - u.bannedAtDaysAgo * dayMs)
+            : null,
+        banReason: u.banReason ?? null,
+        deletedAt:
+          u.deletedAtDaysAgo !== undefined
+            ? new Date(Date.now() - u.deletedAtDaysAgo * dayMs)
+            : null,
+        onboardingVersion: u.onboardingVersion ?? null,
         ...(u.car
           ? {
               car: {
@@ -1497,6 +1799,17 @@ async function main() {
   }
 
   // Create Trips + Bookings
+  // Справочник городов — раньше поездок: нужны id для FK-линковки
+  // fromCityId/toCityId (снимок fromCity/toCity остаётся источником
+  // правды для UI, FK — для аналитики и автодополнения).
+  await seedCities();
+  const cityRows = await prisma.city.findMany({ select: { id: true, nameNormalized: true } });
+  const cityIdByName = new Map(cityRows.map((c) => [c.nameNormalized, c.id]));
+  const cityId = (name: string): string => {
+    const id = cityIdByName.get(normalizeCityName(name));
+    if (!id) throw new Error(`[seed] город «${name}» отсутствует в справочнике City`);
+    return id;
+  };
   for (const t of trips) {
     const confirmedCount = t.bookings.filter(
       (b) => b.status === "confirmed",
@@ -1509,6 +1822,8 @@ async function main() {
         fromAddress: t.fromAddress,
         toCity: t.toCity,
         toAddress: t.toAddress,
+        fromCityId: cityId(t.fromCity),
+        toCityId: cityId(t.toCity),
         departureAt: new Date(Date.now() + t.daysFromNow * dayMs),
         durationMinutes: t.durationMinutes,
         distanceKm: t.distanceKm,
@@ -1527,10 +1842,34 @@ async function main() {
             seat: b.seat,
             status: b.status,
             comment: b.comment,
+            cancelledAt: b.status === "cancelled" ? new Date() : null,
+            cancelledByType:
+              b.status === "cancelled" ? (b.cancelledByType ?? "passenger") : null,
+            cancelledByUserId:
+              b.status === "cancelled"
+                ? b.cancelledByType === "driver"
+                  ? t.driverId
+                  : b.passengerId
+                : null,
+            cancellationReason: b.cancellationReason ?? null,
           })),
         },
       },
     });
+  }
+
+  // Счётчик НЕ отменённых поездок (денормализация для админки:
+  // guard удаления города + отображение; меняется только через
+  // cities/counters.ts, здесь — прямой пересчёт под сид-данные).
+  // Считаем по снимкам fromCity/toCity (источник правды), а не по FK.
+  const liveTrips = trips.filter((t) => t.status !== "cancelled");
+  for (const city of cityRows) {
+    const count = liveTrips.filter(
+      (t) =>
+        normalizeCityName(t.fromCity) === city.nameNormalized ||
+        normalizeCityName(t.toCity) === city.nameNormalized,
+    ).length;
+    await prisma.city.update({ where: { id: city.id }, data: { tripsCount: count } });
   }
 
   // Create Reviews
@@ -1667,12 +2006,58 @@ async function main() {
     await prisma.feedback.create({ data: f });
   }
 
-  // Справочник городов: идемпотентный upsert 25 точек Вологодской
-  // области. Не удаляем уже существующие города (чтобы админские
-  // правки пережили повторный запуск seed). Коллизии nameNormalized
-  // (две записи на одно имя) разруливаются findUnique+create/update
-  // в seedCities().
-  await seedCities();
+  // Create RideRequests
+  for (const rr of rideRequests) {
+    await prisma.rideRequest.create({
+      data: {
+        id: rr.id,
+        userId: rr.userId,
+        fromCityId: cityId(rr.fromCity),
+        toCityId: cityId(rr.toCity),
+        earliestAt: new Date(Date.now() + rr.daysFromNowEarliest * dayMs),
+        latestAt: new Date(Date.now() + rr.daysFromNowLatest * dayMs),
+        seats: rr.seats ?? 1,
+        status: rr.status ?? "active",
+        expiresAt: new Date(Date.now() + (rr.expiresInDays ?? 7) * dayMs),
+      },
+    });
+  }
+
+  // Create Reports
+  for (const r of reports) {
+    let targetId: string;
+    if (r.targetType === "trip") {
+      if (!r.tripRef) throw new Error(`[seed] report ${r.id}: нет tripRef`);
+      targetId = r.tripRef;
+    } else if (r.targetType === "booking") {
+      if (!r.bookingRef) throw new Error(`[seed] report ${r.id}: нет bookingRef`);
+      const booking = await prisma.booking.findFirst({
+        where: { tripId: r.bookingRef.tripId, passengerId: r.bookingRef.passengerId },
+        select: { id: true },
+      });
+      if (!booking) throw new Error(`[seed] report ${r.id}: бронь не найдена`);
+      targetId = booking.id;
+    } else {
+      if (!r.targetUserId) throw new Error(`[seed] report ${r.id}: нет targetUserId`);
+      targetId = r.targetUserId;
+    }
+    const terminal = r.status === "resolved" || r.status === "rejected";
+    await prisma.report.create({
+      data: {
+        id: r.id,
+        reporterId: r.reporterId,
+        targetType: r.targetType,
+        targetId,
+        category: r.category,
+        description: r.description,
+        status: r.status ?? "pending",
+        resolutionNote: r.resolutionNote ?? null,
+        adminActorId: r.adminActorId ?? null,
+        adminActorType: r.adminActorId ? "admin" : null,
+        resolvedAt: terminal ? new Date() : null,
+      },
+    });
+  }
 
   const stats = {
     users: await prisma.user.count(),
@@ -1683,6 +2068,8 @@ async function main() {
     notifications: await prisma.notification.count(),
     feedbacks: await prisma.feedback.count(),
     cities: await prisma.city.count(),
+    rideRequests: await prisma.rideRequest.count(),
+    reports: await prisma.report.count(),
   };
   console.log("Seeding rich mock data complete!", stats);
 }
