@@ -20,7 +20,7 @@ import type { Report } from "@edem/contracts";
 const { mockEnqueue, mutationMock, mockState } = vi.hoisted(() => ({
   mockEnqueue: vi.fn(),
   mutationMock: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  mockState: { myReports: [] as Report[] },
+  mockState: { myReports: [] as Report[], currentUser: null as { id: string } | null },
 }));
 
 vi.mock("@/providers/SnackbarProvider", () => ({
@@ -28,7 +28,7 @@ vi.mock("@/providers/SnackbarProvider", () => ({
 }));
 
 vi.mock("@/hooks/useCurrentUser", () => ({
-  useCurrentUser: () => null,
+  useCurrentUser: () => mockState.currentUser,
 }));
 
 vi.mock("@/queries/useBookingsQuery", () => ({
@@ -157,6 +157,7 @@ describe("TripSecondaryActions", () => {
 
 describe("TripDetailsPanel — inline-секция «Дополнительно»", () => {
   it("постороннему: kebab нет, жалоба скрыта, «Поделиться» есть", () => {
+    mockState.currentUser = null;
     mockState.myReports = [];
     const html = renderToString(
       <TripDetailsPanel id="trip" trip={makeTrip()} onBack={vi.fn()} onOpenDriver={vi.fn()} />,
@@ -171,6 +172,7 @@ describe("TripDetailsPanel — inline-секция «Дополнительно�
   });
 
   it("участник с отправленной жалобой: кнопка переименована, модалка не откроется", () => {
+    mockState.currentUser = null;
     mockState.myReports = [makeReport()];
     const trip = {
       ...makeTrip(),
@@ -183,5 +185,17 @@ describe("TripDetailsPanel — inline-секция «Дополнительно�
     expect(html).toContain("Жалоба уже отправлена");
     expect(html).not.toContain("Пожаловаться на поездку");
     expect(html).toContain("vkuiButton__disabled");
+  });
+
+  it("водитель на своей поездке: жаловаться нельзя, только «Поделиться»", () => {
+    mockState.currentUser = { id: "d-1" };
+    mockState.myReports = [];
+    const html = renderToString(
+      <TripDetailsPanel id="trip" trip={makeTrip()} onBack={vi.fn()} onOpenDriver={vi.fn()} />,
+    );
+
+    expect(html).toContain("Поделиться поездкой");
+    expect(html).not.toContain("Пожаловаться на поездку");
+    expect(html).not.toContain("Жалоба уже отправлена");
   });
 });

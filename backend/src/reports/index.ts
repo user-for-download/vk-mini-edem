@@ -57,14 +57,14 @@ async function canReport(
     return Boolean(relationship);
   }
   if (targetType === "trip") {
+    // На свою поездку жаловаться нельзя: водитель исключён намеренно
+    // (self-report, как и user→user на себя). Право — только у пассажиров
+    // с бронью (любой статус — проверка связи, не активности).
     return Boolean(
       await db.trip.findFirst({
         where: {
           id: targetId,
-          OR: [
-            { driverId: userId },
-            { bookings: { some: { passengerId: userId } } },
-          ],
+          bookings: { some: { passengerId: userId } },
         },
         select: { id: true },
       }),

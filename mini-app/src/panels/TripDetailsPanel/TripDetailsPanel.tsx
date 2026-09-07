@@ -127,7 +127,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   // Состояние «жалоба уже отправлена» для входной кнопки: сервер
   // (`GET /reports`) — источник правды, как в ReportModal. Запрос
   // включаем только участникам (остальным кнопка жалобы скрыта).
-  const canReportTrip = isOwnTrip || trip?.myBooking != null;
+  // На свою поездку жаловаться нельзя — водитель исключён (зеркалит
+  // canReport на бэкенде: trip — только пассажиры с бронью).
+  const canReportTrip = !isOwnTrip && trip?.myBooking != null;
   const { data: myReports } = useMyReportsQuery(canReportTrip);
   const alreadyReported =
     myReports?.some(
@@ -856,9 +858,8 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
       {/* Вторичные действия — inline-секция внизу панели: верхний правый
         угол шапки занят системными кнопками VK-клиента, kebab там невозможен.
-        Жалоба — только участникам (бэкенд иначе вернёт 403): водитель или
-        пассажир с активной бронью — то же определение, что и для приватных
-        деталей (canSeePrivateDetails на сервере). */}
+        Жалоба — только пассажирам с активной бронью (на свою поездку
+        жаловаться нельзя, бэкенд иначе вернёт 403). */}
       <Group header={<Header size="s">Дополнительно</Header>}>
         <TripSecondaryActions
           onShare={() => void handleShareTrip()}

@@ -84,7 +84,7 @@ function reportSubmitError(error: unknown): {
     return {
       title: "Жалоба недоступна",
       subtitle:
-        "Жалобы доступны участникам поездки — водителю и пассажирам с бронью.",
+        "Жалобы на поездку доступны пассажирам с бронью. На свою поездку жаловаться нельзя.",
     };
   }
   if (error instanceof ApiError) {

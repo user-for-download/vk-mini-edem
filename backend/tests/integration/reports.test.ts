@@ -54,8 +54,13 @@ describe("Reports API", () => {
     expect((await app.request("/api/v1/reports", { method: "POST", headers: headers(passengerId), body: JSON.stringify(payload) })).status).toBe(409);
   });
 
-  it("rejects a report from an unrelated user", async () => {
+  it("rejects a driver report on their own trip", async () => {
+    const response = await app.request("/api/v1/reports", { method: "POST", headers: headers(driverId), body: JSON.stringify({ targetType: "trip", targetId: tripId, category: "safety", description: "Жалоба на свою поездку" }) });
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("FORBIDDEN");
+  });
 
+  it("rejects a report from an unrelated user", async () => {
     const unrelated = await db.user.create({ data: { name: "Unrelated", vkUserId: ++vkSeq, avatar: "" } });
     try {
       const response = await app.request("/api/v1/reports", { method: "POST", headers: headers(unrelated.id), body: JSON.stringify({ targetType: "trip", targetId: tripId, category: "spam", description: "Не связан с поездкой" }) });
