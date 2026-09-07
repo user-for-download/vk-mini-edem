@@ -382,7 +382,7 @@ try {
     await pp.getByText("Место 1").first().waitFor({ timeout: 5000 });
     await pp.getByRole("button", { name: /Забронировать/ }).click();
     await pp.getByText("Забронировано").waitFor({ timeout: 15000 });
-    await pp.getByText("Ожидайте подтверждения от водителя").waitFor({ timeout: 5000 });
+    await pp.getByText("Ожидайте подтверждения от водителя", { exact: true }).waitFor({ timeout: 5000 });
     await shot(pp, "booking-done");
     return "снэкбар «Забронировано», возврат к поиску";
   });
