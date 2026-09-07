@@ -46,10 +46,12 @@ export const ConfirmProvider: FC<PropsWithChildren> = ({ children }) => {
   // инстанс и мгновенно размонтировался через onClosed).
   const tailRef = useRef<Promise<void>>(Promise.resolve());
 
-  // Мгновенное завершение БЕЗ ожидания анимации закрытия: VKUI откладывает
-  // action-хендлер до onExited (animationend), а в части окружений это событие
-  // не приходит — промис висел вечно и удаление профиля молча не работало.
-  // Диалог анмаунтится сразу (exit-анимации нет — надёжность важнее красоты).
+  // Мгновенное завершение БЕЗ ожидания анимации закрытия: по умолчанию VKUI
+  // откладывает action-хендлер до onExited (animationend), а в части окружений
+  // (Android WebView) это событие не приходит — промис висел вечно и удаление
+  // профиля молча не работало. Поэтому обеим кнопкам выставлен
+  // autoCloseDisabled: action выполняется СИНХРОННО в тапе, диалог
+  // анмаунтится сразу (exit-анимации нет — надёжность важнее красоты).
   const settle = useCallback((value: boolean) => {
     const resolve = resolveRef.current;
     resolveRef.current = null;
@@ -103,10 +105,16 @@ export const ConfirmProvider: FC<PropsWithChildren> = ({ children }) => {
           onClose={handleClose}
           onClosed={handleClosed}
           actions={[
-            { title: "Отмена", mode: "cancel", action: () => settle(false) },
+            {
+              title: "Отмена",
+              mode: "cancel",
+              autoCloseDisabled: true,
+              action: () => settle(false),
+            },
             {
               title: options.confirmTitle,
               mode: options.confirmMode ?? "destructive",
+              autoCloseDisabled: true,
               action: () => settle(true),
             },
           ]}
