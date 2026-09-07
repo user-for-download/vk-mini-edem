@@ -1,5 +1,13 @@
 import { apiGet, apiPost } from "@/lib/api-client";
-import type { AdminLoginResponse, AdminSessionResponse } from "@edem/contracts";
+import {
+  adminLoginResponseSchema,
+  adminSessionResponseSchema,
+  type AdminLoginResponse,
+  type AdminSessionResponse,
+} from "@edem/contracts";
+import { z } from "zod";
+
+const okSchema = z.object({ ok: z.boolean() }).strict();
 
 /**
  * Вход по статичному ADMIN_TOKEN. Сессия устанавливается httpOnly cookie
@@ -9,12 +17,12 @@ export function adminLogin(
   token: string,
   signal?: AbortSignal
 ): Promise<AdminLoginResponse> {
-  return apiPost<AdminLoginResponse>("/auth/login", { token }, signal);
+  return apiPost("/auth/login", { token }, adminLoginResponseSchema, signal);
 }
 
 /** Выход: бэкенд очищает cookie. Идемпотентно. */
 export function adminLogout(signal?: AbortSignal): Promise<{ ok: boolean }> {
-  return apiPost<{ ok: boolean }>("/auth/logout", undefined, signal);
+  return apiPost("/auth/logout", undefined, okSchema, signal);
 }
 
 /**
@@ -24,5 +32,5 @@ export function adminLogout(signal?: AbortSignal): Promise<{ ok: boolean }> {
 export function getAdminSession(
   signal?: AbortSignal
 ): Promise<AdminSessionResponse> {
-  return apiGet<AdminSessionResponse>("/auth/session", signal);
+  return apiGet("/auth/session", adminSessionResponseSchema, signal);
 }

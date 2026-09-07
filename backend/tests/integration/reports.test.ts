@@ -8,6 +8,11 @@ const headers = (userId: string) => ({
   Authorization: `Bearer ${devMockAccessToken(userId)}`,
 });
 
+// Детерминированные vkUserId (audit: test isolation): монотонный счётчик
+// вместо Math.random — повторы/параллельные прогоны не коллидируют, а
+// «висящие» от упавшего clean-up строки видны по предсказуемому диапазону.
+let vkSeq = 5_100_000;
+
 describe("Reports API", () => {
   let driverId: string;
   let passengerId: string;
@@ -16,8 +21,8 @@ describe("Reports API", () => {
 
   beforeEach(async () => {
     const users = await Promise.all([
-      db.user.create({ data: { name: `Report driver ${Date.now()}`, vkUserId: 5100000 + Math.floor(Math.random() * 100000), avatar: "" } }),
-      db.user.create({ data: { name: `Report passenger ${Date.now()}`, vkUserId: 5200000 + Math.floor(Math.random() * 100000), avatar: "" } }),
+      db.user.create({ data: { name: `Report driver ${vkSeq + 1}`, vkUserId: ++vkSeq, avatar: "" } }),
+      db.user.create({ data: { name: `Report passenger ${vkSeq + 1}`, vkUserId: ++vkSeq, avatar: "" } }),
     ]);
     [driverId, passengerId] = users.map((user) => user.id);
     const trip = await db.trip.create({ data: { driverId, fromCity: "Москва", fromAddress: "Адрес 1", toCity: "Тула", toAddress: "Адрес 2", departureAt: new Date("2030-01-01T10:00:00Z"), durationMinutes: 120, distanceKm: 180, price: 700, seatsTotal: 3, seatsAvailable: 2, tags: [] } });
@@ -51,7 +56,7 @@ describe("Reports API", () => {
 
   it("rejects a report from an unrelated user", async () => {
 
-    const unrelated = await db.user.create({ data: { name: "Unrelated", vkUserId: 5300000 + Math.floor(Math.random() * 100000), avatar: "" } });
+    const unrelated = await db.user.create({ data: { name: "Unrelated", vkUserId: ++vkSeq, avatar: "" } });
     try {
       const response = await app.request("/api/v1/reports", { method: "POST", headers: headers(unrelated.id), body: JSON.stringify({ targetType: "trip", targetId: tripId, category: "spam", description: "Не связан с поездкой" }) });
       expect(response.status).toBe(403);

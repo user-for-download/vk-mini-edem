@@ -1,5 +1,6 @@
 // backend/src/auth/tokens.ts
 import { SignJWT, jwtVerify } from "jose";
+import type { JWTPayload } from "jose";
 import { randomUUID, createHash } from "node:crypto";
 import { env, devUserAllowlist } from "../env.js";
 import { logger } from "../logger.js";
@@ -131,10 +132,10 @@ export function assertDevMockTokenFresh(
 ): void {
   const expMs = claims.exp * 1000;
   if (expMs <= nowMs) {
-    throw new Error("Mock token expired");
+    throw new TokenValidationError("Mock token expired");
   }
   if (expMs > nowMs + ttlMs + MOCK_CLOCK_SKEW_MS) {
-    throw new Error("Mock token TTL exceeded");
+    throw new TokenValidationError("Mock token TTL exceeded");
   }
 }
 
@@ -155,10 +156,10 @@ export function verifyDevMockToken(
 ): DevMockTokenClaims {
   const claims = parseDevMockToken(token, prefix);
   if (!claims) {
-    throw new Error("Invalid mock token format");
+    throw new TokenValidationError("Invalid mock token format");
   }
   if (!isDevMockUserAllowed(claims.userId)) {
-    throw new Error("Mock token user not in allowlist");
+    throw new TokenValidationError("Mock token user not in allowlist");
   }
   assertDevMockTokenFresh(claims, nowMs, ttlMs);
   return claims;
@@ -278,6 +279,25 @@ export async function verifyAdminAccessToken(token: string): Promise<AdminTokenC
  * Обработчик сам решает реакцию: /refresh трактует как reuse и отзывает
  * всю семью токенов, /logout — игнорирует (повторный логаут безопасен).
  */
+/**
+ * Ошибка ВАЛИДАЦИИ токена — вина клиента (невалидный формат/подпись/TTL,
+ * отозванный или уже ротированный токен). Вызывающий код трактует как 401.
+ *
+ * Отдельный класс нужен для узкой обработки в /auth/refresh: ошибки
+ * инфраструктуры (Prisma, доступ к БД, подписание) НЕ являются
+ * TokenValidationError и должны попадать в глобальный onError (500),
+ * а не маскироваться под «Invalid refresh token» (401).
+ */
+export class TokenValidationError extends Error {
+  constructor(
+    message: string,
+    options?: { cause?: unknown }
+  ) {
+    super(message, options);
+    this.name = "TokenValidationError";
+  }
+}
+
 export class RefreshTokenRevokedError extends Error {
   constructor(public readonly userId: string) {
     super("Refresh token revoked");
@@ -343,18 +363,29 @@ export async function verifyRefreshToken(
     }
   }
 
-  const { payload } = await jwtVerify(token, getJwtSecret());
+  // Подпись/формат JWT — вина клиента (битый токен, чужой секрет, истёкший
+  // exp). JOSE-ошибки заворачиваем в TokenValidationError, чтобы /refresh
+  // отличал их от инфраструктурных сбоев (Prisma/подписание) — иначе сбой БД
+  // маскировался бы под 401 «Invalid refresh token».
+  let payload: JWTPayload;
+  try {
+    payload = (await jwtVerify(token, getJwtSecret())).payload;
+  } catch (error) {
+    throw new TokenValidationError("Invalid or expired token", {
+      cause: error,
+    });
+  }
 
   if (payload.type !== "refresh") {
-    throw new Error("Invalid token type");
+    throw new TokenValidationError("Invalid token type");
   }
 
   if (typeof payload.sub !== "string") {
-    throw new Error("Invalid token subject");
+    throw new TokenValidationError("Invalid token subject");
   }
 
   if (typeof payload.jti !== "string") {
-    throw new Error("Invalid token jti");
+    throw new TokenValidationError("Invalid token jti");
   }
 
   const tokenHash = hashToken(payload.jti);
@@ -363,7 +394,7 @@ export async function verifyRefreshToken(
   });
 
   if (!dbToken || dbToken.expiresAt < new Date()) {
-    throw new Error("Token revoked or expired");
+    throw new TokenValidationError("Token revoked or expired");
   }
 
   if (dbToken.revokedAt) {
@@ -400,7 +431,9 @@ export async function rotateRefreshToken(
     });
 
     if (revoked.count !== 1) {
-      throw new Error("Token already used");
+      // Конкурентная ротация уже использовала этот токен — вина клиента
+      // (повторное предъявление), классифицируем как 401, а не 500.
+      throw new TokenValidationError("Token already used");
     }
 
     const newJti = randomUUID();

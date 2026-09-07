@@ -86,6 +86,18 @@ describe("Admin cities CRUD", () => {
     expect(names).not.toContain("Байкал-citiestest");
   });
 
+  it.each([
+    ["unknown parameter", "?unexpected=value"],
+    ["repeated parameter", "?page=1&page=2"],
+    ["malformed page", "?page=not-a-number"],
+    // Граница контракта городов: ADMIN_CITY_PAGE_SIZE_MAX = 200
+    // (у остальных админ-списков 100 — см. admin.schema.ts).
+    ["pageSize above the contract limit", "?pageSize=201"],
+  ])("rejects %s -> 400", async (_case, query) => {
+    const res = await adminRequest("/cities" + query, { method: "GET" }, cookie);
+    expect(res.status).toBe(400);
+  });
+
   it("creates a new city (POST) and returns 201 with tripsCount=0", async () => {
     const res = await adminRequest(
       "/cities",

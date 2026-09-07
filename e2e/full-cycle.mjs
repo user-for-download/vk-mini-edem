@@ -34,6 +34,12 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const results = [];
 let stepNo = 0;
 const pageErrors = { driver: [], passenger: [] };
+// unhandledrejection: pageerror не ловит отклонённые промисы. Собираем их
+// через init-script (Playwright не даёт прямого события) и валям прогон —
+// иначе «зелёный» UI с тихими rejection'ами проходил бы CI (audit:
+// failure signaling).
+const unhandledRejections = { driver: [], passenger: [] };
+const livePages = [];
 
 function record(name, ok, detail = "") {
   results.push({ name, ok, detail });
@@ -88,9 +94,22 @@ async function shot(page, name) {
 async function openApp(browser, userId, role, who) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await ctx.addInitScript((r) => { try { localStorage.setItem("edem-role", r); } catch {} }, role);
+  await ctx.addInitScript(() => {
+    try {
+      window.__e2eUnhandledRejections = [];
+      window.addEventListener("unhandledrejection", (event) => {
+        const reason = event.reason;
+        const text = reason instanceof Error
+          ? `${reason.name}: ${reason.message}`
+          : String(reason);
+        window.__e2eUnhandledRejections.push(text.slice(0, 150));
+      });
+    } catch {}
+  });
   const page = await ctx.newPage();
   page.setDefaultTimeout(12000);
   page.on("pageerror", (e) => pageErrors[who].push(String(e).slice(0, 150)));
+  livePages.push({ page, who });
   // vk_ts — на каждый вызов: один timestamp на весь прогон протухает
   // за 5-минутное серверное окно на длинных ранах.
   page.authUrl = (hash = "/") => {
@@ -123,7 +142,7 @@ async function fillDateInput(page, fieldLocator, timeStr) {
   }
   await day.waitFor({ state: "attached", timeout: 10000 });
   await day.click({ force: true });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(400); // анимация выбора дня (perception-pause)
   const grid = page.locator('[role="grid"], [class*="vkuiCalendarDays"]').first();
   await grid.waitFor({ state: "visible", timeout: 5000 });
   const popup = grid.locator("xpath=ancestor-or-self::*[contains(@class, 'Popper')][1]");
@@ -138,17 +157,19 @@ async function fillDateInput(page, fieldLocator, timeStr) {
     await timeInputs.first().click();
     await timeInputs.first().pressSequentially(timeStr);
   }
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(200); // settle полей времени перед «Готово»
   // Коммит значения + закрытие календаря
   await popup.getByRole("button", { name: "Готово" }).click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(400); // анимация закрытия попапа (perception-pause)
 }
 
 // Cleanup созданной поездки: отзывы (SetNull FK — сами не уйдут) + поездка
 // (брони каскадно). Вызывается из finally — и на pass, и на fail.
-// Не валит прогон: только предупреждает в лог.
+// ВАЛИТ прогон при неудаче (audit: cleanup failure is advisory): тихий
+// провал чистки оставлял мусор в общей dev-БД и загрязнял следующие прогоны.
+// Возвращает true/false для учёта в итоговом вердикте.
 function cleanupTrip(id) {
-  if (!id) return;
+  if (!id) return true;
   try {
     execSync(
       `docker exec ${DB_CONTAINER} psql -U edem -d edem -c "DELETE FROM \\"Review\\" WHERE \\"tripId\\" = '${id}';"`,
@@ -159,9 +180,35 @@ function cleanupTrip(id) {
       { stdio: "pipe" },
     );
     console.log(`[cleanup] trip ${id} removed`);
+    return true;
   } catch (e) {
-    console.log(`[cleanup] WARNING: could not remove trip ${id}: ${String(e.message || e).slice(0, 200)}`);
+    console.log(`[cleanup] FAIL: could not remove trip ${id}: ${String(e.message || e).slice(0, 200)}`);
+    return false;
   }
+}
+
+// Prerequisite check (audit: E2E environment portability) — фейл-фаст с
+// понятным сообщением ДО создания данных, а не посреди прогона на шаге
+// time-travel: без docker exec недоступен ни клинап, ни завершение поездки.
+function checkDbPrerequisite() {
+  try {
+    execSync(
+      `docker exec ${DB_CONTAINER} psql -U edem -d edem -tAc "SELECT 1"`,
+      { stdio: "pipe" },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!checkDbPrerequisite()) {
+  console.error(
+    `⛔ Prerequisite failed: docker exec ${DB_CONTAINER} psql недоступен.\n` +
+    `   Проверьте: docker compose -f docker-compose.local.yml up -d,\n` +
+    `   либо задайте E2E_DB_CONTAINER. Прогон не запущен — данные не созданы.`,
+  );
+  process.exit(2);
 }
 
 const browser = await chromium.launch({ headless: true });
@@ -249,9 +296,23 @@ try {
     await dp.getByText("Можно с животными", { exact: true }).first().click();
     await dp.waitForTimeout(300);
     await shot(dp, "create-trip-form");
-    // Публикация
+    // Публикация. Идентичность прогона — id из ответа POST /trips (audit:
+    // price-based .first() на карточках рискует совпасть с прошлыми
+    // прогонами; id точен всегда). Fallback — извлечение из URL на шаге
+    // деталей. Фиксированный sleep после клика не нужен: состояние ждём
+    // напрямую (snackbar + ответ сети).
+    const publishRespPromise = dp.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/api/v1/trips"),
+      { timeout: 20000 },
+    );
     await dp.getByRole("button", { name: "Опубликовать поездку" }).click();
-    await dp.waitForTimeout(1000);
+    try {
+      const publishResp = await publishRespPromise;
+      const publishBody = await publishResp.json().catch(() => null);
+      if (publishBody?.id) tripId = publishBody.id;
+    } catch {
+      // best-effort: id добым из URL на шаге деталей
+    }
     let alerts = [];
     try {
       alerts = await dp.locator('[role="alert"]').allTextContents();
@@ -261,7 +322,7 @@ try {
     if (alerts.length) console.log("  [alerts]:", JSON.stringify([...new Set(alerts)]));
     await dp.getByText("Поездка опубликована").waitFor({ timeout: 15000 });
     await shot(dp, "trip-published");
-    return `цена ${PRICE_LABEL}, мест 3, тег «Можно с животными», run=${RUN_ID}`;
+    return `цена ${PRICE_LABEL}, мест 3, тег «Можно с животными», run=${RUN_ID}${tripId ? `, tripId=${tripId}` : ""}`;
   });
   if (!created) throw new Error("trip creation failed");
 
@@ -476,7 +537,6 @@ try {
     // на /profile в шагах 11–12). Тот же паттерн, что у водителя в шаге 13.
     await pp.goto(pp.authUrl("/profile"), { waitUntil: "commit" });
     await pp.reload({ waitUntil: "networkidle" });
-    await pp.waitForTimeout(1000);
     await pp.getByText("Профиль").first().waitFor({ timeout: 10000 });
     // Ждём появления поездки в секции «поездки для отзыва»
     await pp.getByText("Вологда → Череповец").first().waitFor({ timeout: 15000 });
@@ -487,6 +547,8 @@ try {
     // Рейтинг по умолчанию 5 — оставляем как есть.
     // Комментарий уникален на запуск — повторы не конфликтуют по тексту.
     await pp.locator("textarea").fill(REVIEW_TEXT);
+    // Короткая пауза-анимация (≤300ms, снэкбар/скелетон settling) перед
+    // скриншотом — допустимый perception-pause по правилам e2e-скилла.
     await pp.waitForTimeout(300);
     await shot(pp, "review-form");
     // Отправляем отзыв
@@ -561,9 +623,26 @@ try {
 } catch (e) {
   console.log(`⛔ Скрипт остановлен: ${String(e.message || e).split("\n")[0]}`);
 } finally {
+  // Сначала собираем unhandledrejection со всех живых страниц (до close):
+  // страница тёплая только пока жив её контекст.
+  for (const { page, who } of livePages) {
+    try {
+      const list = await page.evaluate(
+        () => window.__e2eUnhandledRejections ?? [],
+      );
+      unhandledRejections[who].push(...list);
+    } catch {
+      // страница/контекст уже закрыты — пропускаем
+    }
+  }
   // Cleanup созданных данных — и на pass, и на fail, чтобы повторы
   // стартовали чисто (уникальная цена + удаление = двойная защита).
-  cleanupTrip(tripId);
+  const cleanupOk = cleanupTrip(tripId);
+  results.push({
+    name: "Cleanup: созданная поездка удалена из БД",
+    ok: cleanupOk,
+    detail: tripId ? `trip ${tripId}` : "не требовался (поездка не создана)",
+  });
   await browser.close();
 }
 
@@ -580,11 +659,37 @@ for (const { who, text } of flatPageErrors.slice(0, 6)) {
 if (flatPageErrors.length) {
   console.log(`⛔ pageerror: ${flatPageErrors.length} — прогон считается НЕУСПЕШНЫМ`);
 }
+const flatUnhandledRejections = Object.entries(unhandledRejections).flatMap(
+  ([who, errs]) => errs.map((text) => ({ who, text })),
+);
+for (const { who, text } of flatUnhandledRejections.slice(0, 6)) {
+  console.log(`⛔ unhandledrejection (${who}): ${text}`);
+}
+if (flatUnhandledRejections.length) {
+  console.log(
+    `⛔ unhandledrejection: ${flatUnhandledRejections.length} — прогон считается НЕУСПЕШНЫМ`,
+  );
+}
 fs.writeFileSync(
   path.join(__dirname, "results.json"),
-  JSON.stringify({ results, pageErrors, runId: RUN_ID, price: PRICE }, null, 1) + "\n",
+  JSON.stringify(
+    {
+      results,
+      pageErrors,
+      unhandledRejections,
+      runId: RUN_ID,
+      price: PRICE,
+    },
+    null,
+    1,
+  ) + "\n",
 );
-// pageerror валит прогон даже при 15/15 шагов: тихие исключения в UI
-// иначе маскировали бы регрессии.
-const green = passed === results.length && results.length > 0 && flatPageErrors.length === 0;
+// pageerror И unhandledrejection валят прогон даже при всех шагах в green:
+// тихие исключения/rejection'ы в UI иначе маскировали бы регрессии.
+// Провал cleanup тоже валит: мусор в dev-БД загрязняет следующие прогоны.
+const green =
+  passed === results.length &&
+  results.length > 0 &&
+  flatPageErrors.length === 0 &&
+  flatUnhandledRejections.length === 0;
 process.exit(green ? 0 : 1);

@@ -93,15 +93,16 @@ export function CitiesPage() {
   } | null>(null);
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" aria-labelledby="cities-page-title">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Города</h1>
+        <h1 id="cities-page-title" className="text-2xl font-semibold">Города</h1>
         <Button onClick={() => setCreateOpen(true)}>Добавить город</Button>
       </div>
 
       <div className="flex items-center gap-2">
         <Input
           type="search"
+          aria-label="Поиск городов по названию"
           placeholder="Поиск по названию"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -506,8 +507,8 @@ function CitiesPagination({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm text-muted-foreground">
-      <span>Страница {page} из {data.pagination.totalPages}</span>
+    <nav className="flex items-center justify-between text-sm text-muted-foreground" aria-label="Навигация по страницам городов">
+      <span aria-live="polite">Страница {page} из {data.pagination.totalPages}</span>
       <div className="flex gap-2">
         <Button
           variant="outline"
@@ -526,13 +527,13 @@ function CitiesPagination({
           Вперёд
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }
 
 function CitiesLoading() {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-2" role="status" aria-label="Загрузка городов">
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />
       <Skeleton className="h-12 w-full" />

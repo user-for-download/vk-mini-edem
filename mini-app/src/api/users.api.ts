@@ -1,6 +1,9 @@
 import { apiClient } from "./client";
 import { userSchema, type CompleteOnboardingBody } from "@edem/contracts";
 import type { User } from "@/types";
+import { z } from "zod";
+
+const successSchema = z.object({ success: z.boolean() }).strict();
 
 export interface CarFormDto {
   model: string;
@@ -14,7 +17,7 @@ export const usersApi = {
   },
 
   deleteCurrentUser: (): Promise<{ success: boolean }> =>
-    apiClient.request<{ success: boolean }>("/users/me", { method: "DELETE" }),
+    apiClient.request("/users/me", { method: "DELETE" }, successSchema),
 
   getUserById: (id: string, signal?: AbortSignal): Promise<User> => {
     return apiClient.request<User>(`/users/${encodeURIComponent(id)}`, { signal }, userSchema);

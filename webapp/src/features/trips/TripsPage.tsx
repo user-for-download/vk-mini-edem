@@ -44,6 +44,24 @@ const PAGE_SIZE = 10;
 
 type StatusFilterValue = "" | TripStatus;
 
+const TRIP_STATUSES: TripStatus[] = ["active", "cancelled", "completed"];
+
+// Локализованные статусы поездок (audit: сырые английские идентификаторы
+// в фильтре и бейджах при русской остальной панели).
+const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
+  active: "Активная",
+  cancelled: "Отменена",
+  completed: "Завершена",
+};
+
+/**
+ * Radix Select возвращает строку — рантайм-гвард вместо cast
+ * (audit: unchecked cast на границе компонента).
+ */
+function isTripStatus(value: string): value is TripStatus {
+  return (TRIP_STATUSES as readonly string[]).includes(value);
+}
+
 export function TripsPage() {
   const [status, setStatus] = useState<StatusFilterValue>("");
   const [page, setPage] = useState(1);
@@ -98,9 +116,9 @@ export function TripsPage() {
 
 const STATUS_OPTIONS: { value: StatusFilterValue; label: string }[] = [
   { value: "", label: "Все" },
-  { value: "active", label: "active" },
-  { value: "cancelled", label: "cancelled" },
-  { value: "completed", label: "completed" },
+  { value: "active", label: TRIP_STATUS_LABELS.active },
+  { value: "cancelled", label: TRIP_STATUS_LABELS.cancelled },
+  { value: "completed", label: TRIP_STATUS_LABELS.completed },
 ];
 
 function StatusFilter({
@@ -113,7 +131,10 @@ function StatusFilter({
   return (
     <Select
       value={value || "all"}
-      onValueChange={(next) => onChange(next === "all" ? "" : (next as TripStatus))}
+      onValueChange={(next) => {
+        if (next !== "all" && !isTripStatus(next)) return;
+        onChange(next === "all" ? "" : next);
+      }}
     >
       <SelectTrigger aria-label="Фильтр по статусу" className="w-44">
         <SelectValue placeholder="Статус" />
@@ -211,14 +232,14 @@ function TripStatusBadge({ status }: { status: string }) {
         variant="secondary"
         className="bg-green-500/15 text-green-700 dark:text-green-400"
       >
-        active
+        {TRIP_STATUS_LABELS.active}
       </Badge>
     );
   }
   if (status === "cancelled") {
-    return <Badge variant="destructive">cancelled</Badge>;
+    return <Badge variant="destructive">{TRIP_STATUS_LABELS.cancelled}</Badge>;
   }
-  return <Badge variant="default">{status}</Badge>;
+  return <Badge variant="default">{TRIP_STATUS_LABELS.completed}</Badge>;
 }
 
 function TripsPagination({

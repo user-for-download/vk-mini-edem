@@ -12,7 +12,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
  */
 function readBanReason(errorData: unknown): string | null {
   if (!errorData || typeof errorData !== "object") return null;
-  const reason = (errorData as { banReason?: unknown }).banReason;
+  const reason = Reflect.get(errorData, "banReason");
   if (typeof reason === "string") return reason;
   return null;
 }
@@ -200,12 +200,13 @@ export class ApiClient {
         // Повторяем исходный запрос с новым токеном
         const retryResponse = await this.doFetch(endpoint, options);
         if (!retryResponse.ok) {
-          const errorData = await retryResponse.json().catch(() => ({}));
+          const errorData: unknown = await retryResponse.json().catch(() => ({}));
+          const errorRecord = toErrorRecord(errorData);
           throw new ApiError(
-            errorData.message || `HTTP error ${retryResponse.status}`,
-            errorData.code,
+            errorRecord.message ?? `HTTP error ${retryResponse.status}`,
+            errorRecord.code,
             retryResponse.status,
-            errorData.retryAfterMs,
+            errorRecord.retryAfterMs,
             readBanReason(errorData),
           );
         }
@@ -214,12 +215,13 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData: unknown = await response.json().catch(() => ({}));
+      const errorRecord = toErrorRecord(errorData);
       throw new ApiError(
-        errorData.message || `HTTP error ${response.status}`,
-        errorData.code,
+        errorRecord.message ?? `HTTP error ${response.status}`,
+        errorRecord.code,
         response.status,
-        errorData.retryAfterMs,
+        errorRecord.retryAfterMs,
         readBanReason(errorData),
       );
     }
@@ -385,6 +387,24 @@ export class ApiClient {
       return "transient-failure";
     }
   }
+}
+
+interface ErrorRecord {
+  message?: string;
+  code?: string;
+  retryAfterMs?: number;
+}
+
+function toErrorRecord(value: unknown): ErrorRecord {
+  if (!value || typeof value !== "object") return {};
+  const message = Reflect.get(value, "message");
+  const code = Reflect.get(value, "code");
+  const retryAfterMs = Reflect.get(value, "retryAfterMs");
+  return {
+    message: typeof message === "string" ? message : undefined,
+    code: typeof code === "string" ? code : undefined,
+    retryAfterMs: typeof retryAfterMs === "number" ? retryAfterMs : undefined,
+  };
 }
 
 export const apiClient = new ApiClient();

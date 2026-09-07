@@ -41,10 +41,17 @@ export default defineConfig({
   server: {
     // Админка проксируется на admin.site.com; порт фиксирован (3013).
     port: 3013,
-    // Слушаем все интерфейсы: доступ из сети / через внешний прокси.
-    host: true,
-    // Пускать запросы с любым Host (admin.site.com через прокси, туннели).
-    allowedHosts: true,
+    // По умолчанию — loopback (audit: dev server exposure): дев-админка
+    // с прокси на локальный backend не должна слушаться на всех
+    // интерфейсах (DNS-rebinding / случайный доступ из LAN).
+    // VITE_DEV_HOST=1 — явный opt-in для запуска за внешним прокси/туннелем.
+    host: process.env.VITE_DEV_HOST === "1",
+    // Host-заголовки ограничены: защита от DNS-rebinding. Vite допускает
+    // localhost/IP всегда; внешний домен задают через VITE_DEV_ALLOWED_HOSTS
+    // (например, VITE_DEV_ALLOWED_HOSTS=admin.site.com).
+    allowedHosts: process.env.VITE_DEV_ALLOWED_HOSTS
+      ? process.env.VITE_DEV_ALLOWED_HOSTS.split(",").map((host) => host.trim())
+      : undefined,
     proxy: {
       "/api": {
         target: "http://127.0.0.1:3011",

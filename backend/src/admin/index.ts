@@ -199,8 +199,20 @@ adminRouter.use("*", adminGuard);
  * getSanitizedBody читает только JSON-тело и для GET не подходит:
  * собираем объект из query-параметров и чистим строки от HTML.
  */
-function getSanitizedQuery(c: Context): Record<string, unknown> {
-  return sanitizeValue(c.req.query()) as Record<string, unknown>;
+function getSanitizedQuery(c: Context): Record<string, unknown> | null {
+  const params = new URL(c.req.url).searchParams;
+  const entries: Array<[string, unknown]> = [];
+  const keys = new Set<string>();
+
+  for (const [key, value] of params) {
+    // URLSearchParams preserves duplicate keys; rejecting them prevents a
+    // proxy/client disagreement about which value reaches the contract.
+    if (keys.has(key)) return null;
+    keys.add(key);
+    entries.push([key, sanitizeValue(value)]);
+  }
+
+  return Object.fromEntries(entries);
 }
 
 function invalidQueryResponse(c: Context) {
@@ -671,14 +683,18 @@ adminRouter.patch("/users/:id/onboarding-reset", mutationLimiter, async (c) => {
 
 /**
  * Отмена поездки администратором.
- * Только смена статуса: брони, места и уведомления не трогаем
- * (в отличие от водительской отмены с каскадом — осознанно).
+ *
+ * Полный жизненный цикл — как в водительской отмене (trips/index.ts):
+ * - все pending/confirmed брони становятся cancelled (с аудитом);
+ * - seatsAvailable обнуляется — поездка недоступна для бронирования;
+ * - счётчики городов декрементируются в той же транзакции (F17).
  * Завершённые и уже отменённые поездки отменить нельзя (409).
+ * Уведомления пассажирам — ВНЕ транзакции, после успешного коммита.
  *
  * TOCTOU: загрузка поездки и проверка статуса выполняются ВНУТРИ
  * Serializable-транзакции — параллельные отмены (админ/водитель) не могут
- * дважды декрементировать счётчики городов (F17): конфликтная транзакция
- * получит P2034 и ответит 409.
+ * дважды декрементировать счётчики городов (F17) или дважды отменить
+ * брони: конфликтная транзакция получит P2034 и ответит 409.
  */
 adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
   const id = c.req.param("id");
@@ -687,6 +703,7 @@ adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
     | {
         kind: "ok";
         trip: Prisma.TripGetPayload<{ include: { driver: true } }>;
+        passengerIds: string[];
       }
     | { kind: "not_found" }
     | { kind: "not_active" };
@@ -709,6 +726,30 @@ adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
           return { kind: "not_active" as const };
         }
 
+        // Пассажиров собираем ДО updateMany: после перевода броней
+        // в cancelled выборка по активным статусам вернёт пустой массив.
+        const activeBookings = await tx.booking.findMany({
+          where: { tripId: trip.id, status: { in: [...ACTIVE_BOOKING_STATUSES] } },
+          select: { passengerId: true },
+        });
+
+        // Каскад: активные брони отменяются с аудитом админ-действия.
+        // Без этого отменённая поездка держала бы «живые» брони, которые
+        // пассажир не может отменить сам (пассажирский endpoint требует
+        // active-поездку) — рассинхрон мест и невозможные статусы.
+        await tx.booking.updateMany({
+          where: {
+            tripId: trip.id,
+            status: { in: [...ACTIVE_BOOKING_STATUSES] },
+          },
+          data: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledByType: "admin",
+            cancellationReason: "Trip cancelled by admin",
+          },
+        });
+
         // F17: декремент счётчиков городов — в той же транзакции, что и
         // смена статуса. Guarded (tripsCount > 0): счётчик не уходит в минус.
         await decrementCityTripsCount(tx, trip.fromCityId, trip.toCityId);
@@ -717,13 +758,20 @@ adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
           where: { id },
           data: {
             status: "cancelled",
+            seatsAvailable: 0,
             cancelledAt: new Date(),
             cancelledByType: "admin",
           },
           include: { driver: true },
         });
 
-        return { kind: "ok" as const, trip: updated };
+        return {
+          kind: "ok" as const,
+          trip: updated,
+          passengerIds: Array.from(
+            new Set(activeBookings.map((b) => b.passengerId)),
+          ),
+        };
       },
       { isolationLevel: "Serializable" },
     );
@@ -761,7 +809,40 @@ adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
     );
   }
 
-  return c.json(serializeAdminTrip(result.trip));
+  const { trip, passengerIds } = result;
+
+  // Персистентные уведомления + WS-события пассажирам — ВНЕ транзакции
+  // (паттерн водительской отмены). createNotification глотает ошибки
+  // внутри, поэтому параллелим безопасно.
+  await Promise.all(
+    passengerIds.map(async (pid) => {
+      await createNotification(
+        pid,
+        "trip_cancelled",
+        "Поездка отменена",
+        `Поездка ${trip.fromCity} → ${trip.toCity} отменена администрацией`,
+        "/bookings",
+      );
+
+      wsManager.sendToUser(pid, {
+        type: "trip:status_changed",
+        payload: { tripId: trip.id, status: "cancelled" },
+      });
+      wsManager.sendToUser(pid, {
+        type: "notification:new",
+        payload: { id: "refresh" },
+      });
+    }),
+  );
+
+  logBusinessEvent("trip.cancelled", {
+    tripId: trip.id,
+    cancelledBy: "admin",
+    driverId: trip.driverId,
+    passengersAffected: passengerIds.length,
+  });
+
+  return c.json(serializeAdminTrip(trip));
 });
 
 /**
@@ -772,6 +853,11 @@ adminRouter.patch("/trips/:id/cancel", mutationLimiter, async (c) => {
  * активная бронь (pending/confirmed) удерживает место. Переход
  * active → неактивный освобождает место, обратный переход — повторно
  * удерживает (с проверкой доступности и занятости места).
+ *
+ * Реактивация (неактивная → активная) дополнительно требует ЖИВУЮ поездку:
+ * status=active и отправление в будущем. Иначе админ мог бы «оживить»
+ * бронь на отменённой/завершённой/уехавшей поездке — seatsAvailable
+ * уехал бы в минус, а бронь получила бы невозможный статус.
  */
 adminRouter.patch("/bookings/:id/status", mutationLimiter, async (c) => {
   const id = c.req.param("id");
@@ -800,6 +886,28 @@ adminRouter.patch("/bookings/:id/status", mutationLimiter, async (c) => {
 
         const oldStatus = booking.status;
         const { trip } = booking;
+
+        // Неактивная бронь снова становится активной — сначала проверяем,
+        // что поездка вообще допускает активные брони (жизненный цикл).
+        if (
+          !isActiveBookingStatus(oldStatus) &&
+          isActiveBookingStatus(newStatus)
+        ) {
+          if (trip.status !== "active") {
+            return {
+              kind: "conflict",
+              code: ERROR_CODES.TRIP_NOT_ACTIVE,
+              message: "Trip is not active",
+            } as const;
+          }
+          if (trip.departureAt <= new Date()) {
+            return {
+              kind: "conflict",
+              code: ERROR_CODES.CONFLICT,
+              message: "Trip has already departed",
+            } as const;
+          }
+        }
 
         // Активная бронь становится неактивной — освобождаем место
         // (не выше seatsTotal: защита от рассинхрона счётчика).
@@ -970,18 +1078,82 @@ adminRouter.delete("/reviews/:id", mutationLimiter, async (c) => {
  * же транзакции, что и смена статуса: статус и агрегат меняются атомарно.
  * 404 — отзыв не найден; 409 — статус не pending (повторное одобрение
  * или одобрение отклонённого отзыва запрещено).
+ *
+ * Конкурентность: переход «забирается» атомарным updateMany с предикатом
+ * status=pending ВНУТРИ Serializable-транзакции. Параллельные
+ * approve/reject одного отзыва не могут оба пройти проверку: проигравший
+ * получит count=0 (или P2034) и ответит 409 — рейтинг получателя не
+ * расходится с финальным статусом отзыва.
  */
 adminRouter.patch("/reviews/:id/approve", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
-  const review = await db.review.findUnique({ where: { id } });
-  if (!review) {
+  let result:
+    | { kind: "not_found" }
+    | { kind: "not_pending" }
+    | {
+        kind: "ok";
+        review: Prisma.ReviewGetPayload<{
+          include: { author: true; targetUser: true };
+        }>;
+      };
+
+  try {
+    result = await db.$transaction(
+      async (tx) => {
+        // Атомарный claim перехода: обновляются ONLY pending-отзывы.
+        // count=0 — отзыв не найден или уже обработан конкурентным запросом.
+        const claim = await tx.review.updateMany({
+          where: { id, status: "pending" },
+          data: { status: "published" },
+        });
+
+        if (claim.count === 0) {
+          const exists = await tx.review.findUnique({
+            where: { id },
+            select: { id: true },
+          });
+          return exists
+            ? { kind: "not_pending" as const }
+            : { kind: "not_found" as const };
+        }
+
+        const approved = await tx.review.findUniqueOrThrow({
+          where: { id },
+          include: { author: true, targetUser: true },
+        });
+
+        // Отзыв теперь учитывается в рейтинге — пересчитываем агрегат
+        // получателя по актуальным данным внутри той же транзакции.
+        await recomputeUserRating(tx, approved.targetUserId);
+
+        return { kind: "ok" as const, review: approved };
+      },
+      { isolationLevel: "Serializable" },
+    );
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Review was just changed, please retry",
+        },
+        409,
+      );
+    }
+    throw error;
+  }
+
+  if (result.kind === "not_found") {
     return c.json(
       { code: ERROR_CODES.NOT_FOUND, message: "Review not found" },
       404,
     );
   }
-  if (review.status !== "pending") {
+  if (result.kind === "not_pending") {
     return c.json(
       {
         code: ERROR_CODES.CONFLICT,
@@ -991,17 +1163,7 @@ adminRouter.patch("/reviews/:id/approve", mutationLimiter, async (c) => {
     );
   }
 
-  const updated = await db.$transaction(async (tx) => {
-    const approved = await tx.review.update({
-      where: { id },
-      data: { status: "published" },
-      include: { author: true, targetUser: true },
-    });
-    // Отзыв теперь учитывается в рейтинге — пересчитываем агрегат
-    // получателя по актуальным данным внутри той же транзакции.
-    await recomputeUserRating(tx, approved.targetUserId);
-    return approved;
-  });
+  const updated = result.review;
 
   logBusinessEvent("review.approved", {
     reviewId: updated.id,
@@ -1030,18 +1192,74 @@ adminRouter.patch("/reviews/:id/approve", mutationLimiter, async (c) => {
  * вызывается: pending-отзыв в рейтинг никогда не учитывался, поэтому
  * агрегат получателя отклонением не меняется.
  * 404 — отзыв не найден; 409 — статус не pending.
+ *
+ * Конкурентность: как в approve — атомарный claim через updateMany
+ * с предикатом status=pending. Ждущий reject после чужого approve
+ * получает 409, а не перезапись published → rejected.
  */
 adminRouter.patch("/reviews/:id/reject", mutationLimiter, async (c) => {
   const id = c.req.param("id");
 
-  const review = await db.review.findUnique({ where: { id } });
-  if (!review) {
+  let result:
+    | { kind: "not_found" }
+    | { kind: "not_pending" }
+    | {
+        kind: "ok";
+        review: Prisma.ReviewGetPayload<{
+          include: { author: true; targetUser: true };
+        }>;
+      };
+
+  try {
+    result = await db.$transaction(
+      async (tx) => {
+        const claim = await tx.review.updateMany({
+          where: { id, status: "pending" },
+          data: { status: "rejected" },
+        });
+
+        if (claim.count === 0) {
+          const exists = await tx.review.findUnique({
+            where: { id },
+            select: { id: true },
+          });
+          return exists
+            ? { kind: "not_pending" as const }
+            : { kind: "not_found" as const };
+        }
+
+        const rejected = await tx.review.findUniqueOrThrow({
+          where: { id },
+          include: { author: true, targetUser: true },
+        });
+
+        return { kind: "ok" as const, review: rejected };
+      },
+      { isolationLevel: "Serializable" },
+    );
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2034"
+    ) {
+      return c.json(
+        {
+          code: ERROR_CODES.CONFLICT,
+          message: "Review was just changed, please retry",
+        },
+        409,
+      );
+    }
+    throw error;
+  }
+
+  if (result.kind === "not_found") {
     return c.json(
       { code: ERROR_CODES.NOT_FOUND, message: "Review not found" },
       404,
     );
   }
-  if (review.status !== "pending") {
+  if (result.kind === "not_pending") {
     return c.json(
       {
         code: ERROR_CODES.CONFLICT,
@@ -1051,11 +1269,7 @@ adminRouter.patch("/reviews/:id/reject", mutationLimiter, async (c) => {
     );
   }
 
-  const updated = await db.review.update({
-    where: { id },
-    data: { status: "rejected" },
-    include: { author: true, targetUser: true },
-  });
+  const updated = result.review;
 
   logBusinessEvent("review.rejected", {
     reviewId: updated.id,
@@ -1091,8 +1305,7 @@ adminRouter.patch("/reviews/:id/reject", mutationLimiter, async (c) => {
  * Поиск case-insensitive по подстроке имени.
  */
 adminRouter.get("/cities", adminReadLimiter, async (c) => {
-  const raw = sanitizeValue(c.req.query());
-  const parsed = adminCitiesQuerySchema.safeParse(raw);
+  const parsed = adminCitiesQuerySchema.safeParse(getSanitizedQuery(c));
   if (!parsed.success) {
     return invalidQueryResponse(c);
   }

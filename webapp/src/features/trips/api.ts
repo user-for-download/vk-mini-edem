@@ -1,7 +1,13 @@
 import { apiGet, apiPatch } from "@/lib/api-client";
-import type { AdminPaginatedTrips, AdminTripDto } from "@edem/contracts";
+import {
+  adminPaginatedTripsSchema,
+  adminTripDtoSchema,
+  type AdminPaginatedTrips,
+  type AdminTripDto,
+  type TripStatus,
+} from "@edem/contracts";
 
-export type TripStatus = "active" | "cancelled" | "completed";
+export type { TripStatus };
 
 export interface FetchTripsParams {
   status?: TripStatus;
@@ -21,12 +27,12 @@ export function fetchTrips(params: FetchTripsParams): Promise<AdminPaginatedTrip
   if (params.status !== undefined) {
     search.set("status", params.status);
   }
-  return apiGet(`/trips?${search.toString()}`);
+  return apiGet(`/trips?${search.toString()}`, adminPaginatedTripsSchema);
 }
 
 /**
  * PATCH /api/v1/admin/trips/:id/cancel — отмена поездки.
  */
 export function cancelTrip(id: string): Promise<AdminTripDto> {
-  return apiPatch(`/trips/${id}/cancel`);
+  return apiPatch(`/trips/${encodeURIComponent(id)}/cancel`, undefined, adminTripDtoSchema);
 }

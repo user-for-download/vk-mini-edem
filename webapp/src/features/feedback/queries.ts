@@ -26,7 +26,10 @@ export function useFeedbackQuery(params: FeedbackQueryParams) {
 export function useFeedbackDetailQuery(id: string | null) {
   return useQuery({
     queryKey: id ? feedbackDetailKey(id) : ["admin", "feedback", "detail", "none"],
-    queryFn: () => fetchFeedbackById(id as string),
+    queryFn: () => {
+      if (id === null) throw new Error("Feedback id is required");
+      return fetchFeedbackById(id);
+    },
     enabled: Boolean(id),
   });
 }

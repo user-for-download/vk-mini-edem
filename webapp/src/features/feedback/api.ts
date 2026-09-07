@@ -1,5 +1,11 @@
 import { apiGet, apiPost, apiPut } from "@/lib/api-client";
-import type { AdminFeedbackDto, AdminPaginatedFeedback } from "@edem/contracts";
+import {
+  adminFeedbackDtoSchema,
+  adminPaginatedFeedbackSchema,
+  type AdminFeedbackDto,
+  type AdminPaginatedFeedback,
+  type FeedbackReplyBody,
+} from "@edem/contracts";
 
 export interface FetchFeedbackParams {
   page: number;
@@ -16,14 +22,14 @@ export function fetchFeedback(
     page: String(params.page),
     pageSize: String(params.pageSize),
   });
-  return apiGet(`/feedback?${search.toString()}`);
+  return apiGet(`/feedback?${search.toString()}`, adminPaginatedFeedbackSchema);
 }
 
 /**
  * GET /api/v1/admin/feedback/:id — детальная карточка обращения.
  */
 export function fetchFeedbackById(id: string): Promise<AdminFeedbackDto> {
-  return apiGet<AdminFeedbackDto>(`/feedback/${encodeURIComponent(id)}`);
+  return apiGet(`/feedback/${encodeURIComponent(id)}`, adminFeedbackDtoSchema);
 }
 
 /**
@@ -33,9 +39,10 @@ export function createFeedbackReply(
   id: string,
   reply: string
 ): Promise<AdminFeedbackDto> {
-  return apiPost<AdminFeedbackDto>(
+  return apiPost(
     `/feedback/${encodeURIComponent(id)}/reply`,
-    { reply },
+    { reply } satisfies FeedbackReplyBody,
+    adminFeedbackDtoSchema,
   );
 }
 
@@ -46,8 +53,9 @@ export function updateFeedbackReply(
   id: string,
   reply: string
 ): Promise<AdminFeedbackDto> {
-  return apiPut<AdminFeedbackDto>(
+  return apiPut(
     `/feedback/${encodeURIComponent(id)}/reply`,
-    { reply },
+    { reply } satisfies FeedbackReplyBody,
+    adminFeedbackDtoSchema,
   );
 }

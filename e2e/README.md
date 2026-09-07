@@ -38,13 +38,23 @@ timestamp per run expires after the 5-min server window on long runs).
 
 - Each run uses unique data: `PRICE = 700 + ((Date.now() + pid) % 90)` plus a
   unique review comment, so repeat runs never collide on cards/search.
+  The created trip `id` is captured from the POST /trips response (with a
+  URL fallback on the details step) — assertions key on the exact entity.
+- Prerequisite check runs first: `docker exec $E2E_DB_CONTAINER psql` must
+  answer, otherwise the run exits 2 before creating any data.
 - Created trip + its reviews are deleted in a `finally` block (pass or fail);
-  bookings cascade via FK.
-- `pageerror` / unhandled exceptions fail the run (non-zero exit even at 15/15).
+  bookings cascade via FK. **Cleanup failure fails the run** (recorded as a
+  result step and reflected in the exit code), so residue never leaks into
+  the next run silently.
+- `pageerror` **and** `unhandledrejection` fail the run (non-zero exit even
+  at 15/15). Rejections are collected per page via an init script and
+  reported in `results.json`.
 - Cold-start warm-up: one non-counted `goto /` + 60s content wait right after
   browser launch absorbs fresh-vite compile latency; the 15 recorded steps keep
   normal timeouts.
-- No swallowed waits on key assertions — missing UI state fails the step loudly.
+- No swallowed waits on key assertions — missing UI state fails the step
+  loudly. Fixed sleeps remain only as short (≤800ms), commented
+  animation/perception pauses (calendar open/close, snackbar settle).
 - Step 13 (complete trip) is state-based: asserts `UPDATE 1` rowcount, waits for
   fresh `GET /trips/:id` after reload, then for the enabled «Завершить поездку»
   button (`waitForFunction`) — no fixed sleeps. All navigations use
@@ -69,7 +79,7 @@ timestamp per run expires after the 5-min server window on long runs).
 14. Passenger leaves review (5★ + comment)
 15. Mini-app: `/profile/notifications` → VK push notifications block (banner «Включить» or «Включены»)
 
-The separate `liquidity-safety.mjs` flow checks RideRequest creation, driver matching visibility, pause transition and cleanup. It does not create a booking automatically.
+The separate `liquidity-safety.mjs` flow checks RideRequest creation, driver matching visibility (the created request must be present in the matching results, and must disappear after pausing), pause transition and cleanup. It does not create a booking automatically.
 
 ## Artifacts
 

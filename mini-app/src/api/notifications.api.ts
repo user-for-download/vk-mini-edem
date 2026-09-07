@@ -18,6 +18,7 @@ export const notificationsPageSchema = z.object({
   nextCursor: z.string().nullable(),
   unreadCount: z.number().optional(),
 });
+const successSchema = z.object({ success: z.boolean() }).strict();
 
 export type NotificationsPage = z.infer<typeof notificationsPageSchema>;
 
@@ -43,8 +44,8 @@ export const notificationsApi = {
   },
 
   markAllRead: (): Promise<{ success: boolean }> => {
-    return apiClient.request<{ success: boolean }>("/notifications/read-all", {
+    return apiClient.request("/notifications/read-all", {
       method: "PATCH",
-    });
+    }, successSchema);
   },
 };

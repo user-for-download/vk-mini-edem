@@ -48,9 +48,9 @@ export function AdminLayout() {
       <aside className="flex w-16 shrink-0 flex-col border-r border-border md:w-56">
         <div className="flex h-14 items-center border-b border-border px-4 text-sm font-semibold">
           <span className="hidden md:inline">Edem Admin</span>
-          <span className="md:hidden">EA</span>
+          <span className="md:hidden" aria-label="Edem Admin">EA</span>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-3">
+        <nav aria-label="Основная навигация" className="flex flex-1 flex-col gap-1 p-3">
           {navItems.map((item) => (
             <Link
               key={item.to}
@@ -59,6 +59,7 @@ export function AdminLayout() {
               activeProps={{
                 className: `${navLinkClasses} bg-accent font-medium text-accent-foreground`,
               }}
+              aria-label={item.label}
             >
               <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="hidden md:inline">{item.label}</span>
@@ -68,6 +69,7 @@ export function AdminLayout() {
         <div className="border-t border-border p-3">
           <button
             type="button"
+            aria-label="Выйти из панели администратора"
             onClick={handleLogout}
             className={`${navLinkClasses} w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground`}
           >

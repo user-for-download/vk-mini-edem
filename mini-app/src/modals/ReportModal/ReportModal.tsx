@@ -41,6 +41,16 @@ const labels: Record<(typeof REPORT_CATEGORIES)[number], string> = {
 };
 
 /**
+ * Рантайм-гвард вместо cast: select возвращает произвольную строку из DOM
+ * (audit: unchecked category cast). Неизвестное значение игнорируется.
+ */
+function isReportCategory(
+  value: string,
+): value is (typeof REPORT_CATEGORIES)[number] {
+  return (REPORT_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
  * Маппинг ошибок отправки жалобы (зеркалит паттерн бронирования
  * в TripDetailsPanel): 409 CONFLICT — открытая жалоба на этот объект
  * уже существует, 429 RATE_LIMITED — лимит с учётом retryAfterMs,
@@ -134,9 +144,11 @@ export const ReportModal: FC<ReportModalProps> = ({
         <FormItem top="Причина">
           <Select
             value={category}
-            onChange={(event) =>
-              setCategory(event.target.value as typeof category)
-            }
+            onChange={(event) => {
+              const next = event.target.value;
+              if (!isReportCategory(next)) return;
+              setCategory(next);
+            }}
             options={REPORT_CATEGORIES.map((value) => ({
               value,
               label: labels[value],

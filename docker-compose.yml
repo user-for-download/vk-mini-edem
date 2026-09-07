@@ -74,6 +74,14 @@ services:
       # Лимит GET-эндпоинтов админки (IP-based, выше публичного read-лимитера).
       ADMIN_READ_RATE_WINDOW_MS: ${ADMIN_READ_RATE_WINDOW_MS:-60000}
       ADMIN_READ_RATE_MAX: ${ADMIN_READ_RATE_MAX:-300}
+      # Анти-брутфорс логина админки (audit: env/compose parity — переменные
+      # читаются env.ts и задокументированы в backend/.env.example, но не
+      # пробрасывались прод-compose, молча игнорируя настройку).
+      ADMIN_LOGIN_RATE_WINDOW_MS: ${ADMIN_LOGIN_RATE_WINDOW_MS:-300000}
+      ADMIN_LOGIN_RATE_MAX: ${ADMIN_LOGIN_RATE_MAX:-10}
+      # Метрики: пусто = /metrics закрыт (403). Прокси может отдать токен
+      # сборщику метрик через заголовок Authorization.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       # Backend доступен только через внешний reverse proxy. Не доверяем
       # произвольным forwarding headers от прямых клиентов.
       TRUST_PROXY: "false"

@@ -44,6 +44,13 @@ describe("Review unique NULL-safety (F14)", () => {
 
   beforeAll(async () => {
     await db.$executeRawUnsafe(`
+      ALTER TABLE "Review" DROP CONSTRAINT IF EXISTS "Review_rating_range"
+    `);
+    await db.$executeRawUnsafe(`
+      ALTER TABLE "Review" ADD CONSTRAINT "Review_rating_range"
+        CHECK ("rating" >= 1 AND "rating" <= 5)
+    `);
+    await db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "Review_authorId_targetUserId_nullTrip_key"
         ON "Review"("authorId", "targetUserId")
         WHERE "tripId" IS NULL
@@ -163,6 +170,11 @@ describe("Review unique NULL-safety (F14)", () => {
       expect(cause?.constraint?.index).toBe(NULL_TRIP_INDEX);
       return true;
     });
+  });
+
+  it("rejects ratings outside the 1..5 database constraint", async () => {
+    await expect(createReviewDirect(passengerId, driverId, 0)).rejects.toThrow();
+    await expect(createReviewDirect(passengerId, driverId, 6)).rejects.toThrow();
   });
 
   it("NULL-tripId review for a different target is allowed (partial index scope)", async () => {

@@ -45,6 +45,19 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
   value,
   onChange,
 }) => {
+  // Roving tabindex: фокус следует за выбранной звездой. Без этого клик по
+  // не-выбранной радио-кнопке убирает её из таб-последовательности
+  // (tabIndex -1), а фокус остаётся на ней — «застрявший» фокус
+  // (audit: star rating focus management). Tappable не принимает ref,
+  // поэтому фокус двигаем через DOM события.
+  const selectStar = (n: number, event: React.MouseEvent) => {
+    onChange(n);
+    // Tappable рендерит button: currentTarget — интерактивный элемент.
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.focus();
+    }
+  };
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       let next = value;
@@ -76,7 +89,15 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           return;
       }
 
-      if (next !== value) onChange(next);
+      if (next !== value) {
+        onChange(next);
+        // Стрелки двигают фокус вместе с выбором — как в нативной
+        // radiogroup. Звёзды рендерятся по порядку 1..5, поэтому n-я
+        // radio в контейнере — это DOM-узел выбора n.
+        const radios = e.currentTarget.querySelectorAll('[role="radio"]');
+        const target = radios.item(next - 1);
+        if (target instanceof HTMLElement) target.focus();
+      }
     },
     [value, onChange]
   );
@@ -97,7 +118,7 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
           aria-checked={n === value}
           aria-label={`${n} из 5`}
           tabIndex={n === value ? 0 : -1}
-          onClick={() => onChange(n)}
+          onClick={(event: React.MouseEvent) => selectStar(n, event)}
           // eslint-disable-next-line react/forbid-dom-props
           style={{
             color: n <= value ? "var(--vkui--color_icon_accent)" : "var(--vkui--color_icon_secondary)",

@@ -30,7 +30,8 @@ jobs:
       JWT_SECRET: ci-jwt-secret
       VK_APP_SECRET: ci-vk-secret
       ALLOW_DEV_AUTH: "true"
-      # E2E в CI не гоняется — не качать браузеры в postinstall (экономит минуты на npm ci).
+      # Browser-загрузка не нужна ЭТОЙ job (юнит/интеграционные тесты);
+      # E2E-браузеры ставит отдельная job e2e (npx playwright install chromium).
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
       # error (не silent): unhandled_error с кодом Prisma должен быть виден
       # в логах CI при редких флейках интеграционных тестов.
@@ -53,22 +54,13 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
+          cache: npm
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Restore Bun install cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --no-progress
+      # Единая стратегия установки: npm + package-lock.json (как в Dockerfile).
+      # bun-установка и bun.lock удалены — раньше CI проверял граф зависимостей,
+      # отличный от прод-образов (audit: reproducible dependency installation).
+      - name: Install dependencies (npm ci, lockfile-locked)
+        run: npm ci --no-audit --no-fund
 
       - name: Build contracts
         run: npm run --workspace "@edem/contracts" build
@@ -97,38 +89,153 @@ jobs:
       - name: Contract tests
         run: npm run --workspace "@edem/contracts" test
 
-      - name: Backend smoke tests
+      - name: Backend tests
         run: npm run --workspace backend test
 
       - name: Mini-app tests
         run: npm run --workspace mini-app test
 
-  # Замер скорости bun install vs npm ci — только измерение, прод-рантайм не трогаем.
-  # Отдельная job на отдельном раннере: основную job checks не замедляет и не ломает.
-  install-benchmark:
+      - name: Webapp tests
+        run: npm run --workspace webapp test
+
+  # E2E: реальный браузер + живой backend/frontend + dev-БД (compose).
+  # Раньше e2e-флоу не гонялись в CI вовсе (audit: CI must exercise
+  # production/build-critical paths) — регрессии WS/рендера/жизненного
+  # цикла проходили незамеченными.
+  e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://edem:edem_local@127.0.0.1:5433/edem
+      JWT_SECRET: e2e-jwt-secret
+      VK_APP_SECRET: e2e-vk-secret
+      ALLOW_DEV_AUTH: "true"
+      BACKEND_PORT: "3011"
+      VITE_PORT: "3010"
+      VITE_API_TARGET: http://127.0.0.1:3011
+      LOG_LEVEL: error
+      # Прогон создаёт/подтверждает брони и отзывы — лимиты ослаблены,
+      # чтобы флоу не упирался в 429 на повторных ранах.
+      VK_AUTH_RATE_WINDOW_MS: "900000"
+      VK_AUTH_RATE_MAX: "1000"
+      REFRESH_RATE_WINDOW_MS: "900000"
+      REFRESH_RATE_MAX: "1000"
+      MUTATION_RATE_WINDOW_MS: "900000"
+      MUTATION_RATE_MAX: "1000"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v5
         with:
-          bun-version: latest
+          node-version: 22
+          cache: npm
 
-      - name: Benchmark bun install (cold, no lockfile)
-        run: |
-          rm -f bun.lock bun.lockb
-          /usr/bin/time -v bun install --no-progress 2>&1 | tail -20 || bun install --no-progress
-          echo "--- node_modules size (bun) ---"
-          du -sh node_modules
+      - name: Install dependencies (npm ci, lockfile-locked)
+        run: npm ci --no-audit --no-fund
 
-      - name: Benchmark npm ci (cold cache, for comparison)
+      # Dev-БД как локально: контейнер vk-mini-edem-db-dev на 127.0.0.1:5433.
+      # E2E_DB_CONTAINER в full-cycle.mjs указывает на него же (time-travel
+      # и cleanup через docker exec psql).
+      - name: Start dev database (docker compose local)
+        run: docker compose -f docker-compose.local.yml up -d db-dev
+
+      - name: Build contracts
+        run: npm run --workspace "@edem/contracts" build
+
+      - name: Prisma generate + push schema
+        run: npm run --workspace backend db:generate && npm run --workspace backend db:push
+
+      - name: Seed dev database
+        run: npm run --workspace backend db:seed
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend
         run: |
-          rm -rf node_modules
-          npm cache clean --force
-          /usr/bin/time -v npm ci --no-audit --no-fund 2>&1 | tail -20 || npm ci --no-audit --no-fund
-          echo "--- node_modules size (npm) ---"
-          du -sh node_modules
+          npm run --workspace backend dev > backend-dev.log 2>&1 &
+          echo $! > backend.pid
+
+      - name: Start mini-app (vite)
+        run: |
+          npm run --workspace mini-app dev > mini-app-dev.log 2>&1 &
+          echo $! > mini-app.pid
+
+      - name: Wait for backend readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3011/health/ready > /dev/null; then
+              echo "backend ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend did not become ready"; cat backend-dev.log; exit 1
+
+      - name: Wait for frontend readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3010/ > /dev/null; then
+              echo "frontend ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend did not become ready"; cat mini-app-dev.log; exit 1
+
+      - name: Run liquidity-safety E2E (API-level)
+        run: node e2e/liquidity-safety.mjs
+
+      - name: Run full-cycle E2E (browser)
+        run: node e2e/full-cycle.mjs
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e/results.json
+            e2e/shots/
+          if-no-files-found: ignore
+
+      - name: Dump dev logs on failure
+        if: failure()
+        run: |
+          echo "=== backend-dev.log ==="; tail -100 backend-dev.log || true
+          echo "=== mini-app-dev.log ==="; tail -100 mini-app-dev.log || true
+
+      - name: Stop dev servers
+        if: always()
+        run: |
+          kill $(cat backend.pid) 2>/dev/null || true
+          kill $(cat mini-app.pid) 2>/dev/null || true
+          docker compose -f docker-compose.local.yml down -v || true
+
+  # Docker: прод-образы должны собираться в CI (audit: production Docker
+  # build must be validated) — ошибки копирования/миграций/nginx ловим
+  # до деплоя. Compose-конфиг валидируем с dummy-переменными.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile -t edem-backend-ci .
+
+      - name: Build webapp image
+        run: docker build -f webapp/Dockerfile -t edem-webapp-ci .
+
+      - name: Validate docker-compose.yml
         env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+          POSTGRES_PASSWORD: ci-dummy-password
+          JWT_SECRET: ci-dummy-jwt-secret-value-32-chars-min
+          VK_APP_SECRET: ci-dummy-vk-secret
+          CORS_ORIGINS: https://example.com
+        run: docker compose config --quiet

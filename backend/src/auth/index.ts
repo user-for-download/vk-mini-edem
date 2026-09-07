@@ -19,6 +19,7 @@ import {
   rotateRefreshToken,
   revokeAllActiveTokens,
   RefreshTokenRevokedError,
+  TokenValidationError,
   hashToken,
   MOCK_REFRESH_TOKEN_PREFIX,
 } from "./tokens.js";
@@ -330,8 +331,20 @@ authRouter.post("/refresh", refreshLimiter, async (c) => {
           "[Auth] Refresh token reuse detected — failed to revoke active tokens",
         );
       }
+      return c.json({ message: "Invalid refresh token" }, 401);
     }
-    return c.json({ message: "Invalid refresh token" }, 401);
+
+    // Ошибки ВАЛИДАЦИИ токена (невалидный формат/подпись/TTL, отозванный
+    // или уже ротированный токен) — вина клиента → 401.
+    if (error instanceof TokenValidationError) {
+      return c.json({ message: "Invalid refresh token" }, 401);
+    }
+
+    // Инфраструктурные сбои (Prisma/доступ к БД, подписание) НЕ обязаны
+    // выглядеть как «невалидные креды»: пробрасываем в глобальный onError
+    // (лог + Sentry + 500). Раньше catch-all превращал сбой БД в 401 —
+    // клиенты сбрасывали валидные сессии, а мониторинг не видел инцидент.
+    throw error;
   }
 });
 

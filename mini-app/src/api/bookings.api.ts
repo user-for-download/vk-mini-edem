@@ -11,6 +11,7 @@ import type {
 } from "@edem/contracts";
 
 const passengerBookingArraySchema = z.array(passengerBookingSchema);
+const successSchema = z.object({ success: z.boolean() }).strict();
 
 export const bookingsApi = {
   getUserBookings: (signal?: AbortSignal): Promise<PassengerBooking[]> => {
@@ -69,11 +70,12 @@ export const bookingsApi = {
    * Отмена брони пассажиром.
    */
   cancelBooking: (id: string): Promise<{ success: boolean }> => {
-    return apiClient.request<{ success: boolean }>(
+    return apiClient.request(
       `/bookings/${encodeURIComponent(id)}/cancel`,
       {
         method: "PATCH",
-      }
+      },
+      successSchema,
     );
   },
 };

@@ -1,8 +1,13 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
-import type {
-  AdminCityDto,
-  PaginatedCitiesResponse,
+import {
+  adminCityDtoSchema,
+  paginatedCitiesResponseSchema,
+  type CityNameBody,
 } from "@edem/contracts";
+import type { AdminCityDto, PaginatedCitiesResponse } from "@edem/contracts";
+import { z } from "zod";
+
+const deleteCityResponseSchema = z.object({ ok: z.literal(true), id: z.string() }).strict();
 
 export interface FetchCitiesParams {
   page: number;
@@ -21,28 +26,30 @@ export function fetchCities(
     pageSize: String(params.pageSize),
   });
   if (params.q) search.set("q", params.q);
-  return apiGet<PaginatedCitiesResponse>(`/cities?${search.toString()}`);
+  return apiGet(`/cities?${search.toString()}`, paginatedCitiesResponseSchema);
 }
 
 /**
  * POST /api/v1/admin/cities — создать новую точку.
  */
 export function createCity(name: string): Promise<AdminCityDto> {
-  return apiPost<AdminCityDto>("/cities", { name });
+  return apiPost("/cities", { name } satisfies CityNameBody, adminCityDtoSchema);
 }
 
 /**
  * PATCH /api/v1/admin/cities/:id — переименовать.
  */
 export function renameCity(id: string, name: string): Promise<AdminCityDto> {
-  return apiPatch<AdminCityDto>(`/cities/${encodeURIComponent(id)}`, { name });
+  return apiPatch(
+    `/cities/${encodeURIComponent(id)}`,
+    { name } satisfies CityNameBody,
+    adminCityDtoSchema,
+  );
 }
 
 /**
  * DELETE /api/v1/admin/cities/:id — удалить. 409, если есть поездки.
  */
 export function deleteCity(id: string): Promise<{ ok: true; id: string }> {
-  return apiDelete<{ ok: true; id: string }>(
-    `/cities/${encodeURIComponent(id)}`,
-  );
+  return apiDelete(`/cities/${encodeURIComponent(id)}`, deleteCityResponseSchema);
 }

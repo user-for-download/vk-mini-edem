@@ -107,9 +107,9 @@ export function UsersPage() {
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" aria-labelledby="users-page-title">
       <div>
-        <h1 className="text-2xl font-semibold">Пользователи</h1>
+        <h1 id="users-page-title" className="text-2xl font-semibold">Пользователи</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Поиск пользователей, блокировка, разблокировка и сброс онбординга
         </p>
@@ -326,7 +326,7 @@ function Pagination({
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="flex items-center justify-end gap-2">
+    <nav className="flex items-center justify-end gap-2" aria-label="Навигация по страницам пользователей">
       <Button
         variant="outline"
         size="sm"
@@ -335,7 +335,7 @@ function Pagination({
       >
         Назад
       </Button>
-      <span className="text-sm text-muted-foreground">
+      <span className="text-sm text-muted-foreground" aria-live="polite">
         стр. {page} из {totalPages}
       </span>
       <Button
@@ -346,7 +346,7 @@ function Pagination({
       >
         Вперёд
       </Button>
-    </div>
+    </nav>
   );
 }
 
@@ -393,7 +393,7 @@ function BanReasonField({
           showError ? "text-destructive" : "text-muted-foreground"
         )}
       >
-        <span>
+        <span role={showError ? "alert" : undefined}>
           {showError ? error : `От 1 до ${BAN_REASON_MAX} символов`}
         </span>
         <span aria-label="Количество символов">

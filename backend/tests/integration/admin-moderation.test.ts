@@ -421,3 +421,195 @@ describe("DELETE /admin/reviews/:id — rating recompute", () => {
     expect(body.code).toBe("NOT_FOUND");
   });
 });
+
+describe("admin list query validation", () => {
+  it.each([
+    ["users", "/api/v1/admin/users"],
+    ["trips", "/api/v1/admin/trips"],
+    ["bookings", "/api/v1/admin/bookings"],
+    ["reviews", "/api/v1/admin/reviews"],
+  ])("rejects unknown, repeated, malformed, and out-of-range queries for %s", async (_name, path) => {
+    const cookie = await loginAndGetCookie();
+    const queries = [
+      "?unexpected=value",
+      "?page=1&page=2",
+      "?page=not-a-number",
+      "?page=10001",
+    ];
+
+    for (const query of queries) {
+      const res = await adminRequest("GET", `${path}${query}`, cookie);
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("PATCH /admin/trips/:id/cancel — booking cascade", () => {
+  it("cancels active bookings and zeroes seatsAvailable (full lifecycle)", async () => {
+    // Arrange: активная поездка с pending + confirmed бронями.
+    const cookie = await loginAndGetCookie();
+    const driverId = await createUser("CascadeDriver");
+    const passenger1 = await createUser("CascadeP1");
+    const passenger2 = await createUser("CascadeP2");
+    const tripId = await createTrip(driverId, { seatsAvailable: 1 });
+    const pendingId = await createBooking(tripId, passenger1, 1, "pending");
+    const confirmedId = await createBooking(tripId, passenger2, 2, "confirmed");
+
+    // Act
+    const res = await adminRequest(
+      "PATCH",
+      `/api/v1/admin/trips/${tripId}/cancel`,
+      cookie
+    );
+
+    // Assert: брони отменены с аудитом, места обнулены.
+    expect(res.status).toBe(200);
+    const dbTrip = await db.trip.findUnique({ where: { id: tripId } });
+    expect(dbTrip?.status).toBe("cancelled");
+    expect(dbTrip?.seatsAvailable).toBe(0);
+    const pending = await db.booking.findUnique({ where: { id: pendingId } });
+    expect(pending?.status).toBe("cancelled");
+    expect(pending?.cancelledByType).toBe("admin");
+    const confirmed = await db.booking.findUnique({ where: { id: confirmedId } });
+    expect(confirmed?.status).toBe("cancelled");
+    expect(confirmed?.cancelledByType).toBe("admin");
+  });
+});
+
+describe("PATCH /admin/bookings/:id/status — reactivation lifecycle guard", () => {
+  it("reactivation on a cancelled trip → 409 TRIP_NOT_ACTIVE, booking unchanged", async () => {
+    // Arrange: неактивная бронь на отменённой поездке.
+    const cookie = await loginAndGetCookie();
+    const driverId = await createUser("GhostDriver");
+    const passengerId = await createUser("GhostPassenger");
+    const tripId = await createTrip(driverId, {
+      status: "cancelled",
+      seatsAvailable: 3,
+    });
+    const bookingId = await createBooking(tripId, passengerId, 1, "cancelled");
+
+    // Act
+    const res = await adminRequest(
+      "PATCH",
+      `/api/v1/admin/bookings/${bookingId}/status`,
+      cookie,
+      { status: "confirmed" }
+    );
+
+    // Assert
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("TRIP_NOT_ACTIVE");
+    const dbBooking = await db.booking.findUnique({ where: { id: bookingId } });
+    expect(dbBooking?.status).toBe("cancelled");
+    const dbTrip = await db.trip.findUnique({ where: { id: tripId } });
+    expect(dbTrip?.seatsAvailable).toBe(3);
+  });
+
+  it("reactivation on a departed trip → 409 CONFLICT, seat not taken", async () => {
+    // Arrange: активная поездка, но отправление уже прошло.
+    const cookie = await loginAndGetCookie();
+    const driverId = await createUser("DepartedDriver");
+    const passengerId = await createUser("DepartedPassenger");
+    const trip = await db.trip.create({
+      data: {
+        driverId,
+        fromCity: "Москва",
+        fromAddress: "м. Тёплый Стан",
+        toCity: "Тула",
+        toAddress: "пр-т Ленина",
+        departureAt: new Date(Date.now() - 3600_000),
+        durationMinutes: 120,
+        distanceKm: 180,
+        price: 700,
+        seatsTotal: 3,
+        seatsAvailable: 3,
+        tags: [],
+      },
+    });
+    createdTripIds.push(trip.id);
+    const bookingId = await createBooking(trip.id, passengerId, 1, "declined");
+
+    // Act
+    const res = await adminRequest(
+      "PATCH",
+      `/api/v1/admin/bookings/${bookingId}/status`,
+      cookie,
+      { status: "confirmed" }
+    );
+
+    // Assert
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("CONFLICT");
+    const dbBooking = await db.booking.findUnique({ where: { id: bookingId } });
+    expect(dbBooking?.status).toBe("declined");
+    const dbTrip = await db.trip.findUnique({ where: { id: trip.id } });
+    expect(dbTrip?.seatsAvailable).toBe(3);
+  });
+});
+
+describe("PATCH /admin/reviews/:id/approve|reject — concurrency", () => {
+  it("concurrent approve and reject: exactly one wins, loser gets 409, rating stays consistent", async () => {
+    // Arrange
+    const cookie = await loginAndGetCookie();
+    const targetUserId = await createUser("RaceTarget");
+    const authorId = await createUser("RaceAuthor");
+    const reviewId = await createReview(authorId, targetUserId, 5, "pending");
+
+    // Act: оба решения летят одновременно на один pending-отзыв.
+    const [approveRes, rejectRes] = await Promise.all([
+      adminRequest("PATCH", `/api/v1/admin/reviews/${reviewId}/approve`, cookie),
+      adminRequest("PATCH", `/api/v1/admin/reviews/${reviewId}/reject`, cookie),
+    ]);
+
+    // Assert: ровно один 200; проигравший — 409 CONFLICT, без третьего
+    // статуса (частичных изменений нет).
+    const statuses = [approveRes.status, rejectRes.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const review = await db.review.findUnique({ where: { id: reviewId } });
+    expect(review).not.toBeNull();
+    expect(["published", "rejected"]).toContain(review?.status);
+
+    // Если победил approve — рейтинг пересчитан и учитывает отзыв;
+    // если reject — отзыв в рейтинг не входит (агрегат 0).
+    const target = await db.user.findUnique({ where: { id: targetUserId } });
+    if (review?.status === "published") {
+      expect(target?.rating).toBe(5);
+      expect(target?.reviewsCount).toBe(1);
+    } else {
+      expect(target?.reviewsCount).toBe(0);
+    }
+  });
+
+  it("sequential approve then reject: second transition blocked (409)", async () => {
+    // Arrange
+    const cookie = await loginAndGetCookie();
+    const targetUserId = await createUser("SeqTarget");
+    const authorId = await createUser("SeqAuthor");
+    const reviewId = await createReview(authorId, targetUserId, 4, "pending");
+
+    // Act
+    const approve = await adminRequest(
+      "PATCH",
+      `/api/v1/admin/reviews/${reviewId}/approve`,
+      cookie
+    );
+    const reject = await adminRequest(
+      "PATCH",
+      `/api/v1/admin/reviews/${reviewId}/reject`,
+      cookie
+    );
+
+    // Assert: published не перезаписывается на rejected, рейтинг остаётся
+    // согласованным с финальным статусом.
+    expect(approve.status).toBe(200);
+    expect(reject.status).toBe(409);
+    const review = await db.review.findUnique({ where: { id: reviewId } });
+    expect(review?.status).toBe("published");
+    const target = await db.user.findUnique({ where: { id: targetUserId } });
+    expect(target?.rating).toBe(4);
+    expect(target?.reviewsCount).toBe(1);
+  });
+});

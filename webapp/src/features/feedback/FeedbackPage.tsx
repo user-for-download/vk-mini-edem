@@ -53,8 +53,8 @@ export function FeedbackPage() {
   const feedbackQuery = useFeedbackQuery({ page, pageSize: PAGE_SIZE });
 
   return (
-    <section className="grid gap-4">
-      <h1 className="text-2xl font-semibold">Обратная связь</h1>
+    <section className="grid gap-4" aria-labelledby="feedback-page-title">
+      <h1 id="feedback-page-title" className="text-2xl font-semibold">Обратная связь</h1>
       {feedbackQuery.isPending && <FeedbackLoading />}
       {feedbackQuery.isError && (
         <FeedbackError
@@ -310,7 +310,9 @@ function FeedbackDetailForm({
             <h3 className="mb-1 text-sm font-medium text-muted-foreground">
               {feedback.reply ? "Изменить ответ" : "Ответ поддержки"}
             </h3>
+            <label htmlFor="feedback-reply" className="sr-only">Ответ поддержки</label>
             <Textarea
+              id="feedback-reply"
               value={draft}
               onChange={(e) => {
                 setDraft(e.target.value);
@@ -319,6 +321,8 @@ function FeedbackDetailForm({
               placeholder="Напишите ответ пользователю…"
               rows={6}
               maxLength={FEEDBACK_REPLY_MAX_LENGTH}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? "feedback-reply-error" : undefined}
             />
             <p
               className="mt-1 text-right text-xs text-muted-foreground"
@@ -330,7 +334,7 @@ function FeedbackDetailForm({
         )}
 
         {error && (
-          <Alert variant="destructive">
+          <Alert id="feedback-reply-error" variant="destructive">
             <AlertCircle />
             <AlertTitle>Не удалось отправить ответ</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -367,8 +371,8 @@ function FeedbackPagination({
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-muted-foreground">
+    <nav className="flex flex-wrap items-center justify-between gap-2" aria-label="Навигация по страницам обращений">
+      <p className="text-sm text-muted-foreground" aria-live="polite">
         стр. {data.page} из {totalPages} · всего обращений: {data.total}
       </p>
       <div className="flex gap-2">
@@ -389,7 +393,7 @@ function FeedbackPagination({
           Вперёд
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }
 

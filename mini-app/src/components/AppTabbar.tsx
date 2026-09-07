@@ -27,7 +27,7 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
     : 0;
 
   return (
-    <Tabbar>
+    <Tabbar aria-label="Основная навигация">
       <TabbarItem
         selected={activeView === VIEW_HOME}
         onClick={() => routeNavigator.push("/")}
@@ -43,10 +43,10 @@ export const AppTabbar: FC<AppTabbarProps> = ({ activeView, role }) => {
         }
         aria-label={role === "driver" ? "Поездки" : "Поиск"}
         label={role === "driver" ? "Поездки" : "Поиск"}
-        indicator={
+            indicator={
           role === "driver" && totalPending > 0 ? (
             <Counter size="s" mode="primary">
-              {totalPending}
+              <span aria-label={`${totalPending} ожидающих заявок`}>{totalPending}</span>
             </Counter>
           ) : undefined
         }

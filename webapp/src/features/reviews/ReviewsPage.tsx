@@ -142,10 +142,10 @@ export function ReviewsPage() {
   };
 
   return (
-    <section className="grid gap-4">
+    <section className="grid gap-4" aria-labelledby="reviews-page-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Отзывы</h1>
+            <h1 id="reviews-page-title" className="text-2xl font-semibold">Отзывы</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Модерация отзывов: одобрение, отклонение и фильтр по статусу.
           </p>
@@ -369,8 +369,8 @@ function ReviewsPagination({
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-muted-foreground">
+    <nav className="flex flex-wrap items-center justify-between gap-2" aria-label="Навигация по страницам отзывов">
+      <p className="text-sm text-muted-foreground" aria-live="polite">
         стр. {data.page} из {totalPages} · всего отзывов: {data.total}
       </p>
       <div className="flex gap-2">
@@ -391,7 +391,7 @@ function ReviewsPagination({
           Вперёд
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }
 

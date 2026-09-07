@@ -1,9 +1,14 @@
 import { apiDelete, apiGet, apiPatch } from "@/lib/api-client";
-import type {
-  AdminPaginatedReviews,
-  AdminReviewDto,
-  ReviewStatusValue,
+import {
+  adminPaginatedReviewsSchema,
+  adminReviewDtoSchema,
+  type AdminPaginatedReviews,
+  type AdminReviewDto,
+  type ReviewStatusValue,
 } from "@edem/contracts";
+import { z } from "zod";
+
+const deleteReviewResponseSchema = z.object({ ok: z.boolean(), id: z.string() }).strict();
 
 export interface FetchReviewsParams {
   status?: ReviewStatusValue;
@@ -24,14 +29,14 @@ export function fetchReviews(
   }
   search.set("page", String(params.page));
   search.set("pageSize", String(params.pageSize));
-  return apiGet(`/reviews?${search.toString()}`);
+  return apiGet(`/reviews?${search.toString()}`, adminPaginatedReviewsSchema);
 }
 
 /**
  * DELETE /api/v1/admin/reviews/:id — безвозвратное удаление отзыва.
  */
 export function deleteReview(id: string): Promise<{ ok: boolean; id: string }> {
-  return apiDelete(`/reviews/${id}`);
+  return apiDelete(`/reviews/${encodeURIComponent(id)}`, deleteReviewResponseSchema);
 }
 
 /**
@@ -40,7 +45,7 @@ export function deleteReview(id: string): Promise<{ ok: boolean; id: string }> {
  * 409 CONFLICT, если отзыв уже не в статусе pending.
  */
 export function approveReview(id: string): Promise<AdminReviewDto> {
-  return apiPatch(`/reviews/${id}/approve`);
+  return apiPatch(`/reviews/${encodeURIComponent(id)}/approve`, undefined, adminReviewDtoSchema);
 }
 
 /**
@@ -49,5 +54,5 @@ export function approveReview(id: string): Promise<AdminReviewDto> {
  * 409 CONFLICT, если отзыв уже не в статусе pending.
  */
 export function rejectReview(id: string): Promise<AdminReviewDto> {
-  return apiPatch(`/reviews/${id}/reject`);
+  return apiPatch(`/reviews/${encodeURIComponent(id)}/reject`, undefined, adminReviewDtoSchema);
 }

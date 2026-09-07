@@ -16,36 +16,39 @@ export class ApiError extends Error {
   }
 }
 
-export function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  return request<T>(path, "GET", undefined, signal);
+export function apiGet<T>(path: string, schema: ZodType<T>, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, "GET", undefined, schema, signal);
 }
 
 export function apiPost<T>(
   path: string,
   body?: unknown,
+  schema?: ZodType<T>,
   signal?: AbortSignal
 ): Promise<T> {
-  return request<T>(path, "POST", body, signal);
+  return request<T>(path, "POST", body, schema, signal);
 }
 
 export function apiPatch<T>(
   path: string,
   body?: unknown,
+  schema?: ZodType<T>,
   signal?: AbortSignal
 ): Promise<T> {
-  return request<T>(path, "PATCH", body, signal);
+  return request<T>(path, "PATCH", body, schema, signal);
 }
 
 export function apiPut<T>(
   path: string,
   body?: unknown,
+  schema?: ZodType<T>,
   signal?: AbortSignal
 ): Promise<T> {
-  return request<T>(path, "PUT", body, signal);
+  return request<T>(path, "PUT", body, schema, signal);
 }
 
-export function apiDelete<T>(path: string, signal?: AbortSignal): Promise<T> {
-  return request<T>(path, "DELETE", undefined, signal);
+export function apiDelete<T>(path: string, schema: ZodType<T>, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, "DELETE", undefined, schema, signal);
 }
 
 /**
@@ -60,6 +63,7 @@ async function request<T>(
   path: string,
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   body: unknown,
+  schema: ZodType<T> | undefined,
   signal?: AbortSignal
 ): Promise<T> {
   const headers = new Headers();
@@ -81,7 +85,7 @@ async function request<T>(
     throw await toApiError(response);
   }
 
-  return parseJson<T>(response);
+  return parseJson(response, schema);
 }
 
 function redirectToLogin(): void {
@@ -93,12 +97,24 @@ function redirectToLogin(): void {
 /**
  * Парсинг JSON-тела. Пустое тело (204 No Content) считаем undefined.
  */
-async function parseJson<T>(response: Response): Promise<T> {
+async function parseJson<T>(response: Response, schema?: ZodType<T>): Promise<T> {
   const text = await response.text();
   if (text === "") {
-    return undefined as T;
+    if (schema === undefined) return undefined as T;
+    throw new ApiError(response.status, "INVALID_RESPONSE", "Ответ сервера пуст");
   }
-  return JSON.parse(text) as T;
+  let data: unknown;
+  try {
+    data = JSON.parse(text) as unknown;
+  } catch {
+    throw new ApiError(response.status, "INVALID_RESPONSE", "Ответ сервера содержит некорректный JSON");
+  }
+  if (schema === undefined) return data as T;
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw new ApiError(502, "INVALID_RESPONSE", "Ответ сервера не соответствует контракту");
+  }
+  return parsed.data;
 }
 
 /**
@@ -118,15 +134,17 @@ async function toApiError(response: Response): Promise<ApiError> {
     return fallback;
   }
 
-  const record = body as { code?: unknown; message?: unknown };
+  const record = z.object({ code: z.unknown().optional(), message: z.unknown().optional() }).safeParse(body);
+  if (!record.success) return fallback;
   const message =
-    typeof record.message === "string" && record.message !== ""
-      ? record.message
+    typeof record.data.message === "string" && record.data.message !== ""
+      ? record.data.message
       : fallback.message;
   const code =
-    typeof record.code === "string" && record.code !== ""
-      ? record.code
+    typeof record.data.code === "string" && record.data.code !== ""
+      ? record.data.code
       : fallback.code;
 
   return new ApiError(response.status, code, message);
 }
+import { z, type ZodType } from "zod";

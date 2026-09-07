@@ -50,6 +50,19 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 type StatusFilterValue = BookingStatus | "all";
 
+/**
+ * Radix Select возвращает строку — проверяем её рантайм-гвардом, а не
+ * слепым cast (audit: unchecked cast на границе компонента). Неизвестное
+ * значение игнорируется: фильтр не переводится в невалидный статус.
+ */
+function isBookingStatus(value: string): value is BookingStatus {
+  return (ALL_STATUSES as readonly string[]).includes(value);
+}
+
+function isStatusFilterValue(value: string): value is StatusFilterValue {
+  return value === "all" || isBookingStatus(value);
+}
+
 export function BookingsPage() {
   const [status, setStatus] = useState<StatusFilterValue>("all");
   const [page, setPage] = useState(1);
@@ -112,7 +125,10 @@ function StatusFilter({
   return (
     <Select
       value={value}
-      onValueChange={(next) => onChange(next as StatusFilterValue)}
+      onValueChange={(next) => {
+        if (!isStatusFilterValue(next)) return;
+        onChange(next);
+      }}
     >
       <SelectTrigger aria-label="Фильтр по статусу" className="w-44">
         <SelectValue placeholder="Все" />
@@ -166,9 +182,9 @@ function BookingRow({ booking }: { booking: AdminBookingDto }) {
   );
 
   const handleSelectChange = (value: string) => {
-    const next = value as BookingStatus;
-    if (next === booking.status) return;
-    setPendingStatus(next);
+    if (!isBookingStatus(value)) return;
+    if (value === booking.status) return;
+    setPendingStatus(value);
   };
 
   const handleCancel = () => {

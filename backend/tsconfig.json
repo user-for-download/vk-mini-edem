@@ -18,5 +18,12 @@
     "noEmit": false,
     "outDir": "./dist"
   },
-  "include": ["src/**/*", "prisma/**/*"]
+  "include": [
+    "src/**/*",
+    "prisma/**/*",
+    // Keep the regression fixture in the backend typecheck without making
+    // the database-backed integration suite part of the production build.
+    "tests/dev-mock-auth.ts",
+    "tests/integration/auth-concurrent-launch.test.ts"
+  ]
 }

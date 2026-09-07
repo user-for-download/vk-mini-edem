@@ -121,13 +121,13 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   if (status === "idle" || status === "initializing") {
-    return <ScreenSpinner />;
+    return <ScreenSpinner aria-label="Проверка авторизации" />;
   }
 
   if (status === "banned") {
     return (
       <View activePanel="auth-banned">
-        <Panel id="auth-banned">
+        <Panel id="auth-banned" aria-labelledby="auth-banned-title">
           <PanelHeader>Вход</PanelHeader>
           <Placeholder
             icon={<Icon56LockOutline />}
@@ -148,7 +148,7 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
   if (status === "error" || status === "unauthenticated") {
     return (
       <View activePanel="auth-error">
-        <Panel id="auth-error">
+        <Panel id="auth-error" aria-labelledby="auth-error-title">
           <PanelHeader>Вход</PanelHeader>
           <Placeholder
             icon={<Icon56ErrorOutline />}

@@ -27,8 +27,12 @@ async function ensureCity(name: string): Promise<string> {
   return created.id;
 }
 
+// Детерминированный vkUserId (audit: test isolation): монотонный счётчик
+// вместо Math.random — ретраи/повторные прогоны дают предсказуемые id.
+let vkSeq = 8_000_000;
+
 async function createUserWithCar(name: string): Promise<string> {
-  const seq = Math.floor(Math.random() * 1_000_000) + 8_000_000;
+  const seq = ++vkSeq;
   const user = await db.user.create({
     data: {
       name: `${name}-${seq}`,

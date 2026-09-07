@@ -17,7 +17,8 @@
     "db:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "db:test:migrate": "dotenv -e .env.test -- prisma migrate deploy",
-    "test": "dotenv -e .env.test -- vitest run"
+    "test": "dotenv -e .env.test -- vitest run",
+    "test:coverage": "dotenv -e .env.test -- vitest run --coverage"
   },
   "dependencies": {
     "@edem/contracts": "*",

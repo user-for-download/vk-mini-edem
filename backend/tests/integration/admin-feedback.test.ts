@@ -169,4 +169,14 @@ describe("GET /api/v1/admin/feedback", () => {
     const res = await getFeedback("?page=0", adminCookie);
     expect(res.status).toBe(400);
   });
+
+  it.each([
+    ["unknown parameter", "?unexpected=value"],
+    ["repeated parameter", "?page=1&page=2"],
+    ["malformed page", "?page=not-a-number"],
+    ["page above the contract limit", "?page=10001"],
+  ])("rejects %s -> 400", async (_case, query) => {
+    const res = await getFeedback(query, adminCookie);
+    expect(res.status).toBe(400);
+  });
 });

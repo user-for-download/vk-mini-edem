@@ -201,6 +201,7 @@ async function seedCities(): Promise<void> {
 
     await prisma.city.create({
       data: {
+        id: `city-${nameNormalized.replace(/[^a-z0-9а-яё]+/gi, "-")}`,
         name: trimmed,
         nameNormalized,
       },
@@ -513,6 +514,15 @@ const users: SeedUser[] = [
 // Поездки + брони
 // ─────────────────────────────────────────────────────────────
 const dayMs = 24 * 60 * 60 * 1000;
+// Anchor generated dates to the UTC day so repeated runs on the same day
+// produce identical logical timestamps while active fixtures remain future.
+const now = new Date();
+const seedNow = new Date(
+  Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+);
+
+const bookingId = (tripId: string, passengerId: string, seat: number): string =>
+  `booking-${tripId}-${passengerId}-${seat}`;
 
 const trips: SeedTrip[] = [
   // ── Прошлые (completed) ──
@@ -1596,6 +1606,12 @@ function validateSeedData(): void {
         activePassengers.add(booking.passengerId);
       }
     }
+    const reservedSeats = trip.bookings.filter(
+      (booking) => booking.status === "pending" || booking.status === "confirmed",
+    ).length;
+    if (reservedSeats > trip.seatsTotal) {
+      throw new Error(`Too many active bookings in ${trip.id}`);
+    }
   }
 
   for (const review of reviews) {
@@ -1730,6 +1746,16 @@ function validateSeedData(): void {
     }
   }
 
+  for (const city of SEED_CITIES) {
+    const normalized = normalizeCityName(city);
+    const occurrences = SEED_CITIES.filter(
+      (candidate) => normalizeCityName(candidate) === normalized,
+    ).length;
+    if (occurrences !== 1) {
+      throw new Error(`Duplicate seed city ${normalized}`);
+    }
+  }
+
   // Удалённый пользователь нигде не должен участвовать (auth его не пустит).
   for (const id of referencedUsers) {
     if (deletedUsers.has(id)) {
@@ -1775,16 +1801,16 @@ async function main() {
         tripsCount: u.tripsCount,
         isVerified: u.isVerified,
         notificationsEnabled: u.notificationsEnabled ?? true,
-        verifiedAt: u.isVerified ? new Date(Date.now() - 60 * dayMs) : null,
+        verifiedAt: u.isVerified ? new Date(seedNow.getTime() - 60 * dayMs) : null,
         about: u.about,
         bannedAt:
           u.bannedAtDaysAgo !== undefined
-            ? new Date(Date.now() - u.bannedAtDaysAgo * dayMs)
+            ? new Date(seedNow.getTime() - u.bannedAtDaysAgo * dayMs)
             : null,
         banReason: u.banReason ?? null,
         deletedAt:
           u.deletedAtDaysAgo !== undefined
-            ? new Date(Date.now() - u.deletedAtDaysAgo * dayMs)
+            ? new Date(seedNow.getTime() - u.deletedAtDaysAgo * dayMs)
             : null,
         onboardingVersion: u.onboardingVersion ?? null,
         ...(u.car
@@ -1811,9 +1837,6 @@ async function main() {
     return id;
   };
   for (const t of trips) {
-    const confirmedCount = t.bookings.filter(
-      (b) => b.status === "confirmed",
-    ).length;
     await prisma.trip.create({
       data: {
         id: t.id,
@@ -1824,25 +1847,30 @@ async function main() {
         toAddress: t.toAddress,
         fromCityId: cityId(t.fromCity),
         toCityId: cityId(t.toCity),
-        departureAt: new Date(Date.now() + t.daysFromNow * dayMs),
+        departureAt: new Date(seedNow.getTime() + t.daysFromNow * dayMs),
         durationMinutes: t.durationMinutes,
         distanceKm: t.distanceKm,
         price: t.price,
         seatsTotal: t.seatsTotal,
+        // Pending and confirmed bookings both reserve capacity.
         seatsAvailable:
           t.status === "active"
-            ? Math.max(0, t.seatsTotal - confirmedCount)
+            ? t.seatsTotal -
+              t.bookings.filter(
+                (b) => b.status === "pending" || b.status === "confirmed",
+              ).length
             : 0,
         status: t.status,
         tags: t.tags,
         comment: t.comment,
         bookings: {
           create: t.bookings.map((b) => ({
+            id: bookingId(t.id, b.passengerId, b.seat),
             passengerId: b.passengerId,
             seat: b.seat,
             status: b.status,
             comment: b.comment,
-            cancelledAt: b.status === "cancelled" ? new Date() : null,
+            cancelledAt: b.status === "cancelled" ? seedNow : null,
             cancelledByType:
               b.status === "cancelled" ? (b.cancelledByType ?? "passenger") : null,
             cancelledByUserId:
@@ -1864,11 +1892,13 @@ async function main() {
   // Считаем по снимкам fromCity/toCity (источник правды), а не по FK.
   const liveTrips = trips.filter((t) => t.status !== "cancelled");
   for (const city of cityRows) {
-    const count = liveTrips.filter(
-      (t) =>
-        normalizeCityName(t.fromCity) === city.nameNormalized ||
-        normalizeCityName(t.toCity) === city.nameNormalized,
-    ).length;
+    const count = liveTrips.reduce(
+      (total, trip) =>
+        total +
+        (normalizeCityName(trip.fromCity) === city.nameNormalized ? 1 : 0) +
+        (normalizeCityName(trip.toCity) === city.nameNormalized ? 1 : 0),
+      0,
+    );
     await prisma.city.update({ where: { id: city.id }, data: { tripsCount: count } });
   }
 
@@ -1982,7 +2012,7 @@ async function main() {
       subject: "Вопрос про оплату",
       text: "Оплата водителю наличными или переводом? В приложении кнопки оплаты не нашёл.",
       reply: "Оплата происходит напрямую водителю при встрече — наличными или переводом по договорённости.",
-      repliedAt: new Date(Date.now() - 2 * dayMs),
+      repliedAt: new Date(seedNow.getTime() - 2 * dayMs),
     },
     {
       userId: "u-18",
@@ -1994,7 +2024,7 @@ async function main() {
       subject: "Апелляция: отклонённый отзыв",
       text: "Мой отзыв о поездке отклонили, но я не нарушала правила. Пересмотрите, пожалуйста.",
       reply: "Проверили: в тексте был номер телефона. Уберите контакты и отправьте отзыв заново.",
-      repliedAt: new Date(Date.now() - 5 * dayMs),
+      repliedAt: new Date(seedNow.getTime() - 5 * dayMs),
     },
     {
       userId: "u-22",
@@ -2014,11 +2044,11 @@ async function main() {
         userId: rr.userId,
         fromCityId: cityId(rr.fromCity),
         toCityId: cityId(rr.toCity),
-        earliestAt: new Date(Date.now() + rr.daysFromNowEarliest * dayMs),
-        latestAt: new Date(Date.now() + rr.daysFromNowLatest * dayMs),
+        earliestAt: new Date(seedNow.getTime() + rr.daysFromNowEarliest * dayMs),
+        latestAt: new Date(seedNow.getTime() + rr.daysFromNowLatest * dayMs),
         seats: rr.seats ?? 1,
         status: rr.status ?? "active",
-        expiresAt: new Date(Date.now() + (rr.expiresInDays ?? 7) * dayMs),
+        expiresAt: new Date(seedNow.getTime() + (rr.expiresInDays ?? 7) * dayMs),
       },
     });
   }
@@ -2054,7 +2084,7 @@ async function main() {
         resolutionNote: r.resolutionNote ?? null,
         adminActorId: r.adminActorId ?? null,
         adminActorType: r.adminActorId ? "admin" : null,
-        resolvedAt: terminal ? new Date() : null,
+        resolvedAt: terminal ? seedNow : null,
       },
     });
   }

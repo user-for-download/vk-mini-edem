@@ -108,9 +108,11 @@ export const HomePanel: FC<HomePanelProps> = ({
 
   // Бэкенд сортирует GET /trips/my по departureAt: desc,
   // поэтому сортируем на клиенте по возрастанию — ближайшая поездка первой.
+  // filter() возвращает НОВУЮ копию — последующий sort in-place не мутирует
+  // данные из кэша React Query (audit: явная иммутабельность сортировок).
+  const ownActiveTrips = myTrips.filter((trip) => trip.status === "active");
   const activeOwnTrip =
-    myTrips
-      .filter((trip) => trip.status === "active")
+    ownActiveTrips
       .sort((a, b) => {
         const aTime = a.departureAt ? Date.parse(a.departureAt) : 0;
         const bTime = b.departureAt ? Date.parse(b.departureAt) : 0;
@@ -118,9 +120,10 @@ export const HomePanel: FC<HomePanelProps> = ({
       })[0] ?? null;
 
   // Ближайшая активная бронь пассажира (scope: "active" с бэкенда).
+  // Аналогично: filter-копия перед sort — кэш запроса не мутируется.
+  const activeBookings = (myBookings ?? []).filter((b) => b.scope === "active");
   const nextActiveBooking =
-    (myBookings ?? [])
-      .filter((b) => b.scope === "active")
+    activeBookings
       .sort((a, b) => {
         const aTime = a.trip.departureAt ? Date.parse(a.trip.departureAt) : 0;
         const bTime = b.trip.departureAt ? Date.parse(b.trip.departureAt) : 0;

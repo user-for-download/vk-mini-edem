@@ -40,10 +40,31 @@ async function main() {
     expect(rideRequest.status === "active", "ride request is not active");
     const matching = await context.get(`ride-requests/matching?fromCityId=${from.id}&toCityId=${to.id}&earliestAt=2030-01-01T10:00:00.000Z&latestAt=2030-01-01T11:00:00.000Z`, { headers: auth("driver") });
     expect(matching.ok(), "matching request failed");
+    // Ассерт ПОВЕДЕНИЯ, а не транспорта (audit: matching.ok() пропускал
+    // пустой/нерелевантный ответ 200): созданная заявка обязана быть
+    // видна водителю в выдаче matching.
+    const matchingBody = await matching.json();
+    const matchingItems = Array.isArray(matchingBody?.items) ? matchingBody.items : [];
+    const visible = matchingItems.some(
+      (item) => item && item.id === createdRequestId,
+    );
+    expect(
+      visible,
+      `created ride request ${createdRequestId} is not present in driver matching results`,
+    );
     const pause = await context.patch(`ride-requests/${createdRequestId}/status`, { headers: { ...auth("passenger"), "Content-Type": "application/json" }, data: { status: "paused" } });
     expect(pause.status() === 200, `pause request failed: ${pause.status()}`);
     expect((await pause.json()).status === "paused", "ride request was not paused");
-    console.log("PASS | RideRequest create, matching and pause flow");
+    // После паузы заявка исчезает из matching водителя (негативный ассерт).
+    const pausedMatching = await context.get(`ride-requests/matching?fromCityId=${from.id}&toCityId=${to.id}&earliestAt=2030-01-01T10:00:00.000Z&latestAt=2030-01-01T11:00:00.000Z`, { headers: auth("driver") });
+    expect(pausedMatching.ok(), "paused matching request failed");
+    const pausedBody = await pausedMatching.json();
+    const pausedItems = Array.isArray(pausedBody?.items) ? pausedBody.items : [];
+    expect(
+      !pausedItems.some((item) => item && item.id === createdRequestId),
+      "paused ride request is still visible in driver matching results",
+    );
+    console.log("PASS | RideRequest create, matching, pause, and matching exclusion flow");
   } finally {
     if (createdRequestId) {
       const cleanup = await context.delete(`ride-requests/${createdRequestId}`, { headers: auth("passenger") });

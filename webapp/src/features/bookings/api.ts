@@ -1,4 +1,9 @@
 import { apiGet, apiPatch } from "@/lib/api-client";
+import {
+  adminBookingDtoSchema,
+  adminPaginatedBookingsSchema,
+  type BookingStatus,
+} from "@edem/contracts";
 import type {
   AdminBookingDto,
   AdminBookingStatusBody,
@@ -6,7 +11,7 @@ import type {
 } from "@edem/contracts";
 
 export interface FetchBookingsParams {
-  status?: "pending" | "confirmed" | "declined" | "cancelled";
+  status?: BookingStatus;
   page: number;
   pageSize: number;
 }
@@ -20,12 +25,16 @@ export function fetchBookings(
   }
   qs.set("page", String(params.page));
   qs.set("pageSize", String(params.pageSize));
-  return apiGet<AdminPaginatedBookings>("/bookings?" + qs);
+  return apiGet("/bookings?" + qs, adminPaginatedBookingsSchema);
 }
 
 export function updateBookingStatus(
   id: string,
   body: AdminBookingStatusBody
 ): Promise<AdminBookingDto> {
-  return apiPatch<AdminBookingDto>(`/bookings/${id}/status`, body);
+  return apiPatch(
+    `/bookings/${encodeURIComponent(id)}/status`,
+    body,
+    adminBookingDtoSchema,
+  );
 }

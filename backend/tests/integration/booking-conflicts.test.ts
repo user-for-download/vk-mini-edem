@@ -29,6 +29,24 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
 
   beforeAll(async () => {
     await db.$executeRawUnsafe(`
+      ALTER TABLE "Trip"
+        DROP CONSTRAINT IF EXISTS "Trip_seatsTotal_range",
+        DROP CONSTRAINT IF EXISTS "Trip_seatsAvailable_nonnegative",
+        DROP CONSTRAINT IF EXISTS "Trip_price_positive"
+    `);
+    await db.$executeRawUnsafe(`
+      ALTER TABLE "Booking" DROP CONSTRAINT IF EXISTS "Booking_seat_positive"
+    `);
+    await db.$executeRawUnsafe(`
+      ALTER TABLE "Trip"
+        ADD CONSTRAINT "Trip_seatsTotal_range" CHECK ("seatsTotal" >= 1 AND "seatsTotal" <= 3),
+        ADD CONSTRAINT "Trip_seatsAvailable_nonnegative" CHECK ("seatsAvailable" >= 0),
+        ADD CONSTRAINT "Trip_price_positive" CHECK ("price" > 0)
+    `);
+    await db.$executeRawUnsafe(`
+      ALTER TABLE "Booking" ADD CONSTRAINT "Booking_seat_positive" CHECK ("seat" >= 1)
+    `);
+    await db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "active_seat_booking"
         ON "Booking"("tripId", "seat")
         WHERE "status" IN ('pending', 'confirmed')
@@ -68,7 +86,7 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
         distanceKm: 700,
         price: 2000,
         seatsTotal: 3,
-        seatsAvailable: 4,
+        seatsAvailable: 3,
         tags: [],
       },
     });
@@ -81,10 +99,23 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
     await db.user.deleteMany({ where: { id: { in: [driverId, passenger1Id, passenger2Id] } } });
   });
 
+  /**
+   * Ответ POST /bookings — объединение форм успеха и конфликта:
+   * успех → DTO брони (id/seat/status), 409 → { code, message }.
+   * Явная форма вместо `any` (audit: type safety in tests).
+   */
+  type BookingResponse = {
+    id?: string;
+    seat?: number;
+    status?: string;
+    code?: string;
+    message?: string;
+  };
+
   async function book(
     passengerId: string,
     seat: number
-  ): Promise<{ status: number; body: any }> {
+  ): Promise<{ status: number; body: BookingResponse }> {
     const res = await app.request("/api/v1/bookings", {
       method: "POST",
       headers: {
@@ -93,7 +124,7 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
       },
       body: JSON.stringify({ tripId, seat }),
     });
-    return { status: res.status, body: await res.json() };
+    return { status: res.status, body: (await res.json()) as BookingResponse };
   }
 
   // Отклонение брони водителем через API (полный цикл F15: место
@@ -282,6 +313,37 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
     const own = await book(passenger1Id, 2);
     expect(own.status).toBe(409);
     expect(own.body.code).toBe("ALREADY_BOOKED");
+  });
+
+  it("rejects invalid price, trip seats, and booking seat at the database boundary", async () => {
+    await expect(
+      db.trip.create({
+        data: {
+          driverId,
+          fromCity: "Москва",
+          fromAddress: "Тверская 1",
+          toCity: "СПб",
+          toAddress: "Невский 1",
+          departureAt: new Date("2030-06-01T09:00:00Z"),
+          durationMinutes: 420,
+          distanceKm: 700,
+          price: 0,
+          seatsTotal: 3,
+          seatsAvailable: 3,
+          tags: [],
+        },
+      })
+    ).rejects.toThrow();
+
+    await expect(
+      db.trip.update({ where: { id: tripId }, data: { seatsTotal: 0 } })
+    ).rejects.toThrow();
+
+    await expect(
+      db.booking.create({
+        data: { tripId, passengerId: passenger1Id, seat: 0, status: "pending" },
+      })
+    ).rejects.toThrow();
   });
 
   it("returns 200 idempotent retry on own confirmed booking without duplicating (F15)", async () => {

@@ -53,6 +53,7 @@ function renderOpenModal(): string {
       <ReportModal
         modalProps={{ id: MODAL_ID }}
         close={vi.fn()}
+        update={vi.fn()}
         targetType="trip"
         targetId="trip-1"
       />

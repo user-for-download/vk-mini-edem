@@ -521,7 +521,15 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
           <ChipsSelect
             value={selectedTags.map((tag) => ({ value: tag, label: tag }))}
             onChange={(options) =>
-              setSelectedTags(options.map((option) => option.value as TripTag))
+              setSelectedTags(
+                // Рантайм-гвард вместо cast: ChipsSelect возвращает
+                // произвольные строки (audit: unchecked tag cast).
+                options
+                  .map((option) => option.value)
+                  .filter((value): value is TripTag =>
+                    (TRIP_TAGS as readonly string[]).includes(value),
+                  ),
+              )
             }
             options={TRIP_TAGS.map((tag) => ({ value: tag, label: tag }))}
             placeholder="Можно с животными, багаж..."
