@@ -8,6 +8,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { Alert } from "@vkontakte/vkui";
+import { chainConfirmTask } from "@/helpers/confirmQueue";
 
 interface ConfirmOptions {
   title: string;
@@ -31,29 +32,30 @@ export const useConfirm = (): ConfirmApi => {
 export const ConfirmProvider: FC<PropsWithChildren> = ({ children }) => {
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const resolveRef = useRef<((confirmed: boolean) => void) | null>(null);
-  const isOpenRef = useRef(false);
+  const choiceRef = useRef(false);
+  // Хвост очереди диалогов: следующий confirm открывается только после
+  // полного закрытия предыдущего (onClosed), а не в анимации закрытия.
+  const tailRef = useRef<Promise<void>>(Promise.resolve());
 
   const confirm = useCallback<ConfirmApi>((nextOptions) => {
-    if (isOpenRef.current) {
-      return Promise.resolve(false);
-    }
-
-    isOpenRef.current = true;
-    setOptions(nextOptions);
-
-    return new Promise((resolve) => {
-      resolveRef.current = resolve;
+    const { task, tail } = chainConfirmTask(tailRef.current, () => {
+      choiceRef.current = false;
+      setOptions(nextOptions);
+      return new Promise<boolean>((resolve) => {
+        resolveRef.current = resolve;
+      });
     });
+    tailRef.current = tail;
+    return task;
   }, []);
 
-  const resolve = (confirmed: boolean) => {
-    resolveRef.current?.(confirmed);
-    resolveRef.current = null;
-  };
-
+  // Единственная точка резолва — факт закрытия алерта. Кнопка действия
+  // лишь фиксирует выбор (сам алерт VKUI закрывает автоматически),
+  // поэтому двойной confirm подряд больше не теряет второй диалог.
   const handleClosed = () => {
-    resolve(false);
-    isOpenRef.current = false;
+    resolveRef.current?.(choiceRef.current);
+    resolveRef.current = null;
+    choiceRef.current = false;
     setOptions(null);
   };
 
@@ -71,7 +73,9 @@ export const ConfirmProvider: FC<PropsWithChildren> = ({ children }) => {
             {
               title: options.confirmTitle,
               mode: options.confirmMode ?? "destructive",
-              action: () => resolve(true),
+              action: () => {
+                choiceRef.current = true;
+              },
             },
           ]}
         />

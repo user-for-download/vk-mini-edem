@@ -201,6 +201,7 @@
 
 ### Fixed
 
+- Удаление профиля детерминированно не работало: `ConfirmProvider.confirm` при открытом алерте сразу возвращал `false`, а второй confirm в `handleDeleteAccount` вызывался синхронно — Alert ещё в анимации закрытия (`onClosed` не отработал) — итог всегда `false`, тихий выход без запроса. Провайдер переписан: очередь через `chainConfirmTask` (`helpers/confirmQueue.ts`) + единственная точка резолва по факту закрытия (`onClosed`, выбор фиксируется в action-хендлере). Одиночные confirm'ы (брони, поездки) ведут себя как раньше. Tests: `confirmQueue.test.ts` (3: порядок, блокировка второго, живучесть цепочки).
 - `City.nameNormalized`: добавлен `@unique` в Prisma-схему (SQL-миграция уже создавала уникальный индекс `City_nameNormalized_key`, но атрибут в схеме отсутствовал — `prisma validate`/CI ловил дрейф).
 - e2e `full-cycle.mjs`: навигация по месяцам в календаре, перезагрузка отзывов и селектор push-уведомлений; поток теперь 15 шагов (15-й покрывает блок «Push-уведомления VK» в `/profile/notifications`).
 - Убран мёртвый код `dto.fromCity`/`toCity` из `importantFieldsChanged` в `backend/src/trips` (маршрут в PATCH заблокирован — см. City Picker).
