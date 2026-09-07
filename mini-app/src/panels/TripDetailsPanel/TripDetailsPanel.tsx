@@ -12,6 +12,7 @@ import {
   Header,
   Panel,
   PanelHeaderBack,
+  PanelHeaderButton,
   RichCell,
   ScreenSpinner,
   SegmentedControl,
@@ -24,7 +25,7 @@ import {
   Footnote,
   ContentBadge,
 } from "@vkontakte/vkui";
-import { Icon16Favorite } from "@vkontakte/icons";
+import { Icon16Favorite, Icon28MoreHorizontal } from "@vkontakte/icons";
 import type { Trip } from "@/types";
 import { RouteLine } from "@/components/RouteLine";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
@@ -48,6 +49,7 @@ import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useModalApi } from "@/providers/ModalProvider";
 import { BookingRequestRow } from "@/components/BookingRequestRow";
+import { TripActionsSheet } from "@/panels/TripDetailsPanel/TripActionsSheet";
 import { TripPassengerRow } from "@/components/TripPassengerRow";
 import type { DriverBookingAction } from "@edem/contracts";
 import { useConfirm } from "@/providers/ConfirmProvider";
@@ -88,6 +90,9 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
   const [isCompletingTrip, setIsCompletingTrip] = useState(false);
+  // Kebab-меню опций поездки в шапке (Поделиться / Пожаловаться).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const moreRef = useRef<HTMLElement | null>(null);
 
   // Защита от двойного сабмита: ref синхронен (в отличие от state),
   // поэтому второй клик до ре-рендера не отправит второй запрос.
@@ -478,9 +483,33 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
     <Panel id={id}>
       <AppPanelHeader
         before={<PanelHeaderBack onClick={onBack} />}
+        after={
+          <PanelHeaderButton
+            aria-label="Действия с поездкой"
+            aria-expanded={menuOpen}
+            getRootRef={moreRef}
+            onClick={() => setMenuOpen(true)}
+          >
+            <Icon28MoreHorizontal />
+          </PanelHeaderButton>
+        }
       >
         Детали поездки
       </AppPanelHeader>
+      {menuOpen && (
+        <TripActionsSheet
+          toggleRef={moreRef}
+          onClose={() => setMenuOpen(false)}
+          onShare={() => {
+            setMenuOpen(false);
+            void handleShareTrip();
+          }}
+          onReport={() => {
+            setMenuOpen(false);
+            void handleReportTrip();
+          }}
+        />
+      )}
 
       <Box padding="system">
         <Card mode="outline" // eslint-disable-next-line react/forbid-dom-props
@@ -606,16 +635,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           </Button>
         </Box>
       )}
-
-      <Box padding="system">
-        <Button size="m" mode="secondary" stretched onClick={() => void handleShareTrip()}>
-          Поделиться поездкой
-        </Button>
-        <Spacing size={8} />
-        <Button size="m" mode="tertiary" stretched onClick={() => void handleReportTrip()}>
-          Пожаловаться на поездку
-        </Button>
-      </Box>
 
       {/* Секция заявок видна только когда есть что показывать:
         - есть заявки → «Управление заявками (N)»;
