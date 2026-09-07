@@ -1,5 +1,5 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanel.tsx
-import { type FC, useEffect, useRef, useState } from "react";
+import { type FC, type ReactNode, useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Button,
@@ -90,8 +90,10 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
   const [isCompletingTrip, setIsCompletingTrip] = useState(false);
-  // Kebab-меню опций поездки в шапке (Поделиться / Пожаловаться).
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Kebab-меню опций поездки в шапке (Поделиться / Пожаловаться) —
+  // паттерн из доков ActionSheet: элемент хранится в стейте и рендерится
+  // рядом с кнопкой-якорем, закрытие — через onClose (setActionSheet(null)).
+  const [actionSheet, setActionSheet] = useState<ReactNode | null>(null);
   const moreRef = useRef<HTMLElement | null>(null);
 
   // Защита от двойного сабмита: ref синхронен (в отличие от state),
@@ -262,6 +264,27 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       component: module.ReportModal,
       additionalProps: { targetType: "trip", targetId: trip.id },
     });
+  };
+
+  const handleCloseActions = () => {
+    setActionSheet(null);
+  };
+
+  const handleOpenActions = () => {
+    setActionSheet(
+      <TripActionsSheet
+        toggleRef={moreRef}
+        onClose={handleCloseActions}
+        onShare={() => {
+          handleCloseActions();
+          void handleShareTrip();
+        }}
+        onReport={() => {
+          handleCloseActions();
+          void handleReportTrip();
+        }}
+      />,
+    );
   };
 
   const canBook =
@@ -481,14 +504,15 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   return (
     <Panel id={id}>
+      {actionSheet}
       <AppPanelHeader
         before={<PanelHeaderBack onClick={onBack} />}
         after={
           <PanelHeaderButton
             aria-label="Действия с поездкой"
-            aria-expanded={menuOpen}
+            aria-expanded={actionSheet !== null}
             getRootRef={moreRef}
-            onClick={() => setMenuOpen(true)}
+            onClick={handleOpenActions}
           >
             <Icon28MoreHorizontal />
           </PanelHeaderButton>
@@ -496,20 +520,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       >
         Детали поездки
       </AppPanelHeader>
-      {menuOpen && (
-        <TripActionsSheet
-          toggleRef={moreRef}
-          onClose={() => setMenuOpen(false)}
-          onShare={() => {
-            setMenuOpen(false);
-            void handleShareTrip();
-          }}
-          onReport={() => {
-            setMenuOpen(false);
-            void handleReportTrip();
-          }}
-        />
-      )}
 
       <Box padding="system">
         <Card mode="outline" // eslint-disable-next-line react/forbid-dom-props
