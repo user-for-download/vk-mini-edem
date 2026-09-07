@@ -54,6 +54,7 @@ function isReportCategory(
  * Маппинг ошибок отправки жалобы (зеркалит паттерн бронирования
  * в TripDetailsPanel): 409 CONFLICT — открытая жалоба на этот объект
  * уже существует, 429 RATE_LIMITED — лимит с учётом retryAfterMs,
+ * 403 FORBIDDEN — нет связи с объектом (не участник поездки),
  * остальное — через общий словарь getErrorMessage.
  */
 function reportSubmitError(error: unknown): {
@@ -75,6 +76,16 @@ function reportSubmitError(error: unknown): {
     (error.status === 429 || error.code === "RATE_LIMITED")
   ) {
     return { title: getRateLimitMessage(error.retryAfterMs) };
+  }
+  if (
+    error instanceof ApiError &&
+    (error.status === 403 || error.code === "FORBIDDEN")
+  ) {
+    return {
+      title: "Жалоба недоступна",
+      subtitle:
+        "Жалобы доступны участникам поездки — водителю и пассажирам с бронью.",
+    };
   }
   if (error instanceof ApiError) {
     return {
@@ -183,7 +194,7 @@ export const ReportModal: FC<ReportModalProps> = ({
           disabled={create.isPending || alreadyReported}
           onClick={submit}
         >
-          Отправить жалобу
+          {alreadyReported ? "Жалоба уже отправлена" : "Отправить жалобу"}
         </Button>
       </Box>
       <Spacing size={24} />

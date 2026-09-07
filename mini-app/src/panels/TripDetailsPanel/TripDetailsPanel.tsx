@@ -1,5 +1,5 @@
 // mini-app/src/panels/TripDetailsPanel/TripDetailsPanel.tsx
-import { type FC, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FC, useEffect, useRef, useState } from "react";
 import {
   Avatar,
   Button,
@@ -12,7 +12,6 @@ import {
   Header,
   Panel,
   PanelHeaderBack,
-  PanelHeaderButton,
   RichCell,
   ScreenSpinner,
   SegmentedControl,
@@ -25,7 +24,7 @@ import {
   Footnote,
   ContentBadge,
 } from "@vkontakte/vkui";
-import { Icon16Favorite, Icon28MoreHorizontal } from "@vkontakte/icons";
+import { Icon16Favorite } from "@vkontakte/icons";
 import type { Trip } from "@/types";
 import { RouteLine } from "@/components/RouteLine";
 import { AppPanelHeader } from "@/components/AppPanelHeader";
@@ -45,11 +44,12 @@ import {
   useCompleteTripMutation,
   TRIP_KEYS,
 } from "@/queries/useTripsQuery";
+import { useMyReportsQuery } from "@/queries/useReportsQuery";
 import { ApiError } from "@/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useModalApi } from "@/providers/ModalProvider";
 import { BookingRequestRow } from "@/components/BookingRequestRow";
-import { TripActionsSheet } from "@/panels/TripDetailsPanel/TripActionsSheet";
+import { TripSecondaryActions } from "@/panels/TripDetailsPanel/TripSecondaryActions";
 import { TripPassengerRow } from "@/components/TripPassengerRow";
 import type { DriverBookingAction } from "@edem/contracts";
 import { useConfirm } from "@/providers/ConfirmProvider";
@@ -90,11 +90,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   const [isCancellingBooking, setIsCancellingBooking] = useState(false);
   const [isCancellingTrip, setIsCancellingTrip] = useState(false);
   const [isCompletingTrip, setIsCompletingTrip] = useState(false);
-  // Kebab-меню опций поездки в шапке (Поделиться / Пожаловаться) —
-  // паттерн из доков ActionSheet: элемент хранится в стейте и рендерится
-  // рядом с кнопкой-якорем, закрытие — через onClose (setActionSheet(null)).
-  const [actionSheet, setActionSheet] = useState<ReactNode | null>(null);
-  const moreRef = useRef<HTMLElement | null>(null);
 
   // Защита от двойного сабмита: ref синхронен (в отличие от state),
   // поэтому второй клик до ре-рендера не отправит второй запрос.
@@ -128,6 +123,16 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
   // участвовать в проверках прав (иначе водитель, открывший свою поездку
   // в роли «пассажир», увидит кнопку бронирования своей же поездки).
   const isOwnTrip = !!currentUser && !!trip && trip.driver.id === currentUser.id;
+
+  // Состояние «жалоба уже отправлена» для входной кнопки: сервер
+  // (`GET /reports`) — источник правды, как в ReportModal. Запрос
+  // включаем только участникам (остальным кнопка жалобы скрыта).
+  const canReportTrip = isOwnTrip || trip?.myBooking != null;
+  const { data: myReports } = useMyReportsQuery(canReportTrip);
+  const alreadyReported =
+    myReports?.some(
+      (report) => report.targetType === "trip" && report.targetId === trip?.id,
+    ) ?? false;
 
   // Заявки на места видны только водителю поездки — пассажиру бэкенд
   // вернёт 403 (driver-only эндпоинт), поэтому запрос не делаем вовсе.
@@ -264,27 +269,6 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       component: module.ReportModal,
       additionalProps: { targetType: "trip", targetId: trip.id },
     });
-  };
-
-  const handleCloseActions = () => {
-    setActionSheet(null);
-  };
-
-  const handleOpenActions = () => {
-    setActionSheet(
-      <TripActionsSheet
-        toggleRef={moreRef}
-        onClose={handleCloseActions}
-        onShare={() => {
-          handleCloseActions();
-          void handleShareTrip();
-        }}
-        onReport={() => {
-          handleCloseActions();
-          void handleReportTrip();
-        }}
-      />,
-    );
   };
 
   const canBook =
@@ -504,19 +488,8 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
 
   return (
     <Panel id={id}>
-      {actionSheet}
       <AppPanelHeader
         before={<PanelHeaderBack onClick={onBack} />}
-        after={
-          <PanelHeaderButton
-            aria-label="Действия с поездкой"
-            aria-expanded={actionSheet !== null}
-            getRootRef={moreRef}
-            onClick={handleOpenActions}
-          >
-            <Icon28MoreHorizontal />
-          </PanelHeaderButton>
-        }
       >
         Детали поездки
       </AppPanelHeader>
@@ -880,6 +853,20 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
           )}
         </Box>
       )}
+
+      {/* Вторичные действия — inline-секция внизу панели: верхний правый
+        угол шапки занят системными кнопками VK-клиента, kebab там невозможен.
+        Жалоба — только участникам (бэкенд иначе вернёт 403): водитель или
+        пассажир с активной бронью — то же определение, что и для приватных
+        деталей (canSeePrivateDetails на сервере). */}
+      <Group header={<Header size="s">Дополнительно</Header>}>
+        <TripSecondaryActions
+          onShare={() => void handleShareTrip()}
+          onReport={() => void handleReportTrip()}
+          canReport={canReportTrip}
+          alreadyReported={alreadyReported}
+        />
+      </Group>
 
       <Spacing size={32} />
     </Panel>

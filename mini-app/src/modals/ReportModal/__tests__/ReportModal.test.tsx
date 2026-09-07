@@ -71,10 +71,12 @@ describe("ReportModal — лимит «1 жалоба навсегда»", () =>
     expect(html).not.toContain("Повторная отправка недоступна");
   });
 
-  it("жалоба на этот объект уже есть: кнопка disabled + хинт", () => {
+  it("жалоба на этот объект уже есть: кнопка «Жалоба уже отправлена» disabled + хинт", () => {
     mockState.myReports = [makeReport()];
     const html = renderOpenModal();
 
+    expect(html).toContain("Жалоба уже отправлена");
+    expect(html).not.toContain("Отправить жалобу");
     expect(html).toContain("vkuiButton__disabled");
     expect(html).toContain("Повторная отправка недоступна");
   });
