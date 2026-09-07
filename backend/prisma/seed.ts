@@ -3,6 +3,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { MAX_SEATS } from "@edem/contracts";
 import { config as loadEnv } from "dotenv";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { seedCityId, seedReportId, seedRideRequestId } from "./seed-ids.js";
 
 // Prisma 7 больше не подгружает .env автоматически — путь относительно файла.
 loadEnv({ path: new URL("../.env", import.meta.url) });
@@ -182,18 +183,44 @@ const normalizeCityName = (raw: string): string =>
  * миграцией `City_nameNormalized_key`. Здесь используем
  * `findFirst` по нормализованному имени — при наличии дублей
  * (нештатная ситуация) переименуется/обновится первая запись.
+ *
+ * ВАЖНО: id справочника — детерминированный UUID v5 (seedCityId),
+ * а НЕ slug (`city-вологда`) и НЕ рандом. Причины:
+ * - `createTripDtoSchema` требует fromCityId/toCityId строго uuid —
+ *   slug-id ломали создание поездок через API на свежезасеянной БД
+ *   (E2E в CI: POST /trips 400 "Invalid payload"), хотя на старых БД
+ *   с uuid-id всё работало;
+ * - детерминизм: то же имя → тот же id на каждом прогоне сида
+ *   (повторы не плодят дубли и не рвут FK-ссылки сид-поездок).
+ *
+ * Реалайнмент: если строка существует, но id не детерминированный
+ * (наследие сломанного сида со slug-id) — PK переписывается на
+ * детерминированный. Это безопасно: main() удаляет ВСЕ строки,
+ * ссылающиеся на City (поездки, заявки, брони, отзывы, жалобы),
+ * ДО вызова seedCities, а FK Trip/RideRequest — onDelete: SetNull.
  */
 async function seedCities(): Promise<void> {
   for (const name of SEED_CITIES) {
     const trimmed = name.trim().replace(/\s+/g, " ");
     const nameNormalized = normalizeCityName(name);
+    const deterministicId = seedCityId(nameNormalized);
+    // Самопроверка контракта: сид должен падать ГРОМКО здесь, а не
+    // тихим 400 в API/E2E (урок инцидента с `city-…` slug-id).
+    assertUuid(deterministicId, `seed city «${trimmed}»`);
 
     const existing = await prisma.city.findFirst({ where: { nameNormalized } });
     if (existing) {
+      const patch: { name?: string; id?: string } = {};
       if (existing.name !== trimmed) {
+        patch.name = trimmed;
+      }
+      if (existing.id !== deterministicId) {
+        patch.id = deterministicId;
+      }
+      if (Object.keys(patch).length > 0) {
         await prisma.city.update({
           where: { id: existing.id },
-          data: { name: trimmed },
+          data: patch,
         });
       }
       continue;
@@ -201,11 +228,21 @@ async function seedCities(): Promise<void> {
 
     await prisma.city.create({
       data: {
-        id: `city-${nameNormalized.replace(/[^a-z0-9а-яё]+/gi, "-")}`,
+        id: deterministicId,
         name: trimmed,
         nameNormalized,
       },
     });
+  }
+}
+
+/**
+ * Строгая проверка UUID-формата для сид-id, пересекающих валидируемые
+ * контракты. Бросает ДО записи в БД — сид падает громко и понятно.
+ */
+function assertUuid(value: string, what: string): void {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error(`[seed] ${what} — невалидный UUID: ${value}`);
   }
 }
 
@@ -1455,7 +1492,7 @@ const reviews: SeedReview[] = [
 // ─────────────────────────────────────────────────────────────
 const rideRequests: SeedRideRequest[] = [
   {
-    id: "rr-1",
+    id: seedRideRequestId("rr-1"),
     userId: "u-14",
     fromCity: "Вологда",
     toCity: "Череповец",
@@ -1466,7 +1503,7 @@ const rideRequests: SeedRideRequest[] = [
     expiresInDays: 7,
   },
   {
-    id: "rr-2",
+    id: seedRideRequestId("rr-2"),
     userId: "u-16",
     fromCity: "Череповец",
     toCity: "Вологда",
@@ -1477,7 +1514,7 @@ const rideRequests: SeedRideRequest[] = [
     expiresInDays: 10,
   },
   {
-    id: "rr-3",
+    id: seedRideRequestId("rr-3"),
     userId: "u-18",
     fromCity: "Вологда",
     toCity: "Грязовец",
@@ -1488,7 +1525,7 @@ const rideRequests: SeedRideRequest[] = [
     expiresInDays: 7,
   },
   {
-    id: "rr-4",
+    id: seedRideRequestId("rr-4"),
     userId: "u-21",
     fromCity: "Сокол",
     toCity: "Вологда",
@@ -1499,7 +1536,7 @@ const rideRequests: SeedRideRequest[] = [
     expiresInDays: 1,
   },
   {
-    id: "rr-5",
+    id: seedRideRequestId("rr-5"),
     userId: "u-22",
     fromCity: "Кадуй",
     toCity: "Череповец",
@@ -1518,7 +1555,7 @@ const rideRequests: SeedRideRequest[] = [
 // ─────────────────────────────────────────────────────────────
 const reports: SeedReport[] = [
   {
-    id: "rep-1",
+    id: seedReportId("rep-1"),
     reporterId: "u-4",
     targetType: "trip",
     tripRef: "t-past-1",
@@ -1527,7 +1564,7 @@ const reports: SeedReport[] = [
     status: "pending",
   },
   {
-    id: "rep-2",
+    id: seedReportId("rep-2"),
     reporterId: "u-15",
     targetType: "user",
     targetUserId: "u-1",
@@ -1537,7 +1574,7 @@ const reports: SeedReport[] = [
     adminActorId: "u-2",
   },
   {
-    id: "rep-3",
+    id: seedReportId("rep-3"),
     reporterId: "u-19",
     targetType: "trip",
     tripRef: "t-past-3",
@@ -1548,7 +1585,7 @@ const reports: SeedReport[] = [
     adminActorId: "u-2",
   },
   {
-    id: "rep-4",
+    id: seedReportId("rep-4"),
     reporterId: "u-8",
     targetType: "booking",
     bookingRef: { tripId: "t-past-3", passengerId: "u-21" },
@@ -1681,6 +1718,10 @@ function validateSeedData(): void {
     if (!userIds.has(rr.userId) || deletedUsers.has(rr.userId)) {
       throw new Error(`Invalid user in seed ride request ${rr.id}`);
     }
+    // id заявки пересекает валидируемый контракт (rideRequestSchema.id —
+    // uuid, мини-апп валидирует список): slug-id роняют клиентскую
+    // валидацию. Проверяем здесь, а не тихим 400/пустым списком в UI.
+    assertUuid(rr.id, `seed ride request «${rr.id}»`);
     referencedUsers.add(rr.userId);
     if (
       !cityNames.has(normalizeCityName(rr.fromCity)) ||
@@ -1704,6 +1745,9 @@ function validateSeedData(): void {
     if (!userIds.has(report.reporterId) || deletedUsers.has(report.reporterId)) {
       throw new Error(`Invalid reporter in seed report ${report.id}`);
     }
+    // id жалобы пересекает валидируемый контракт (reportSchema.id — uuid:
+    // мини-апп и админка валидируют списки). См. комментарий у rideRequests.
+    assertUuid(report.id, `seed report «${report.id}»`);
     referencedUsers.add(report.reporterId);
     if (report.adminActorId) {
       if (!userIds.has(report.adminActorId)) {

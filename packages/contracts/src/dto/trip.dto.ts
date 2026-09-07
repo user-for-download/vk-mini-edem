@@ -11,7 +11,12 @@ import { tripTagSchema, tripSchema, MAX_SEATS } from "../schemas/trip.schema.js"
  * пары id-ов сервер отвергает поездку (autocomplete UI не позволяет
  * ввести город вручную — только выбор из справочника).
  */
-const baseTripSchema = z.object({
+/**
+ * Экспортируется для тестов/валидаторов, которым нужно отдельное поле
+ * контракта (у refined createTripDtoSchema нет .shape): например,
+ * сид-тест проверяет seedCityId против .shape.fromCityId.
+ */
+export const baseTripSchema = z.object({
   fromCity: z.string().min(1).max(100),
   fromAddress: z.string().max(200),
   toCity: z.string().min(1).max(100),
