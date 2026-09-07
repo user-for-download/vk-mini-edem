@@ -9,6 +9,19 @@
 
 ### Added
 
+#### One Report Forever (лимит «1 жалоба навсегда»)
+
+- `POST /api/v1/reports`: повторная жалоба на ту же связку (автор, тип объекта, объект) отклоняется `409 CONFLICT` при любой категории и любом статусе первой жалобы — включая `resolved`/`rejected`. Раньше дедуп ловил только открытые жалобы той же категории (обход: другая категория, повтор после рассмотрения).
+- DB: `@@unique([reporterId, targetType, targetId])` + forward-only миграция `20260906115105_report_one_per_reporter_target` (удаляет частичный `Report_open_unique_idx`); pre-check упрощён до поиска любой жалобы тройки, catch `P2002`/`P2034` стал живым race-guard. Код ошибки `CONFLICT` не менялся.
+- Mini-app `ReportModal`: подтекст 409 — «Повторная отправка недоступна»; кнопка отправки гаснет, если жалоба на объект уже есть в `GET /reports` (сервер — источник правды).
+- Tests: backend `reports.test.ts` (+3: другая категория → 409, повтор после resolve → 409, гонка → 201+409 и одна строка); mini-app `ReportModal.test.tsx` (4 SSR-теста).
+
+#### Trip Actions Kebab Menu (опции поездки в шапке)
+
+- Кнопки «Поделиться поездкой» / «Пожаловаться на поездку» убраны из низа `TripDetailsPanel` в kebab-меню шапки (`PanelHeader after`, `Icon28MoreHorizontal`, `aria-expanded`).
+- Новый `TripActionsSheet` (паттерн из доков VKUI: элемент в стейте, рендер рядом с якорем): `ActionSheet mode="menu"` + `placement="bottom"` — меню всегда под кнопкой, шторки снизу нет; `toggleRef`-якорь, `onClose`/`onClosed`, iOS-«Отмена» через `slotProps` (без deprecated `isCancelItem`), иконки через `AdaptiveIconRenderer` (20/28). Хендлеры шеринга/жалобы переиспользованы без изменений.
+- Tests: `TripActionsMenu.test.tsx` (шит + закрытое состояние панели).
+
 #### Profile «Отзывы» Panel (SegmentedControl: Мои / О вас)
 
 - Разрозненные секции отзывов в профиле («отзывы о вас» — 2 последних, «мои отзывы» — 3 последних) собраны в единый раздел «Отзывы» — отдельная панель `/profile/reviews` (ProfileView, lazy-chunk) с SegmentedControl по паттерну «История поездок» (`/bookings/history`):
@@ -134,6 +147,16 @@
 - `e2e/full-cycle.mjs` (Playwright + Chromium): 14-step driver→passenger flow — driver auth, search accordion, trip creation, passenger search and booking, driver confirmation, snackbar/status checks, trip completion, passenger review. Artifacts: `e2e/shots/`, `e2e/results.json`.
 
 ### Changed
+
+#### Bun Install (быстрая установка зависимостей)
+
+- CI `checks` ставит зависимости через `bun install --frozen-lockfile` (+ кэш `~/.bun/install/cache`) вместо `npm ci`: ~10 с против ~минуты. Рантайм везде остался Node 22 (сборка/тесты без изменений).
+- `bun.lock` (мигрирован из `package-lock.json`) убран из `.gitignore` и закоммичен; `package-lock.json` оставлен как npm-фолбэк. README обновлён (`bun install` в quickstart/сборке/деплое).
+- Временная `install-benchmark`-джоба оставлена для сравнения замеров; под снос после серии зелёных прогонов.
+
+#### Seed Coverage (заявки, жалобы, города, демо-пользователи)
+
+- `backend/prisma/seed.ts`: 5 заявок (`active`/`paused`/`fulfilled`/`expired`), 4 жалобы (все статусы модерации, уникальные тройки), линковка поездок на справочник (`fromCityId`/`toCityId`, 30/30) + пересчёт `City.tripsCount` по не-отменённым, демо-пользователи `u-23` (бан с причиной) и `u-24` (soft-delete), отменённая бронь с причиной, cleanup и stats покрывают новые таблицы, `validateSeedData` проверяет новые сущности (включая уникальность троек жалоб).
 
 #### Prisma 5.22 → 7 Upgrade (driver-адаптер + prisma.config.ts)
 

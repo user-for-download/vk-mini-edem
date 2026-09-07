@@ -1,6 +1,6 @@
 # Edem Current Memory
 
-Updated: 2026-09-05
+Updated: 2026-09-06
 
 ## Project
 
@@ -20,7 +20,7 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - Production Docker backend listens on `3000` and serves `mini-app/dist`; the published bind address is configurable via `BACKEND_BIND_ADDR` in the root `.env` (default `127.0.0.1` for a same-host proxy, `0.0.0.0` for an external proxy plus firewall rules), while PostgreSQL is available only inside the Docker network.
 - Production requires `DATABASE_URL`, `JWT_SECRET`, `VK_APP_SECRET`, and `CORS_ORIGINS`.
 - `ALLOW_DEV_AUTH` is disabled in production and only supports local/test mock auth.
-- Node >= 22 is required (`engines` in root `package.json`; CI and the Docker image both run Node 22). npm with `package-lock.json` is canonical; `bun.lock` was removed.
+- Node >= 22 is required (`engines` in root `package.json`; CI and the Docker image both run Node 22). Installs go through **Bun** (`bun install --frozen-lockfile` in CI + cache, ~10s); `bun.lock` is committed, `package-lock.json` kept as npm fallback. Full Bun runtime NOT adopted (Hono WS layer on `@hono/node-ws`, vitest suites stay on Node).
 
 ## Prisma (v7, upgraded 2026-09-04 from 5.22)
 
@@ -246,4 +246,11 @@ When behavior changes, update this file and the relevant README/API document in 
 - RideRequest MVP is implemented under `/api/v1/ride-requests`: city route, time window, seats, expiry, active/paused/fulfilled/expired/cancelled states, three-active-request limit, matching query and no automatic booking. Matching trips produce deduplicated in-app notifications with a `/trips/:id` deep link.
 - Reports are implemented under `/api/v1/reports` and `/api/v1/admin/reports`. Targets are user/trip/booking; creation requires a relevant driver/passenger relationship, is rate-limited and deduplicated, and admin states are pending/in_review/resolved/rejected. The mini-app exposes trip reporting and the webapp has moderation controls.
 - Profile deletion is `DELETE /api/v1/users/me`. It is transactional, blocked by active driver trips or future active bookings, cancels owned RideRequests, deletes refresh tokens/notifications/feedback/car, anonymizes the user, keeps `vkUserId` as a tombstone, and closes WebSockets. Required auth rejects the deleted account and repeat VK login cannot recreate it.
-- Security hardening: RideRequest quota/status writes and Report moderation/deduplication use serializable or conditional database writes; open reports have a partial unique index. Public user serialization omits notification/onboarding/verification metadata, and report/ride-request read and mutation endpoints have dedicated rate limits.
+- Security hardening: RideRequest quota/status writes and Report moderation/deduplication use serializable or conditional database writes; open reports had a partial unique index (replaced 2026-09-06 by full reporter+target unique — see Recent Changes). Public user serialization omits notification/onboarding/verification metadata, and report/ride-request read and mutation endpoints have dedicated rate limits.
+
+## Recent Changes (2026-09-06)
+
+- **One report forever:** `POST /reports` rejects any repeat on (reporterId, targetType, targetId) with `409` regardless of category/status (migration `20260906115105_report_one_per_reporter_target`, `@@unique`, replaces partial open index). `ReportModal`: 409 copy updated + submit disabled when already reported.
+- **Trip actions kebab:** share/report buttons moved from panel bottom into `PanelHeader after` kebab (`TripActionsSheet`, `ActionSheet mode="menu"` anchored under button, iOS cancel via slotProps). Handlers unchanged.
+- **Seed coverage:** 5 ride requests, 4 reports (all moderation states), trips FK-linked to City + `tripsCount` recomputed, demo users u-23 (banned+reason) / u-24 (soft-deleted), cancelled booking with reason.
+- **Installs via Bun** (see Runtime); prod rebuilt 2026-09-06 with report-unique migration applied (prod reports table empty — no conflicts).

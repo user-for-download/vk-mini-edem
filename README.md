@@ -36,9 +36,9 @@
 │
 ├── backend/                     # Backend: Hono + Prisma ORM + PostgreSQL
 │   ├── prisma/
-│   │   ├── schema.prisma        # Модели: User, RefreshToken, Notification, Car, Trip, Booking, Review
+│   │   ├── schema.prisma        # Модели: User, RefreshToken, Notification, Car, Trip, City, RideRequest, Booking, Review, Report, Feedback
 │   │   ├── migrations/          # Prisma-миграции (единый snapshot)
-│   │   └── seed.ts              # Наполнение тестовыми данными (22 юзера, 28 поездок и т.д.)
+│   │   └── seed.ts              # Наполнение тестовыми данными (24 юзера incl. бан/удаление, 30 поездок, заявки, жалобы)
 │   ├── src/
 │   │   ├── auth/                # VK-авторизация (подпись launch params + диагностика дрейфа часов), JWT + refresh-токены (ротация, хэш в БД), admin JWT
 │   │   ├── admin/               # Админ-API /api/v1/admin (login/session/logout, guard по httpOnly cookie, модерация)
@@ -81,7 +81,7 @@
 
 ### Запуск проекта (Фронтенд + Бэкенд)
 ```bash
-npm ci
+bun install
 cp backend/.env.example backend/.env
 docker compose -f docker-compose.local.yml up -d
 npm run dev
@@ -96,7 +96,7 @@ npm run dev --workspace=webapp   # админ-панель на http://localhost
 ```
 Dev-сервер webapp проксирует `/api` на бэкенд (`:3011`), поэтому admin-cookie работают same-origin без настройки CORS. Вход — по `ADMIN_TOKEN` из `backend/.env` (пустой токен = панель выключена). В production проксируйте на одном домене и статику webapp, и `/api` на бэкенд (см. раздел деплоя).
 
-Канонический workflow использует npm workspaces (`npm ci`/`npm run`); lockfile — `package-lock.json`. Bun не поддерживается (bun.lock удалён, чтобы избежать дрейфа версий).
+Канонический workflow использует npm workspaces (`npm run`); рантайм везде — Node 22. Установка зависимостей — через Bun (`bun install`, lockfile `bun.lock`, в CI с `--frozen-lockfile` + кэшем): ~10 с против ~минуты `npm ci`. `package-lock.json` оставлен как фолбэк для npm.
 
 ### Запуск в Docker (бэкенд в контейнере)
 ```bash
@@ -111,7 +111,7 @@ docker exec -it vk-mini-edem-backend-1 node --import tsx prisma/seed.ts
 
 ### Установка зависимостей
 ```bash
-npm ci
+bun install   # быстро (~10 с); фолбэк — npm ci по package-lock.json
 ```
 
 ### Сборка приложения (включая общий пакет)
@@ -222,7 +222,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/ride-requests/:id` | Изменить временное окно, места или срок действия |
 | PATCH | `/api/v1/ride-requests/:id/status` | Поставить запрос на паузу/возобновить/завершить |
 | DELETE | `/api/v1/ride-requests/:id` | Отменить пассивный запрос |
-| POST | `/api/v1/reports` | Создать жалобу на связанного пользователя, поездку или бронь |
+| POST | `/api/v1/reports` | Создать жалобу на связанного пользователя, поездку или бронь (лимит: 1 жалоба навсегда на связку автор+объект — повтор → `409`) |
 | GET | `/api/v1/reports` | Мои жалобы |
 | DELETE | `/api/v1/users/me` | Soft-delete и анонимизация профиля; активные обязательства блокируют операцию |
 | POST | `/api/v1/admin/auth/login` | Вход админ-панели по `ADMIN_TOKEN` (5 req/5 мин, `ADMIN_LOGIN_RATE_*`); ставит httpOnly cookie `edem_admin_jwt` |
@@ -348,7 +348,7 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
 
 1. **Собрать**:
    ```bash
-   npm ci
+   bun install
    npm run build        # contracts → backend (dist) → mini-app (dist, base: './')
    ```
 2. **Применить миграции**:

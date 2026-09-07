@@ -7,7 +7,7 @@
 
 Categories are `safety`, `fraud`, `harassment`, `spam`, `inaccurate_info` and `other`.
 
-Reports require a relevant driver/passenger relationship. Self-reports and unrelated targets are rejected. Open duplicate reports for the same reporter, target and category return `409`. Mutations are sanitized and rate-limited.
+Reports require a relevant driver/passenger relationship. Self-reports and unrelated targets are rejected. Limit is **one report forever per reporter+target**: any repeat (any category, even after resolve/reject) returns `409 CONFLICT`. Mutations are sanitized and rate-limited.
 
 ## Admin endpoints
 
@@ -17,4 +17,4 @@ Reports require a relevant driver/passenger relationship. Self-reports and unrel
 
 The state machine is `pending -> in_review -> resolved|rejected`. Terminal reports cannot be changed. Admin actions record `adminActorType: "admin"` and a resolution timestamp.
 
-Open reports are protected by a database partial unique index for reporter, target and category. Concurrent duplicates return `409`. Admin status writes are conditional on a non-terminal current status and concurrent transitions return `409`.
+One report forever is enforced by a database unique constraint on reporter, target type and target id (migration `report_one_per_reporter_target`, replacing the former partial open-report index). Concurrent duplicates return `409` via the constraint (`P2002`) as well as a pre-check. Admin status writes are conditional on a non-terminal current status and concurrent transitions return `409`.
