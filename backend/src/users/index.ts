@@ -47,7 +47,9 @@ usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
         where: {
           passengerId: user.id,
           status: { in: ["pending", "confirmed"] },
-          trip: { status: { not: "cancelled" } },
+          // Только активные поездки — завершённые/отменённые это история
+          // и удалению не мешают (иначе история блокировала бы его навсегда).
+          trip: { status: "active" },
         },
         select: { id: true },
       });

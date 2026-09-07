@@ -42,6 +42,7 @@ describe("DELETE /api/v1/users/me", () => {
   });
 
   it("blocks deletion while the user has an active trip obligation", async () => {
+
     const ownTrip = await db.trip.create({ data: { driverId: userId, fromCity: "Москва", fromAddress: "A", toCity: "Тула", toAddress: "B", departureAt: new Date("2030-01-01T10:00:00Z"), durationMinutes: 120, distanceKm: 180, price: 700, seatsTotal: 3, seatsAvailable: 3, tags: [] } });
     try {
       const response = await app.request("/api/v1/users/me", { method: "DELETE", headers: { Authorization: `Bearer ${devMockAccessToken(userId)}` } });
@@ -49,6 +50,28 @@ describe("DELETE /api/v1/users/me", () => {
       expect((await response.json()).code).toBe("ACCOUNT_HAS_ACTIVE_OBLIGATIONS");
     } finally {
       await db.trip.delete({ where: { id: ownTrip.id } });
+    }
+  });
+
+  it("blocks deletion while the user has a booking on an active trip", async () => {
+    const booking = await db.booking.create({ data: { tripId, passengerId: userId, seat: 1, status: "confirmed" } });
+    try {
+      const response = await app.request("/api/v1/users/me", { method: "DELETE", headers: { Authorization: `Bearer ${devMockAccessToken(userId)}` } });
+      expect(response.status).toBe(409);
+      expect((await response.json()).code).toBe("ACCOUNT_HAS_ACTIVE_OBLIGATIONS");
+    } finally {
+      await db.booking.delete({ where: { id: booking.id } });
+    }
+  });
+
+  it("allows deletion with bookings only on completed trips (history)", async () => {
+    await db.trip.update({ where: { id: tripId }, data: { status: "completed" } });
+    const booking = await db.booking.create({ data: { tripId, passengerId: userId, seat: 1, status: "confirmed" } });
+    try {
+      const response = await app.request("/api/v1/users/me", { method: "DELETE", headers: { Authorization: `Bearer ${devMockAccessToken(userId)}` } });
+      expect(response.status).toBe(200);
+    } finally {
+      await db.booking.deleteMany({ where: { passengerId: userId } });
     }
   });
 
