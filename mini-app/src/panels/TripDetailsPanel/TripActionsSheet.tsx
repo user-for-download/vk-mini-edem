@@ -37,6 +37,8 @@ export const TripActionsSheet: FC<TripActionsSheetProps> = ({
       onClose={onClose}
       onClosed={onClose}
       toggleRef={toggleRef}
+      mode="menu"
+      placement="bottom"
       slotProps={{ iosCloseItem: { children: "Отмена" } }}
     >
       <ActionSheetItem
