@@ -108,4 +108,18 @@ describe("AuthGate — экран бана", () => {
     expect(html).toContain("Ошибка авторизации");
     expect(html).toContain("Попробовать снова");
   });
+
+  it("удалённый аккаунт видит «Профиль удалён» без кнопки повтора", () => {
+    // Arrange
+    mockState.status = "deleted";
+
+    // Act
+    const html = renderToString(<AuthGate />);
+
+    // Assert — ретрая нет: /auth/vk отвечает удалённому 403, цикл бессмыслен.
+    expect(html).toContain("Профиль удалён");
+    expect(html).toContain("Восстановление невозможно");
+    expect(html).not.toContain("Попробовать снова");
+    expect(html).not.toContain("Ошибка авторизации");
+  });
 });

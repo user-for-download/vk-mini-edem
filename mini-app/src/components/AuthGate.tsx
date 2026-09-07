@@ -8,7 +8,7 @@ import {
   PanelHeader,
   View,
 } from "@vkontakte/vkui";
-import { Icon56LockOutline, Icon56ErrorOutline } from "@vkontakte/icons";
+import { Icon56LockOutline, Icon56ErrorOutline, Icon56DeleteOutline } from "@vkontakte/icons";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiClient } from "@/api/client";
 import { bridge } from "@/helpers/bridge";
@@ -50,9 +50,10 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
   useEffect(() => {
     return apiClient.onTokenUpdate((tokens) => {
       const state = useAuthStore.getState();
-      // Не воскрешаем сессию, если пользователь вышел (clearSession) или
-      // авторизация в состоянии ошибки — refresh мог стартовать ДО логаута.
-      if (state.status === "unauthenticated" || state.status === "error") {
+      // Не воскрешаем сессию, если пользователь вышел (clearSession),
+      // удалил аккаунт или авторизация в состоянии ошибки — refresh мог
+      // стартовать ДО логаута.
+      if (state.status === "unauthenticated" || state.status === "error" || state.status === "deleted") {
         return;
       }
       useAuthStore.setState({
@@ -139,6 +140,23 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
             }
           >
             Причина: {banReason || "Причина не указана"}
+          </Placeholder>
+        </Panel>
+      </View>
+    );
+  }
+
+  if (status === "deleted") {
+    return (
+      <View activePanel="auth-deleted">
+        <Panel id="auth-deleted" aria-labelledby="auth-deleted-title">
+          <PanelHeader>Вход</PanelHeader>
+          <Placeholder
+            icon={<Icon56DeleteOutline />}
+            title="Профиль удалён"
+          >
+            Аккаунт анонимизирован. Поездки и отзывы сохранены без вашего
+            имени. Восстановление невозможно.
           </Placeholder>
         </Panel>
       </View>

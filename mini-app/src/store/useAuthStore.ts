@@ -12,7 +12,8 @@ export type AuthStatus =
   | "unauthenticated"
   | "error"
   | "background"
-  | "banned";
+  | "banned"
+  | "deleted";
 
 export interface Session {
   accessToken: string;
@@ -41,6 +42,12 @@ interface AuthState {
   refreshSession: () => Promise<void>;
   handleBackgroundState: (isHidden: boolean) => void;
   clearSession: (reason?: string) => Promise<void>;
+  /**
+   * Терминальное состояние после успешного DELETE /users/me: отдельный экран
+   * «Профиль удалён» вместо «Ошибки авторизации» (иначе ретрай зацикливался
+   * бы: /auth/vk отвечает удалённому аккаунту 403).
+   */
+  markAccountDeleted: () => void;
 }
 
 let bootstrapPromise: Promise<void> | null = null;
@@ -136,6 +143,21 @@ function isBannedError(error: unknown): error is ApiError {
   return error instanceof ApiError && error.status === 403 && error.code === "FORBIDDEN";
 }
 
+/**
+ * Распознаёт 403 удалённого аккаунта из bootstrap: код совпадает с баном
+ * (FORBIDDEN), различаем по message ("Account is deleted"). Проверять ДО
+ * isBannedError, иначе удалённый аккаунт попадёт на плашку бана.
+ */
+const ACCOUNT_DELETED_MESSAGE = "Account is deleted";
+
+function isDeletedError(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError &&
+    error.status === 403 &&
+    error.message === ACCOUNT_DELETED_MESSAGE
+  );
+}
+
 function applyAuthenticated(set: (state: Partial<AuthState>) => void, response: AuthResponse) {
   apiClient.setSession(response);
   set({
@@ -164,6 +186,18 @@ function applyBanned(
     session: null,
     banReason: error.banReason ?? null,
     launchParams,
+  });
+}
+
+function applyDeleted(set: (state: Partial<AuthState>) => void) {
+  console.log("[Auth] Account is deleted");
+  apiClient.setSession(null);
+  set({
+    status: "deleted",
+    user: null,
+    session: null,
+    banReason: null,
+    launchParams: null,
   });
 }
 
@@ -208,6 +242,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const response = await authApi.loginWithVk(payload);
         applyAuthenticated(set, response);
       } catch (error) {
+        // Удалённый аккаунт проверяем раньше бана: code совпадает (FORBIDDEN).
+        if (isDeletedError(error)) {
+          applyDeleted(set);
+          return;
+        }
         if (isBannedError(error)) {
           applyBanned(set, error, launchParams);
           return;
@@ -243,7 +282,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // размонтирован). Подписка одноразовая — снимается в finally ниже.
         // Дублирующее обновление из AuthGate идемпотентно (те же значения).
         const unsubscribe = apiClient.onTokenUpdate((tokens) => {
-          if (get().status === "unauthenticated" || get().status === "error") {
+          if (get().status === "unauthenticated" || get().status === "error" || get().status === "deleted") {
             return;
           }
           set({
@@ -297,6 +336,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   handleBackgroundState: (isHidden) => {
+    // Удалённый аккаунт терминален: фоновые проверки не должны сбрасывать
+    // экран «Профиль удалён» в «Ошибку авторизации».
+    if (get().status === "deleted") {
+      return;
+    }
     const state = get();
 
     if (isHidden) {
@@ -338,5 +382,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       banReason: null,
       launchParams: null,
     });
+  },
+
+  markAccountDeleted: () => {
+    apiClient.invalidatePendingRefresh();
+    applyDeleted(set);
   },
 }));

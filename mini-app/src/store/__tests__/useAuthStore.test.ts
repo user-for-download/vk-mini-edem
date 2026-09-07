@@ -162,6 +162,54 @@ describe("useAuthStore.bootstrap", () => {
     expect(state.user).toBeNull();
     expect(state.session).toBeNull();
   });
+
+  it("403 FORBIDDEN 'Account is deleted' даёт deleted, а не banned (code совпадает!)", async () => {
+    // Arrange — бэкенд отличает удалённый аккаунт только message.
+    mockedLoginWithVk.mockRejectedValue(
+      new ApiError("Account is deleted", "FORBIDDEN", 403),
+    );
+
+    // Act
+    await useAuthStore.getState().bootstrap();
+
+    // Assert
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("deleted");
+    expect(state.banReason).toBeNull();
+    expect(state.user).toBeNull();
+    expect(state.session).toBeNull();
+  });
+
+  it("markAccountDeleted выставляет терминальный deleted", async () => {
+    // Arrange — как после успешного DELETE /users/me.
+    useAuthStore.setState({
+      status: "authenticated",
+      user: validUser,
+      session: { accessToken: "a", refreshToken: "r", expiresAt: Date.now() + 60_000 },
+      banReason: null,
+    });
+
+    // Act
+    useAuthStore.getState().markAccountDeleted();
+
+    // Assert
+    const state = useAuthStore.getState();
+    expect(state.status).toBe("deleted");
+    expect(state.user).toBeNull();
+    expect(state.session).toBeNull();
+  });
+
+  it("deleted переживает фоновые переходы (не сбрасывается в ошибку)", async () => {
+    // Arrange
+    useAuthStore.setState({ status: "deleted", user: null, session: null });
+
+    // Act
+    useAuthStore.getState().handleBackgroundState(true);
+    useAuthStore.getState().handleBackgroundState(false);
+
+    // Assert
+    expect(useAuthStore.getState().status).toBe("deleted");
+  });
 });
 
 describe("useAuthStore.refreshSession", () => {

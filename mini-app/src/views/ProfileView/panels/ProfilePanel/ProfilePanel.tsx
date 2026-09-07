@@ -72,7 +72,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
   const [deleting, setDeleting] = useState(false);
   const { enqueue } = useSnackbar();
   const confirm = useConfirm();
-  const clearSession = useAuthStore((state) => state.clearSession);
+  const markAccountDeleted = useAuthStore((state) => state.markAccountDeleted);
 
   const {
     data: availableReviewTrips,
@@ -111,7 +111,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
     setDeleting(true);
     try {
       await usersApi.deleteCurrentUser();
-      await clearSession("Account deleted");
+      markAccountDeleted();
     } catch (error) {
       const code = error instanceof ApiError ? error.code : undefined;
       enqueue({
