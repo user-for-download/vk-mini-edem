@@ -72,7 +72,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
     const color = values.color.trim();
     // Пустой номер не отправляем (бэкенд хранит null, сериализатор
     // опускает ключ — контракт carSchema допускает отсутствие plate).
-    const plate = values.plate.trim() || undefined;
+    const plate = values.plate?.trim() || undefined;
 
     if (!model) {
       setError("Укажите модель автомобиля");
