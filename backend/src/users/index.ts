@@ -25,7 +25,9 @@ const updateProfileSchema = z.object({
 const carFormSchema = z.object({
   model: z.string().min(1).max(50),
   color: z.string().min(1).max(30),
-  plate: z.string().min(1).max(15),
+  // Номер — опционален (примета для узнавания машины, не госномер строго).
+  // Пустая строка нормализуется в null в upsertCar, чтобы не хранить "".
+  plate: z.string().max(15).optional(),
 });
 
 const updateNotificationSettingsSchema = z.object({
@@ -199,13 +201,17 @@ async function upsertCar(c: Context<AuthEnv>) {
     );
   }
 
+  const { plate, ...rest } = parseResult.data;
+  // Пустой/пробельный номер → null (поле опционально, "" не храним).
+  const normalizedPlate = plate?.trim() ? plate.trim() : null;
+
   const updated = await db.user.update({
     where: { id: user.id },
     data: {
       car: {
         upsert: {
-          create: parseResult.data,
-          update: parseResult.data,
+          create: { ...rest, plate: normalizedPlate },
+          update: { ...rest, plate: normalizedPlate },
         },
       },
     },

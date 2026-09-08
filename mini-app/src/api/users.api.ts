@@ -8,7 +8,9 @@ const successSchema = z.object({ success: z.boolean() }).strict();
 export interface CarFormDto {
   model: string;
   color: string;
-  plate: string;
+  // Номер-примета опционален: отсутствие = ключ не отправляется
+  // (JSON.stringify дропает undefined, бэкенд хранит null).
+  plate?: string;
 }
 
 export const usersApi = {

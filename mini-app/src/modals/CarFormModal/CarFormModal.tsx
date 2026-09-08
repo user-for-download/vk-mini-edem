@@ -62,16 +62,17 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
     }
   };
 
-  const isFormValid = Boolean(
-    values.model.trim() && values.color.trim() && values.plate.trim()
-  );
+  // Номер опционален — обязательны только модель и цвет.
+  const isFormValid = Boolean(values.model.trim() && values.color.trim());
 
   const handleSubmit = async () => {
     if (isSubmittingRef.current) return;
 
     const model = values.model.trim();
     const color = values.color.trim();
-    const plate = values.plate.trim();
+    // Пустой номер не отправляем (бэкенд хранит null, сериализатор
+    // опускает ключ — контракт carSchema допускает отсутствие plate).
+    const plate = values.plate.trim() || undefined;
 
     if (!model) {
       setError("Укажите модель автомобиля");
@@ -80,11 +81,6 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
 
     if (!color) {
       setError("Укажите цвет автомобиля");
-      return;
-    }
-
-    if (!plate) {
-      setError("Укажите номер автомобиля");
       return;
     }
 
@@ -161,7 +157,7 @@ export const CarFormModal: FC<CarFormModalProps> = ({ modalProps, close }) => {
 
         <FormItem top="Номер">
           <Input
-            placeholder="А 217 МК 78"
+            placeholder="Например: 583"
             value={values.plate}
             onChange={(e) => handleChange("plate", e.target.value)}
           />

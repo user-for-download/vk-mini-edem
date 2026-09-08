@@ -192,7 +192,11 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
               before={<Icon24CarOutline />}
               chevron="always"
               onClick={onOpenCarForm}
-              subtitle={`${currentUser.car.color} · ${currentUser.car.plate}`}
+              subtitle={
+                currentUser.car.plate
+                  ? `${currentUser.car.color} · ${currentUser.car.plate}`
+                  : currentUser.car.color
+              }
             >
               {currentUser.car.model}
             </SimpleCell>

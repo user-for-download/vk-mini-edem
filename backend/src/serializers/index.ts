@@ -103,7 +103,12 @@ export function serializeUser(
       ? {
           model: user.car.model,
           color: user.car.color,
-          ...(options?.includePlate === false ? {} : { plate: user.car.plate }),
+          // plate опционален (string | null в БД): null не сериализуем,
+          // т.к. контракт carSchema допускает только string | undefined
+          // (fail-closed валидация ответов на клиенте).
+          ...(options?.includePlate === false || user.car.plate == null
+            ? {}
+            : { plate: user.car.plate }),
         }
       : undefined,
     about: isDeleted ? undefined : (user.about ?? undefined),
