@@ -7,6 +7,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `/ride-requests`: форма в стиле `CreateTripModal` — города через `CityPickerField` (поиск + `excludeCityId`, состояние `CityDto | null`), время через `DateInput` с `enableTime` + `disablePast` (внутри тот же `Calendar`; состояние `Date | null`). Семантика моментов не менялась (абсолютные Date → ISO, как раньше парс `datetime-local`; wall-clock сплит не нужен — API принимает ISO). Валидация и тексты ошибок без изменений.
+- `/ride-requests` «Мои запросы»: элементы списка переведены с `FormItem` на `RichCell` — `overTitle` = статус («Активен»/«На паузе»/«Выполнен»/«Отменён»), `subtitle` = окно отправления, текст = маршрут, `actions` = горизонтальный `ButtonGroup` (пауза/возобновить + отмена только для active/paused). Поведение кнопок не менялось.
+
 ### Added
 
 #### One Report Forever (лимит «1 жалоба навсегда»)

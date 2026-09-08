@@ -1,16 +1,19 @@
 import { type FC, useId, useState } from "react";
 import {
   Button,
+  ButtonGroup,
+  DateInput,
   FormItem,
   Group,
-  Input,
+  Header,
   Panel,
   PanelHeaderBack,
-  Select,
+  RichCell,
   Spacing,
   Text,
 } from "@vkontakte/vkui";
-import { useAllCitiesQuery } from "@/queries/useAllCities";
+import type { CityDto } from "@edem/contracts";
+import { CityPickerField } from "@/components/CityPickerField/CityPickerField";
 import {
   useRideRequestsQuery,
   useCreateRideRequestMutation,
@@ -31,39 +34,46 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
   id,
   onBack,
 }) => {
-  const cities = useAllCitiesQuery();
   const requests = useRideRequestsQuery();
   const create = useCreateRideRequestMutation();
   const setStatus = useRideRequestStatusMutation();
   const cancel = useCancelRideRequestMutation();
   const { enqueue: notify } = useSnackbar();
-  const [fromCityId, setFromCityId] = useState("");
-  const [toCityId, setToCityId] = useState("");
-  const [earliestAt, setEarliestAt] = useState("");
-  const [latestAt, setLatestAt] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
+  // Города — как в CreateTripModal: CityDto через CityPickerField
+  // (поиск + excludeCityId), а не сырые id из Select.
+  const [fromCity, setFromCity] = useState<CityDto | null>(null);
+  const [toCity, setToCity] = useState<CityDto | null>(null);
+  // Моменты — как в CreateTripModal: DateInput с enableTime (внутри тот же
+  // Calendar); абсолютные Date уходят в ISO — та же семантика, что была
+  // у datetime-local (wall-clock сплит через moscowTime здесь не нужен:
+  // API принимает ISO-моменты, а не раздельные date/time).
+  const [earliestAt, setEarliestAt] = useState<Date | null>(null);
+  const [latestAt, setLatestAt] = useState<Date | null>(null);
+  const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Связка FormItem htmlFor ↔ поле id (a11y, дока Select/FormItem).
+  // id для CityPickerField (a11y, как в CreateTripModal).
   const fromCityFieldId = useId();
   const toCityFieldId = useId();
-  const earliestFieldId = useId();
-  const latestFieldId = useId();
-  const expiresFieldId = useId();
 
   const submit = async () => {
     setFormError(null);
     try {
+      const fromCityId = fromCity?.id ?? "";
+      const toCityId = toCity?.id ?? "";
       if (fromCityId && fromCityId === toCityId) {
         const msg = "Города отправления и прибытия должны различаться";
         setFormError(msg);
         notify({ type: "error", title: msg });
         return;
       }
-      const earliest = new Date(earliestAt);
-      const latest = new Date(latestAt);
-      const expires = new Date(expiresAt);
+      const earliest = earliestAt;
+      const latest = latestAt;
+      const expires = expiresAt;
       if (
+        !earliest ||
+        !latest ||
+        !expires ||
         ![earliest, latest, expires].every((date) =>
           Number.isFinite(date.getTime()),
         ) ||
@@ -88,11 +98,11 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
         expiresAt: expires.toISOString(),
         seats: 1,
       });
-      setFromCityId("");
-      setToCityId("");
-      setEarliestAt("");
-      setLatestAt("");
-      setExpiresAt("");
+      setFromCity(null);
+      setToCity(null);
+      setEarliestAt(null);
+      setLatestAt(null);
+      setExpiresAt(null);
       notify({ type: "success", title: "Запрос опубликован" });
     } catch (error) {
       const code = error instanceof ApiError ? error.code : undefined;
@@ -142,82 +152,85 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
       });
     }
   };
-  const cityOptions = (cities.data ?? []).map((city) => ({
-    label: city.name,
-    value: city.id,
-  }));
+  // Подписи статусов для RichCell overTitle.
+  const statusLabel: Record<string, string> = {
+    active: "Активен",
+    paused: "На паузе",
+    fulfilled: "Выполнен",
+    cancelled: "Отменён",
+  };
 
   return (
     <Panel id={id}>
       <AppPanelHeader before={<PanelHeaderBack onClick={onBack} />}>
         Ищу попутку
       </AppPanelHeader>
-      <Group header="Новый запрос">
-        {/* Select onChange: значение берём из второго аргумента (дока Select) —
-          event.target.value надёжен только для NativeSelect (мобилы). */}
-        <FormItem top="Откуда" htmlFor={fromCityFieldId}>
-          <Select
-            id={fromCityFieldId}
-            value={fromCityId}
-            onChange={(_, v) => setFromCityId(String(v ?? ""))}
-            options={cityOptions}
-            placeholder="Выберите город"
-          />
-        </FormItem>
-        <FormItem top="Куда" htmlFor={toCityFieldId}>
-          <Select
-            id={toCityFieldId}
-            value={toCityId}
-            onChange={(_, v) => setToCityId(String(v ?? ""))}
-            options={cityOptions.filter((city) => city.value !== fromCityId)}
-            placeholder="Выберите город"
-          />
-        </FormItem>
+            <Group header={<Header size="s">Новый запрос</Header>}>
+        <CityPickerField
+          id={fromCityFieldId}
+          label="Откуда"
+          value={fromCity}
+          excludeCityId={toCity?.id}
+          onChange={setFromCity}
+        />
+        <CityPickerField
+          id={toCityFieldId}
+          label="Куда"
+          value={toCity}
+          excludeCityId={fromCity?.id}
+          onChange={setToCity}
+        />
         <FormItem
           top="Время отправления от"
-          htmlFor={earliestFieldId}
           status={formError ? "error" : "default"}
           bottom={formError ?? undefined}
         >
-          <Input
-            id={earliestFieldId}
-            type="datetime-local"
+          <DateInput
             value={earliestAt}
-            onChange={(event) => setEarliestAt(event.target.value)}
+            onChange={setEarliestAt}
+            enableTime
+            disablePast
+            size="m"
+            placeholder="Выберите дату и время"
             aria-invalid={formError ? true : undefined}
           />
         </FormItem>
-        <FormItem top="Время отправления до" htmlFor={latestFieldId}>
-          <Input
-            id={latestFieldId}
-            type="datetime-local"
+        <FormItem top="Время отправления до">
+          <DateInput
             value={latestAt}
-            onChange={(event) => setLatestAt(event.target.value)}
+            onChange={setLatestAt}
+            enableTime
+            disablePast
+            size="m"
+            placeholder="Выберите дату и время"
           />
         </FormItem>
-        <FormItem top="Запрос действует до" htmlFor={expiresFieldId}>
-          <Input
-            id={expiresFieldId}
-            type="datetime-local"
+        <FormItem top="Запрос действует до">
+          <DateInput
             value={expiresAt}
-            onChange={(event) => setExpiresAt(event.target.value)}
+            onChange={setExpiresAt}
+            enableTime
+            disablePast
+            size="m"
+            placeholder="Выберите дату и время"
           />
         </FormItem>
         <FormItem>
           <Button
             stretched
+            size="m"
             mode="primary"
             onClick={() => void submit()}
             loading={create.isPending}
             disabled={
-              !fromCityId || !toCityId || !earliestAt || !latestAt || !expiresAt
+              !fromCity || !toCity || !earliestAt || !latestAt || !expiresAt
             }
           >
             Опубликовать запрос
           </Button>
         </FormItem>
       </Group>
-      <Group header="Мои запросы">
+      <Group header={<Header size="s">Мои запросы</Header>}>
         {requests.isLoading && <Text role="status">Загрузка...</Text>}
         {requests.isError && (
           <FormItem>
@@ -236,49 +249,58 @@ export const RideRequestsPanel: FC<RideRequestsPanelProps> = ({
           (requests.data ?? []).length === 0 && (
             <Text>Активных запросов пока нет.</Text>
           )}
-        {(requests.data ?? []).map((request) => (
-          <FormItem
-            key={request.id}
-            top={`${request.fromCity.name} → ${request.toCity.name}`}
-            bottom={`${new Date(request.earliestAt).toLocaleString("ru-RU")} · ${request.status}`}
-          >
-            {request.status === "active" && (
-              <Button
-                size="s"
-                mode="secondary"
-                loading={setStatus.isPending}
-                disabled={setStatus.isPending || cancel.isPending}
-                aria-label={`Поставить на паузу запрос ${request.fromCity.name} — ${request.toCity.name}`}
-                onClick={() => void handleStatusChange(request.id, "paused")}
-              >
-                Поставить на паузу
-              </Button>
-            )}
-            {request.status === "paused" && (
-              <Button
-                size="s"
-                mode="secondary"
-                loading={setStatus.isPending}
-                disabled={setStatus.isPending || cancel.isPending}
-                aria-label={`Возобновить запрос ${request.fromCity.name} — ${request.toCity.name}`}
-                onClick={() => void handleStatusChange(request.id, "active")}
-              >
-                Возобновить
-              </Button>
-            )}
-            {(request.status === "active" || request.status === "paused") && (
-              <Button
-                size="s"
-                mode="tertiary"
-                loading={cancel.isPending}
-                disabled={setStatus.isPending || cancel.isPending}
-                onClick={() => void handleCancel(request.id)}
-              >
-                Отменить
-              </Button>
-            )}
-          </FormItem>
-        ))}
+        {(requests.data ?? []).map((request) => {
+          const route = `${request.fromCity.name} → ${request.toCity.name}`;
+          const when = `${new Date(request.earliestAt).toLocaleString("ru-RU")} — ${new Date(request.latestAt).toLocaleString("ru-RU")}`;
+          const busy = setStatus.isPending || cancel.isPending;
+          return (
+            <RichCell
+              key={request.id}
+              overTitle={statusLabel[request.status] ?? request.status}
+              subtitle={when}
+              actions={
+                request.status === "active" || request.status === "paused" ? (
+                  <ButtonGroup mode="horizontal" gap="s" stretched>
+                    {request.status === "active" ? (
+                      <Button
+                        mode="secondary"
+                        size="s"
+                        loading={setStatus.isPending}
+                        disabled={busy}
+                        aria-label={`Поставить на паузу запрос ${route}`}
+                        onClick={() => void handleStatusChange(request.id, "paused")}
+                      >
+                        На паузу
+                      </Button>
+                    ) : (
+                      <Button
+                        mode="primary"
+                        size="s"
+                        loading={setStatus.isPending}
+                        disabled={busy}
+                        aria-label={`Возобновить запрос ${route}`}
+                        onClick={() => void handleStatusChange(request.id, "active")}
+                      >
+                        Возобновить
+                      </Button>
+                    )}
+                    <Button
+                      mode="tertiary"
+                      size="s"
+                      loading={cancel.isPending}
+                      disabled={busy}
+                      onClick={() => void handleCancel(request.id)}
+                    >
+                      Отменить
+                    </Button>
+                  </ButtonGroup>
+                ) : undefined
+              }
+            >
+              {route}
+            </RichCell>
+          );
+        })}
       </Group>
       <Spacing size={24} />
     </Panel>
