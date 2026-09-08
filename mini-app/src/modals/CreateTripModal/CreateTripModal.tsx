@@ -293,7 +293,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
             }
           >
             <Input
-              placeholder="Например: м. Тёплый Стан"
+              placeholder="Например: у Магнита на Пионеров"
               value={values.fromAddress}
               onChange={(e) => handleChange("fromAddress", e.target.value)}
               onBlur={() => handleBlur("fromAddress")}
@@ -335,7 +335,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
             }
           >
             <Input
-              placeholder="Например: м. Московская"
+              placeholder="Например: у Магнита на Пионеров"
               value={values.toAddress}
               onChange={(e) => handleChange("toAddress", e.target.value)}
               onBlur={() => handleBlur("toAddress")}
