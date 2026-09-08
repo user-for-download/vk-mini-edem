@@ -14,6 +14,7 @@
 import { type FC, useMemo } from "react";
 import {
   Button,
+  Caption,
   CustomSelect,
   CustomSelectOption,
   Flex,
@@ -117,27 +118,20 @@ export const CityPickerField: FC<CityPickerFieldProps> = ({
       status={error ? "error" : "default"}
       bottom={
         error ? (
-          // eslint-disable-next-line react/forbid-dom-props
-          <span role="alert" style={{ color: "var(--vkui--color_text_negative)", fontSize: 13 }}>
-            {error}
-          </span>
+          error
         ) : isCitiesLoadFailed ? (
           <Flex direction="column" gap={4} align="start">
-            {/* eslint-disable-next-line react/forbid-dom-props */}
-            <span role="alert" style={{ color: "var(--vkui--color_text_negative)", fontSize: 13 }}>
+            <Caption role="alert">
               {citiesError instanceof Error
                 ? `Не удалось загрузить справочник: ${citiesError.message}`
                 : "Не удалось загрузить справочник городов. Проверьте соединение."}
-            </span>
+            </Caption>
             <Button size="s" mode="tertiary" onClick={() => { void refetchCities(); }}>
               Попробовать снова
             </Button>
           </Flex>
         ) : helperText ? (
-          // eslint-disable-next-line react/forbid-dom-props
-          <span style={{ color: "var(--vkui--color_text_secondary)", fontSize: 13 }}>
-            {helperText}
-          </span>
+          helperText
         ) : undefined
       }
     >

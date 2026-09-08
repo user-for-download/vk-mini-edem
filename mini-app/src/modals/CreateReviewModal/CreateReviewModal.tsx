@@ -128,6 +128,9 @@ const StarPicker: FC<{ value: number; onChange: (v: number) => void }> = ({
             minHeight: 46,
           }}
         >
+          {/* Иконка 24 увеличена до 30 — тап-зона кнопки 46px (a11y),
+              визуальный размер сердца под неё; единственная иконка
+              с ресайзом в приложении — осознанно, см. StarPicker. */}
           <Icon24FavoriteOutline width={30} height={30} aria-hidden="true" />
         </Tappable>
       ))}

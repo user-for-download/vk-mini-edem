@@ -4,6 +4,11 @@
 // react-dom/server renderToString (среда node), модалка внутри ModalRoot
 // с activeModal — паттерн как в CreateReviewModal.test.tsx.
 //
+// ModalRoot здесь легитимен, несмотря на @deprecated в v8: это внутренний
+// рендерер useModalManager (его ContextHolder рендерит тот же ModalRoot),
+// тест воспроизводит прод-структуру 1:1. Депрекация адресует только ручной
+// менеджмент activeModal в приложении.
+//
 // Хуки мокаются (vi.hoisted + vi.mock): SnackbarProvider,
 // useReportsQuery (mutation + список моих жалоб), чтобы не тянуть
 // react-query в рендер-тест.

@@ -4,7 +4,8 @@
 // (не установлен): используем react-dom/server renderToString (среда node,
 // DOM не нужен) — паттерн как в CreateReviewModal.test.tsx и
 // ReviewsPanel.test.tsx (vi.hoisted + фабрики vi.mock, mockReturnValue
-// настраивается в каждом тесте).
+// настраивается в каждом тесте). ModalRoot с activeModal — тот же рендерер,
+// что внутри useModalManager (см. обоснование в CreateReviewModal.test.tsx).
 //
 // Что покрываем (acceptance high-fixes-19):
 // 1) Параллельная загрузка: reviews-хук вызывается с driverId из пропсов

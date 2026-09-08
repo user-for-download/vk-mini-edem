@@ -483,6 +483,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               <Button
                 mode="secondary"
                 appearance="neutral"
+                size="s"
                 onClick={() =>
                   handleChange("seats", Math.max(1, values.seats - 1))
                 }
@@ -503,6 +504,7 @@ export const CreateTripModal: FC<CreateTripModalProps> = ({
               <Button
                 mode="secondary"
                 appearance="neutral"
+                size="s"
                 onClick={() =>
                   handleChange("seats", Math.min(MAX_SEATS, values.seats + 1))
                 }

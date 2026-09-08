@@ -1,6 +1,6 @@
 // mini-app/src/components/RouteLine.tsx
 import { type FC } from "react";
-import { Text, Footnote, Flex, Spacing, ContentBadge } from "@vkontakte/vkui";
+import { Title, Text, Footnote, Flex, Spacing, ContentBadge } from "@vkontakte/vkui";
 
 export interface RoutePoint {
   city: string;
@@ -52,20 +52,16 @@ export const RouteLine: FC<RouteLineProps> = ({
             </Footnote>
           ) : <div />}
           {price !== undefined && (
-            <Text
-              weight="1"
-              // eslint-disable-next-line react/forbid-dom-props
-              style={{ color: "var(--vkui--color_text_primary)", fontSize: 18, lineHeight: "22px" }}
-            >
+            <Title level="3" style={{ color: "var(--vkui--color_text_primary)" }}>
               {price.toLocaleString("ru-RU")} ₽
-            </Text>
+            </Title>
           )}
         </Flex>
       )}
 
       {/* Строка 2: Маршрут с вертикальной линией слева */}
       <Flex align="stretch" gap="m">
-        <Spacing size={6} />
+        <Spacing size={8} />
         <Flex
           direction="column"
           align="center"
@@ -132,7 +128,7 @@ export const RouteLine: FC<RouteLineProps> = ({
 
           {from.address && (
             <>
-              <Spacing size={2} />
+              <Spacing size={4} />
               <Footnote
                 // eslint-disable-next-line react/forbid-dom-props
                 style={{
@@ -165,7 +161,7 @@ export const RouteLine: FC<RouteLineProps> = ({
 
           {to.address && (
             <>
-              <Spacing size={2} />
+              <Spacing size={4} />
               <Footnote
                 // eslint-disable-next-line react/forbid-dom-props
                 style={{
@@ -185,7 +181,7 @@ export const RouteLine: FC<RouteLineProps> = ({
       {/* Время в пути и расстояние */}
       {tripDetailsText && (
         <>
-          <Spacing size={6} />
+          <Spacing size={8} />
           <Footnote
             // eslint-disable-next-line react/forbid-dom-props
             style={{ color: "var(--vkui--color_text_secondary)" }}

@@ -9,6 +9,23 @@
 
 ### Changed
 
+#### UI Consistency Fixes (стилистический аудит)
+
+- **ReportModal**: сабмит приведён к единому модальному паттерну — sticky-футер (`Box` + `Separator` + `size="l" stretched` primary), как в CreateTrip/EditTrip/CarForm/EditProfile/Feedback/CreateReview; хвостовой `Spacing 24` удалён.
+- **Banner actions**: NotificationsPanel — кнопкам явно проставлен `size="m"` (дефолт VKUI — `size="s"`, визуальный вес кнопок в баннерах HomePanel и Notifications расходился). Степперы мест «−/+» в CreateTripModal/EditTripModal — явно `size="s"` (размер больше не зависит от дефолтов версии).
+- **Card**: из TripCard и карточки маршрута в TripDetailsPanel убраны ручные `borderRadius: 12`/`backgroundColor` (дубли токенов VKUI `mode="outline"`); остались только функциональные стили (`overflow: hidden` для обрезки по радиусу, cursor/opacity).
+- **RouteLine**: цена — `Title level="3"` (токены 17/22 weight 600) вместо хардкода `fontSize: 18, lineHeight: "22px"`; Spacing вне шкалы приведены к 4-кратной (2→4, 6→8).
+- **CityPickerField**: кастомные `span` в `bottom` FormItem заменены на строки/`Caption` — цвет ошибки красит штатный `.statusError .bottom`, helper — штатный серый (подтверждено по CSS VKUI).
+- **AuthGate**: 3 экрана авторизации переведены с сырого `PanelHeader` на единый `AppPanelHeader`.
+- **A11y/чистота**: избыточный `aria-label="Назад"` убран со всех 13 `PanelHeaderBack` (VKUI сам даёт accessible name через label); `Icon24FavoriteOutline`-ресайз 30 в CreateReviewModal задокументирован как осознанный (тарч-зона 46px); BookingRequestRow — subtitle без Caption-обёртки (RichCell красит сам), уникальный `mode="outline"` → `secondary` (симметрия пар «принять/отклонить»), косметика отступов.
+
+#### VKUI Audit Fixes (adaptivity + a11y)
+
+- `transformVKBridgeAdaptivity` приведён к официальному хелперу из инструкции интеграции VK Mini Apps (vkui.io): конвертация через библиотечные `getViewWidthByViewportWidth`/`getViewHeightByViewportHeight` + enum `ViewWidth`. **Behavior change:** адаптивный viewport теперь маппится по брейкпоинтам VKUI (320/768/1024/1280) — 320–767px = `MOBILE` (было `SMALL_TABLET`), 768–1023 = `SMALL_TABLET` (было `TABLET`), 1024–1279 = `TABLET` (было `DESKTOP`), с 1280 = `DESKTOP`; добавлен `viewHeight` (415/720) — раньше не передавался вовсе. `force_mobile_compact` теперь включает `density: "compact"` (v8: density вместо sizeX/sizeY — компактные отступы/высоты компонентов), `force_mobile` — явно `regular`. Устранены magic numbers 2/3/4/5.
+- HomePanel «Поиск» (Search-имитация кнопки): `aria-label` перенесён в `slotProps.input` (паттерн migration-v8 — restProps идут в корень, поле оставалось без имени для скрин-ридеров), поле получает `tabIndex: -1` — единственный tab-stop остаётся корень с `role="button"` (нет вложенных интерактивов). Клик/Enter/Space — без изменений.
+- Тесты модалок: документировано, почему `ModalRoot` в тестах легитимен (это внутренний рендерер `useModalManager` — его ContextHolder рендерит тот же ModalRoot; депрекация адресует ручной менеджмент в приложении).
+- Tests: `transformVKBridgeAdaptivity.test.ts` переписан под официальные брейкпоинты (+4 кейса: SMALL_MOBILE < 320, DESKTOP ≥ 1280, границы высоты 415/720; force_mobile/compact — с density).
+
 - `/ride-requests`: форма в стиле `CreateTripModal` — города через `CityPickerField` (поиск + `excludeCityId`, состояние `CityDto | null`), время через `DateInput` с `enableTime` + `disablePast` (внутри тот же `Calendar`; состояние `Date | null`). Семантика моментов не менялась (абсолютные Date → ISO, как раньше парс `datetime-local`; wall-clock сплит не нужен — API принимает ISO). Валидация и тексты ошибок без изменений.
 - `/ride-requests` «Мои запросы»: элементы списка переведены с `FormItem` на `RichCell` — `overTitle` = статус («Активен»/«На паузе»/«Выполнен»/«Отменён»), `subtitle` = окно отправления, текст = маршрут, `actions` = горизонтальный `ButtonGroup` (пауза/возобновить + отмена только для active/paused). Поведение кнопок не менялось.
 - Профиль → «поездки и бронирования»: новая ячейка «Мои запросы» (роль пассажира, иконка поиска) — переход на `/ride-requests` («Ищу попутку»).

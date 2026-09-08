@@ -5,10 +5,10 @@ import {
   Placeholder,
   Button,
   Panel,
-  PanelHeader,
   View,
 } from "@vkontakte/vkui";
 import { Icon56LockOutline, Icon56ErrorOutline, Icon56DeleteOutline } from "@vkontakte/icons";
+import { AppPanelHeader } from "@/components/AppPanelHeader";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiClient } from "@/api/client";
 import { bridge } from "@/helpers/bridge";
@@ -129,7 +129,7 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     return (
       <View activePanel="auth-banned">
         <Panel id="auth-banned" aria-labelledby="auth-banned-title">
-          <PanelHeader>Вход</PanelHeader>
+          <AppPanelHeader>Вход</AppPanelHeader>
           <Placeholder
             icon={<Icon56LockOutline />}
             title="Аккаунт заблокирован"
@@ -150,7 +150,7 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     return (
       <View activePanel="auth-deleted">
         <Panel id="auth-deleted" aria-labelledby="auth-deleted-title">
-          <PanelHeader>Вход</PanelHeader>
+          <AppPanelHeader>Вход</AppPanelHeader>
           <Placeholder
             icon={<Icon56DeleteOutline />}
             title="Профиль удалён"
@@ -167,7 +167,7 @@ export const AuthGate: FC<PropsWithChildren> = ({ children }) => {
     return (
       <View activePanel="auth-error">
         <Panel id="auth-error" aria-labelledby="auth-error-title">
-          <PanelHeader>Вход</PanelHeader>
+          <AppPanelHeader>Вход</AppPanelHeader>
           <Placeholder
             icon={<Icon56ErrorOutline />}
             title="Ошибка авторизации"

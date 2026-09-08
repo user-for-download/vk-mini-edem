@@ -29,7 +29,7 @@ export const AboutPanel: FC<AboutPanelProps> = ({ id, onBack }) => {
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         О сервисе
       </AppPanelHeader>

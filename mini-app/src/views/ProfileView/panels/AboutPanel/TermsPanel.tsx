@@ -23,7 +23,7 @@ export const TermsPanel: FC<TermsPanelProps> = ({ id, onBack }) => {
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         Пользовательское соглашение
       </AppPanelHeader>

@@ -8,6 +8,7 @@ import {
   ModalPageHeader,
   PanelHeaderButton,
   Select,
+  Separator,
   Spacing,
   Textarea,
   Box,
@@ -178,7 +179,16 @@ export const ReportModal: FC<ReportModalProps> = ({
           <Caption aria-live="polite">{description.length}/2000</Caption>
         </Box>
       </Group>
-      <Box padding="system">
+      <Box
+        padding="system"
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "var(--vkui--color_background_content)",
+        }}
+      >
+        <Separator />
+        <Spacing size={12} />
         {alreadyReported && (
           <Box paddingBlockEnd={8}>
             <Caption aria-live="polite">
@@ -197,7 +207,6 @@ export const ReportModal: FC<ReportModalProps> = ({
           {alreadyReported ? "Жалоба уже отправлена" : "Отправить жалобу"}
         </Button>
       </Box>
-      <Spacing size={24} />
     </ModalPage>
   );
 };

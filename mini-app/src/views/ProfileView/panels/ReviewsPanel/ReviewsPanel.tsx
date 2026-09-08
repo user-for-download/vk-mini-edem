@@ -126,7 +126,7 @@ export const ReviewsPanel: FC<ReviewsPanelProps> = ({
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         Отзывы
       </AppPanelHeader>

@@ -160,7 +160,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         Уведомления
       </AppPanelHeader>
@@ -171,7 +171,11 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
             title="Уведомления в сообщениях VK"
             subtitle="Разрешите сообществу отправлять поддерживаемые сервисные сообщения. Доставка работает только при настроенной серверной интеграции."
             actions={
-              <Button loading={isRequestingVkPermission} onClick={() => void requestVkPermission()}>
+              <Button
+                size="m"
+                loading={isRequestingVkPermission}
+                onClick={() => void requestVkPermission()}
+              >
                 Разрешить
               </Button>
             }
@@ -189,6 +193,7 @@ export const NotificationsPanel: FC<NotificationsPanelProps> = ({
             subtitle="Включите, чтобы узнавать о подтверждении брони, отмене поездки и завершении — даже когда приложение закрыто."
             actions={
               <Button
+                size="m"
                 loading={isRequestingPush}
                 disabled={pushEnabled === null}
                 onClick={() => void requestPushPermission()}

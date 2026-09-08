@@ -36,7 +36,6 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
           before={
             <PanelHeaderBack
               onClick={() => routeNavigator.back()}
-              aria-label="Назад"
             />
           }
         >
@@ -57,7 +56,6 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
           before={
             <PanelHeaderBack
               onClick={() => routeNavigator.back()}
-              aria-label="Назад"
             />
           }
         >
@@ -75,7 +73,6 @@ export const TripDetailsPanelWrapper: FC<{ id: string }> = ({ id }) => {
           before={
             <PanelHeaderBack
               onClick={() => routeNavigator.back()}
-              aria-label="Назад"
             />
           }
         >

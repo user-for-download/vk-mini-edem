@@ -69,7 +69,7 @@ export const PassengerBookingsPanel: FC<PassengerBookingsPanelProps> = ({
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         Мои поездки
       </AppPanelHeader>

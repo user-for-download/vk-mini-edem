@@ -159,6 +159,17 @@ export const HomePanel: FC<HomePanelProps> = ({
                     onGoSearch();
                   }
                 }}
+                slotProps={{
+                  // v8: restProps (aria/tabIndex) идут в корень, атрибуты
+                  // поля — только через slotProps.input (migration-v8).
+                  // tabIndex=-1: поле-имитация кнопки не должно быть вторым
+                  // tab-stop — корень с role="button" единственная точка
+                  // входа с клавиатуры (a11y: no nested interactives).
+                  input: {
+                    "aria-label": "Поиск поездки",
+                    tabIndex: -1,
+                  },
+                }}
               />
             </Box>
           </Group>

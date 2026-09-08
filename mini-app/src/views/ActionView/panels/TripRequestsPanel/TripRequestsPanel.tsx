@@ -172,7 +172,7 @@ export const TripRequestsPanel: FC<TripRequestsPanelProps> = ({
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         <PanelHeaderContent
           subtitle={

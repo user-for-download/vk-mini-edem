@@ -99,17 +99,13 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
             />
           ) : undefined
         }
-        subtitle={
-            <Caption style={{ color: "var(--vkui--color_text_secondary)"}}>
-                {subtitleText}
-            </Caption>
-        }
+        subtitle={subtitleText}
         actions={
           booking.status === "pending" ? (
             <Spacing size={8}>
-              <ButtonGroup mode="horizontal"  stretched>
+              <ButtonGroup mode="horizontal" stretched>
                 <Button
-                  mode="outline"
+                  mode="secondary"
                   size="s"
                   onClick={() => handleStatus("confirmed")}
                   disabled={isUpdating}
@@ -132,8 +128,8 @@ export const BookingRequestRow: FC<BookingRequestRowProps> = memo(
       >
         <Flex align="center" gap={8}>
           <Text weight="2">{passenger.name}</Text>
-          <Caption style={{ color: "var(--vkui--color_text_secondary)"}}>
-              (Бронь места № {booking.seat})
+          <Caption style={{ color: "var(--vkui--color_text_secondary)" }}>
+            (Бронь места № {booking.seat})
           </Caption>
         </Flex>
       </RichCell>

@@ -497,8 +497,13 @@ export const TripDetailsPanel: FC<TripDetailsPanelProps> = ({
       </AppPanelHeader>
 
       <Box padding="system">
-        <Card mode="outline" // eslint-disable-next-line react/forbid-dom-props
-        style={{ borderRadius: 12, backgroundColor: "var(--vkui--color_background_content)", overflow: "hidden" }}>
+        {/* Радиус/фон — из токенов VKUI Card; overflow обрезает контент
+            по скруглению (Separator внутри карточки). */}
+        <Card
+          mode="outline"
+          // eslint-disable-next-line react/forbid-dom-props
+          style={{ overflow: "hidden" }}
+        >
           <Box padding={16}>
             <RouteLine
               from={{ city: trip.fromCity, address: trip.fromAddress }}

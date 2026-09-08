@@ -80,7 +80,7 @@ export const PassengerHistoryPanel: FC<PassengerHistoryPanelProps> = ({
   return (
     <Panel id={id}>
       <AppPanelHeader
-        before={<PanelHeaderBack onClick={onBack} aria-label="Назад" />}
+        before={<PanelHeaderBack onClick={onBack} />}
       >
         История поездок
       </AppPanelHeader>

@@ -77,8 +77,8 @@ export const TripCard: FC<TripCardProps> = ({
       mode="outline"
       // eslint-disable-next-line react/forbid-dom-props
       style={{
-        borderRadius: 12,
-        backgroundColor: "var(--vkui--color_background_content)",
+        // радиус/фон — из токенов VKUI Card (mode="outline");
+        // overflow обрезает контент по скруглению (Separator внизу карточки)
         overflow: "hidden",
         cursor: disabled ? "default" : "pointer",
         opacity: isArchived ? 0.6 : 1,

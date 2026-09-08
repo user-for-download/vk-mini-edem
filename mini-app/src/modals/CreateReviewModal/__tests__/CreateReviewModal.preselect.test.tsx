@@ -6,6 +6,8 @@
 //
 // Паттерн как в CreateReviewModal.test.tsx: SSR через renderToString внутри
 // ModalRoot (DOM не нужен), хуки мокаются через vi.hoisted + vi.mock.
+// ModalRoot с activeModal — внутренний рендерер useModalManager (обоснование
+// в CreateReviewModal.test.tsx).
 // Отличие сценария: current user — ВОДИТЕЛЬ поездки, а useTripBookingsQuery
 // отдаёт подтверждённые брони, поэтому radio-группа рендерится.
 //
