@@ -1,7 +1,19 @@
+# Общая политика логов: stdout (pino/nginx/postgres) → docker json-file
+# с ротацией. Ограниченный объём = ограниченный срок хранения журналов
+# (в т.ч. PII: ip в rate-limit/ws-логах, vkUserId в vk_push) —
+# требуется правовой частью (Политика конфиденциальности, раздел 7).
+# YAML-якорь подставляется в каждый сервис ниже.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: edem
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -19,6 +31,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
@@ -103,6 +116,7 @@ services:
       context: .
       dockerfile: webapp/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       backend:
         condition: service_healthy

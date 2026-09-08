@@ -121,3 +121,21 @@ Example environment entry:
 ```dotenv
 METRICS_TOKEN=replace-with-a-long-random-secret
 ```
+
+## Logging and retention
+
+The backend logs structured JSON (pino) to **stdout** — no local log files,
+no in-app rotation. Log records may embed limited PII (IP in rate-limit/WS
+warnings, `vkUserId` in VK push/messenger logs, `userId` in business events).
+
+Retention is enforced at the infrastructure level, not by the app:
+
+- `docker-compose.yml` sets the `json-file` driver with `max-size: 10m` /
+  `max-file: 3` for every service (db, backend, webapp) via the shared
+  `x-logging` anchor — ~30 MB per service, oldest files are rotated away.
+- The Privacy Policy (section 7) states that technical logs are kept in
+  bounded volume with automatic rotation; any change here must keep that
+  statement true (or update the text).
+
+If you run the backend outside compose, configure the same bound on your
+collector/systemd unit (journald `SystemMaxUse` or equivalent).

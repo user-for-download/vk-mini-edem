@@ -77,6 +77,10 @@ usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
           reviewsCount: 0,
           tripsCount: 0,
           onboardingVersion: null,
+          // Согласие аннулируется вместе с аккаунтом (акцепт при следующем
+          // входе после восстановления невозможен — вход для удалённого
+          // терминален; поле обнуляется для чистоты обезличивания).
+          consentAcceptedAt: null,
         },
       });
       return { kind: "deleted" as const };
@@ -136,6 +140,10 @@ usersRouter.patch(
  * При обновлении набора слайдов клиент повышает версию и проходит
  * онбординг заново; админка может сбросить флаг в null
  * (PATCH /admin/users/:id/onboarding-reset) для повторного показа.
+ *
+ * С версии "2" этот же вызов — фиксация акцепта правовых документов
+ * (ConsentGate «Принять»): проставляем consentAcceptedAt — момент
+ * согласия (152-ФЗ ст. 9, доказуемость).
  */
 usersRouter.post("/me/onboarding", requireUser, mutationLimiter, async (c) => {
   const user = c.get("user");
@@ -148,7 +156,10 @@ usersRouter.post("/me/onboarding", requireUser, mutationLimiter, async (c) => {
 
   const updated = await db.user.update({
     where: { id: user.id },
-    data: { onboardingVersion: parseResult.data.version },
+    data: {
+      onboardingVersion: parseResult.data.version,
+      consentAcceptedAt: new Date(),
+    },
     include: { car: true },
   });
 

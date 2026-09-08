@@ -3,12 +3,17 @@ import { AdaptivityProvider, AppRoot, ConfigProvider } from "@vkontakte/vkui";
 import { RouterProvider } from "@vkontakte/vk-mini-apps-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { parseURLSearchParamsForGetLaunchParams } from "@vkontakte/vk-bridge";
-import { useAppearance, useInsets, useAdaptivity } from "@vkontakte/vk-bridge-react";
+import {
+  useAppearance,
+  useInsets,
+  useAdaptivity,
+} from "@vkontakte/vk-bridge-react";
 import { bridge } from "@/helpers/bridge";
 
 import { transformVKBridgeAdaptivity } from "@/helpers/transformVKBridgeAdaptivity";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGate } from "@/components/AuthGate";
+import { ConsentGate } from "@/components/ConsentGate";
 import { router } from "@/router";
 import { WsProvider } from "@/providers/WsProvider";
 import { GlobalWsListener } from "@/components/GlobalWsListener";
@@ -56,11 +61,17 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
   const vkBridgeInsets = useInsets() || undefined;
   const vkBridgeAdaptivityProps = transformVKBridgeAdaptivity(useAdaptivity());
 
-  const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
+  const { vk_platform } = parseURLSearchParamsForGetLaunchParams(
+    window.location.search,
+  );
 
-  const mockPlatform = import.meta.env.DEV ? import.meta.env.VITE_MOCK_PLATFORM : undefined;
+  const mockPlatform = import.meta.env.DEV
+    ? import.meta.env.VITE_MOCK_PLATFORM
+    : undefined;
   const platform =
-    vk_platform === "desktop_web" || mockPlatform === "vkcom" ? "vkcom" : undefined;
+    vk_platform === "desktop_web" || mockPlatform === "vkcom"
+      ? "vkcom"
+      : undefined;
 
   return (
     <ConfigProvider
@@ -81,10 +92,14 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
                   <ConfirmProvider>
                     <ModalProvider>
                       <AuthGate>
-                        <WsProvider>
-                          <GlobalWsListener />
-                          {children}
-                        </WsProvider>
+                        {/* ConsentGate: до акцепта правовых документов приложение
+                          (WS, навигация, запросы) не монтируется. */}
+                        <ConsentGate>
+                          <WsProvider>
+                            <GlobalWsListener />
+                            {children}
+                          </WsProvider>
+                        </ConsentGate>
                       </AuthGate>
                     </ModalProvider>
                   </ConfirmProvider>

@@ -98,7 +98,7 @@ afterEach(async () => {
 });
 
 describe("POST /users/me/onboarding — completion", () => {
-  it("persists a valid version (200, version in response and DB)", async () => {
+  it("persists a valid version (200, version and consent timestamp in response and DB)", async () => {
     // Arrange
     const userId = await createUser();
     const token = await signAccessToken(userId);
@@ -113,6 +113,11 @@ describe("POST /users/me/onboarding — completion", () => {
     expect(body.onboardingVersion).toBe("1");
     const dbUser = await db.user.findUnique({ where: { id: userId } });
     expect(dbUser?.onboardingVersion).toBe("1");
+    // Момент акцепта (152-ФЗ ст. 9): проставлен, недавний.
+    expect(dbUser?.consentAcceptedAt).not.toBeNull();
+    expect(
+      Date.now() - (dbUser?.consentAcceptedAt?.getTime() ?? 0),
+    ).toBeLessThan(60_000);
   });
 
   it("accepts a version of exactly 50 characters (boundary)", async () => {
@@ -217,10 +222,14 @@ describe("POST /users/me/onboarding — completion", () => {
 });
 
 describe("PATCH /admin/users/:id/onboarding-reset — admin reset", () => {
-  it("nulls onboardingVersion of a user with a completed onboarding (200 + DB null)", async () => {
-    // Arrange — пользователь с пройденным онбордингом (версия задана в БД).
+  it("nulls onboardingVersion and consent timestamp of a user with a completed onboarding (200 + DB nulls)", async () => {
+    // Arrange — пользователь с пройденным онбордингом и акцептом.
     const cookie = await loginAndGetCookie();
     const userId = await createUser({ onboardingVersion: "1" });
+    await db.user.update({
+      where: { id: userId },
+      data: { consentAcceptedAt: new Date() },
+    });
 
     // Act
     const res = await adminRequest(
@@ -229,12 +238,13 @@ describe("PATCH /admin/users/:id/onboarding-reset — admin reset", () => {
       cookie
     );
 
-    // Assert — флаг обнулён в БД; ответ — обновлённый admin user DTO.
+    // Assert — флаг и момент акцепта обнулены в БД; ответ — обновлённый admin user DTO.
     expect(res.status).toBe(200);
     const body = (await res.json()) as { id: string; bannedAt: string | null };
     expect(body.id).toBe(userId);
     const dbUser = await db.user.findUnique({ where: { id: userId } });
     expect(dbUser?.onboardingVersion).toBeNull();
+    expect(dbUser?.consentAcceptedAt).toBeNull();
   });
 
   it("is idempotent: resetting an already-null flag returns the user (200)", async () => {
@@ -255,6 +265,7 @@ describe("PATCH /admin/users/:id/onboarding-reset — admin reset", () => {
     expect(body.id).toBe(userId);
     const dbUser = await db.user.findUnique({ where: { id: userId } });
     expect(dbUser?.onboardingVersion).toBeNull();
+    expect(dbUser?.consentAcceptedAt).toBeNull();
   });
 
   it("requires an admin session: 401 without the cookie", async () => {

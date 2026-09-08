@@ -658,8 +658,9 @@ adminRouter.patch("/users/:id/unban", mutationLimiter, async (c) => {
 });
 
 /**
- * Сброс онбординга пользователя: обнуляем onboardingVersion.
- * При следующем запуске приложения пользователь снова увидит слайды.
+ * Сброс онбординга пользователя: обнуляем onboardingVersion и момент
+ * акцепта (consentAcceptedAt) — при следующем запуске пользователь снова
+ * увидит слайды и экран согласия (повторный акцепт новой редакции).
  * Идемпотентно: сброс уже пустого флага просто возвращает пользователя.
  */
 adminRouter.patch("/users/:id/onboarding-reset", mutationLimiter, async (c) => {
@@ -675,7 +676,7 @@ adminRouter.patch("/users/:id/onboarding-reset", mutationLimiter, async (c) => {
 
   const updated = await db.user.update({
     where: { id },
-    data: { onboardingVersion: null },
+    data: { onboardingVersion: null, consentAcceptedAt: null },
   });
 
   return c.json(serializeAdminUser(updated));

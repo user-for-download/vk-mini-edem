@@ -31,14 +31,14 @@ import { ProfileView } from "@/views/ProfileView/ProfileView";
 import { SwipeBackSync } from "@/hooks/useSwipeBackSync";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { useOnboarding } from "@/onboarding/useOnboarding";
 import { parseDeepLink } from "@/helpers/deepLink";
 import { useModalApi } from "@/providers/ModalProvider";
 import { loadModule } from "@/helpers/loadModule";
 
 export default function App() {
   const { isOnline, wasOffline } = useOnlineStatus();
-  useOnboarding();
+  // Онбординг (слайды + акцепт правовых документов) живёт в ConsentGate:
+  // App монтируется только после согласия.
   const [role, setRole] = useState<Role>(() => {
     try {
       const storedRole = localStorage.getItem("edem-role");
