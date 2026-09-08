@@ -2,6 +2,7 @@ import { useState, type FC } from "react";
 import {
   Avatar,
   Button,
+  ButtonGroup,
   Caption,
   Box,
   Flex,
@@ -24,6 +25,7 @@ import {
   Icon24NotificationOutline,
   Icon24HelpOutline,
   Icon24InfoCircleOutline,
+  Icon24SearchOutline,
 } from "@vkontakte/icons";
 import { useRouteNavigator } from "@vkontakte/vk-mini-apps-router";
 import type { Role, Trip } from "@/types";
@@ -105,7 +107,7 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
       title: "Подтвердите удаление",
       description:
         "Восстановление будет невозможно. Удалить профиль окончательно?",
-      confirmTitle: "Удалить профиль",
+      confirmTitle: "Удалить",
     });
     if (!second) return;
     setDeleting(true);
@@ -147,9 +149,21 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             Личность подтверждена ВКонтакте
           </Caption>
           <Spacing size={4} />
-          <Button mode="secondary" size="m" onClick={onOpenEditProfile}>
-            Редактировать
-          </Button>
+          <ButtonGroup mode="horizontal" gap="m">
+            <Button mode="secondary" size="m" onClick={onOpenEditProfile}>
+              Редактировать
+            </Button>
+            <Button
+              mode="tertiary"
+              appearance="negative"
+              size="m"
+              loading={deleting}
+              disabled={deleting}
+              onClick={() => void handleDeleteAccount()}
+            >
+              Удалить профиль
+            </Button>
+          </ButtonGroup>
         </Flex>
         <Spacing size={16} />
 
@@ -288,6 +302,15 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
             История поездок
           </SimpleCell>
         )}
+        {role === "passenger" && (
+          <SimpleCell
+            before={<Icon24SearchOutline />}
+            chevron="always"
+            onClick={() => routeNavigator.push("/ride-requests")}
+          >
+            Мои запросы
+          </SimpleCell>
+        )}
         <SimpleCell
           before={<Icon24MessageStarsOutline />}
           chevron="always"
@@ -319,24 +342,6 @@ export const ProfilePanel: FC<ProfilePanelProps> = ({
         >
           О сервисе
         </SimpleCell>
-      </Group>
-
-      <Group header={<Header size="s">опасная зона</Header>}>
-        <Box padding="system">
-          <Button
-            mode="tertiary"
-            appearance="negative"
-            loading={deleting}
-            disabled={deleting}
-            stretched
-            onClick={() => void handleDeleteAccount()}
-          >
-            Удалить профиль
-          </Button>
-          <Caption level="1">
-            Активные поездки и брони нужно завершить или отменить заранее.
-          </Caption>
-        </Box>
       </Group>
 
       <Spacing size={24} />
