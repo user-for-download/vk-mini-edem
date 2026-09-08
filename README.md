@@ -125,7 +125,8 @@ npm run build:contracts  # только contracts
 npm run db:generate       # Сгенерировать Prisma Client (в backend/src/generated, gitignored)
 npm run db:migrate        # Создать миграцию (dev) + пересоздать клиент
 npm run db:migrate:deploy # Применить миграции к БД
-npm run db:seed           # Заполнить БД тестовыми данными (идемпотентно)
+npm run db:seed           # Заполнить БД тестовыми данными (идемпотентно; dev/test only)
+npm run db:seed:cities    # Только справочник городов (идемпотентно; безопасен для prod)
 npm run prisma:validate   # Валидация schema.prisma
 ```
 Подключение — через pg driver-адаптер `@prisma/adapter-pg` (`backend/src/db.ts`): URL из `DATABASE_URL`, параметры пула заданы в коде (node-pg игнорирует `connection_limit`/`pool_timeout` из URL — это параметры старого Rust-движка). Конфигурация CLI — `backend/prisma.config.ts`: в Prisma 7 `datasource.url` из схемы и автозагрузка `.env` удалены, URL берётся из окружения, `.env` подгружается явно. Сгенерированный клиент (`backend/src/generated/`) компилируется tsc в `dist`; после `git pull` с изменённой схемой выполните `npm run db:generate`.
@@ -355,11 +356,19 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
    ```bash
    npm run db:migrate:deploy
    ```
-3. **Запустить** (production):
+3. **Наполнить справочник городов** (только на свежей БД; полный
+   `db:seed` в проде запрещён — он создаёт демо-пользователей и поездки):
+   ```bash
+   npm run db:seed:cities   # идемпотентно, админские города не трогает
+   ```
+4. **Запустить** (production):
    ```bash
    NODE_ENV=production PORT=3000 npm start
    ```
    Или через Docker: `docker compose up -d --build` (backend на :3000, админ-панель webapp на :3014, миграции применяются при старте).
+
+Полный чеклист релиза (секреты, VK-консоль, проверки после деплоя) — в
+[`docs/deployment/production-checklist.md`](docs/deployment/production-checklist.md).
 
 ### Переменные окружения (production)
 

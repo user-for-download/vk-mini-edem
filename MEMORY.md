@@ -125,6 +125,7 @@ Edem is a VK Mini App for shared rides. It is an npm-workspaces TypeScript monor
 - **Contracts:** `city.schema.ts` + `city.dto.ts` с константами `CITY_NAME_MAX_LENGTH = 100`, `CITY_SUGGEST_LIMIT_MAX = 20` и `normalizeCityName`/`cityNameNormalized` хелперами. Уникальный индекс `City_nameNormalized_key` создаётся SQL-миграцией (Prisma не умеет в unique с выражением).
 - **Mini-app:** новый `CityAutocomplete` компонент (VKUI `Input` + popup с `Cell`-списком, keyboard nav ↑/↓/Enter/Esc, click-outside, async typing). В `CreateTripModal`/`EditTripModal` поля «Откуда»/«Куда» заменены на `CityAutocomplete`, адреса остались свободным текстом. `useCityAutocompleteQuery` с `keepPreviousData` (без мигания), `staleTime: 60s`. `Trip` теперь включает `fromCityId`/`toCityId` (nullable, для pre-fill в EditTripModal).
 - **Webapp:** новая страница `/cities` со списком (поиск с дебаунсом 300мс, пагинация), диалоги создания/переименования/удаления. Удаление заблокировано UI если `tripsCount > 0`. Sidebar: «Города» с `MapPin` иконкой. Lazy chunk: 88.96 kB / 24.38 kB gzip.
+- **Prod-сид:** `db:seed:cities` (`backend/prisma/seed-cities.ts`, root/backend скрипты) — 25 городов без демо-данных: идемпотентен, админские города не трогает, PK не переписывает (расхождение id → warning). Полный `db:seed` в проде запрещён (24 демо-юзера + 30 поездок). Docker CMD гоняет только `migrate deploy`, справочник — отдельным шагом (см. `docs/deployment/production-checklist.md`).
 
 ## City Picker + Locked Route (UX: CustomSelect, маршрут заблокирован в PATCH)
 
