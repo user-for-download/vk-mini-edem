@@ -1,7 +1,7 @@
 // backend/src/auth/index.ts
 import { Hono } from "hono";
 import { Prisma } from "../generated/prisma/client.js";
-import { authRequestSchema, refreshRequestSchema } from "@edem/contracts";
+import { authRequestSchema, refreshRequestSchema, telegramAuthRequestSchema } from "@edem/contracts";
 import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../env.js";
@@ -12,6 +12,8 @@ import { serializeUser } from "../serializers/index.js";
 
 import { verifyVkLaunchSignature } from "./vkSign.js";
 import { resolveVkProfile } from "./vkProfile.js";
+import { verifyTelegramInitData } from "./telegramSign.js";
+import { resolveTelegramProfile } from "./telegramProfile.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -38,6 +40,12 @@ const refreshLimiter = createRateLimiter({
   windowMs: env.REFRESH_RATE_WINDOW_MS,
   max: env.REFRESH_RATE_MAX,
   keyPrefix: "auth-refresh",
+});
+
+const tgAuthLimiter = createRateLimiter({
+  windowMs: env.TG_AUTH_RATE_WINDOW_MS,
+  max: env.TG_AUTH_RATE_MAX,
+  keyPrefix: "auth-tg",
 });
 
 authRouter.post("/vk", vkAuthLimiter, async (c) => {
@@ -169,6 +177,146 @@ authRouter.post("/vk", vkAuthLimiter, async (c) => {
     logger.warn(
       { userId: finalUser.id, revokedCount },
       "[Auth] VK login rejected — user is banned",
+    );
+    return c.json(
+      {
+        code: ERROR_CODES.FORBIDDEN,
+        message: "Account is banned",
+        banReason: finalUser.banReason ?? null,
+      },
+      403,
+    );
+  }
+
+  if (finalUser.deletedAt) {
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+      403,
+    );
+  }
+
+  const accessToken = await signAccessToken(finalUser.id);
+  const refreshToken = await signRefreshToken(finalUser.id); // Создаёт запись в БД
+
+  return c.json({
+    accessToken,
+    refreshToken,
+    expiresIn: env.JWT_ACCESS_TTL_SECONDS,
+    user: serializeUser(finalUser),
+  });
+});
+
+authRouter.post("/telegram", tgAuthLimiter, async (c) => {
+  const body = await getSanitizedBody(c);
+  const parseResult = telegramAuthRequestSchema.safeParse(body);
+
+  if (!parseResult.success) {
+    return c.json(
+      {
+        message: "Invalid request payload",
+        errors: z.formatError(parseResult.error),
+      },
+      400,
+    );
+  }
+
+  const { initData } = parseResult.data;
+
+  // Не сконфигурирован: токен бота не задан и dev-режим выключен.
+  // Это не «невалидная подпись» (401), а выключенная фича (как пустой
+  // ADMIN_TOKEN): клиенту не нужно ретраить и сбрасывать сессию.
+  if (!env.TELEGRAM_BOT_TOKEN && !env.ALLOW_DEV_AUTH) {
+    return c.json(
+      { code: ERROR_CODES.INTERNAL_ERROR, message: "Telegram auth is not configured" },
+      503,
+    );
+  }
+
+  const result = verifyTelegramInitData(initData);
+
+  if (!result.isValid || result.telegramUserId === undefined) {
+    return c.json({ message: "Invalid or expired signature" }, 401);
+  }
+
+  const telegramUserId = result.telegramUserId;
+
+  // Display-данные: user-объект подписан Telegram (часть initData), но
+  // всё равно проходит санитизацию и host-allowlist аватара
+  // (telegramProfile.ts — defense in depth, единообразно с VK-веткой).
+  const { name: tgName, avatar: tgAvatar } = resolveTelegramProfile(result.user);
+  const placeholderName = `Пользователь Telegram ${telegramUserId}`;
+
+  // Каноника гонок — как у VK: уникальный telegramUserId, upsert как
+  // SELECT → INSERT (не ON CONFLICT) при пустом update → P2002 у второго
+  // из двух конкурентных запусков; один ретрай решает (см. /vk выше).
+  const upsertUser = () =>
+    db.user.upsert({
+      where: { telegramUserId },
+      create: {
+        telegramUserId,
+        name: tgName ?? placeholderName,
+        avatar: tgAvatar ?? DEFAULT_AVATAR_URL,
+        rating: 5.0,
+        reviewsCount: 0,
+        tripsCount: 0,
+        // Telegram-auth = верифицированный вход (подпись initData) —
+        // зеркально VK-ветке: isVerified true без отдельной модерации.
+        isVerified: true,
+        verifiedAt: new Date(),
+      },
+      update: {
+        // Аватар не редактируется через API — синхронизируем с актуальным
+        // фото Telegram при входе. Tombstone удалённых не трогаем (ниже).
+        ...(tgAvatar ? { avatar: tgAvatar } : {}),
+      },
+      include: { car: true },
+    });
+
+  // Tombstone удалённых хранит telegramUserId для блокировки повторного
+  // входа: проверяем ДО upsert, чтобы отклонённый логин не мутировал запись.
+  const tombstone = await db.user.findUnique({
+    where: { telegramUserId },
+    select: { id: true, deletedAt: true },
+  });
+  if (tombstone?.deletedAt) {
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+      403,
+    );
+  }
+
+  let user;
+  try {
+    user = await upsertUser();
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Гонка конкурентных запусков: другой запрос успел создать пользователя.
+      user = await upsertUser();
+    } else {
+      throw error;
+    }
+  }
+
+  // Placeholder-имена дописываем реальным именем Telegram; вручную
+  // отредактированное (PATCH /users/me) не перезаписываем. Зеркально VK.
+  const finalUser =
+    tgName && user.name === placeholderName
+      ? await db.user.update({
+          where: { id: user.id },
+          data: { name: tgName },
+          include: { car: true },
+        })
+      : user;
+
+  // Проверка бана ДО выпуска токенов — единая точка отказа обеих платформ.
+  if (finalUser.bannedAt) {
+    const revokedCount = await revokeAllActiveTokens(finalUser.id);
+    logger.warn(
+      { userId: finalUser.id, revokedCount },
+      "[Auth] Telegram login rejected — user is banned",
     );
     return c.json(
       {

@@ -147,6 +147,32 @@ export const env = {
   VK_SERVICE_KEY: process.env.VK_SERVICE_KEY || "",
 
   /**
+   * Токен Telegram-бота (выдаёт @BotFather). Нужен для серверной
+   * валидации initData Telegram Mini Apps (HMAC-SHA256, @telegram-apps/
+   * init-data-node). Опционален: пустое значение = Telegram-auth выключен
+   * (POST /auth/telegram отвечает 503) — приложение продолжает работать
+   * на VK. В dev/test при ALLOW_DEV_AUTH без токена работает dev-bypass
+   * (hash=dev-hash, см. auth/telegramSign.ts). Секрет: не логировать,
+   * не коммитить. Намеренно НЕ secretEnv: эфемерный токен бессмыслен,
+   * роут должен быть закрыт, пока токен не задан (как ADMIN_TOKEN).
+   */
+  TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || "",
+
+  /**
+   * TTL initData в секундах: сколько подписанная Telegram строка считается
+   * свежей (анти-replay). Дефолт 1 час (не платформенные сутки): initData
+   * может быть украдена и переиспользована в окне валидности; длинную
+   * сессию держит наша JWT refresh-ротация, а не initData.
+   */
+  TG_INIT_DATA_TTL_SECONDS: positiveIntEnv("TG_INIT_DATA_TTL_SECONDS", 3600),
+
+  /**
+   * Rate limit Telegram-auth (зеркально VK-лимитеру: те же дефолты).
+   */
+  TG_AUTH_RATE_WINDOW_MS: positiveIntEnv("TG_AUTH_RATE_WINDOW_MS", 5 * 60 * 1000),
+  TG_AUTH_RATE_MAX: positiveIntEnv("TG_AUTH_RATE_MAX", 5),
+
+  /**
    * CORS.
    * В production список origin обязателен.
    */
