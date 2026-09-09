@@ -48,6 +48,9 @@ services:
       # VK API: сервисный ключ мини-аппа для push-уведомлений (опционально)
       # notifications.sendMessage. Пусто = push не отправляются, приложение работает.
       VK_SERVICE_KEY: ${VK_SERVICE_KEY:-}
+      # Telegram Mini Apps: токен бота для валидации initData
+      # (POST /api/v1/auth/telegram). Пусто = Telegram-auth выключен (503).
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ALLOW_DEV_AUTH: "false"
