@@ -173,6 +173,18 @@ export const env = {
   TG_AUTH_RATE_MAX: positiveIntEnv("TG_AUTH_RATE_MAX", 5),
 
   /**
+   * Хосты Telegram-версии фронта (comma-separated): запросы со Host из
+   * этого списка получают telegram-app/dist вместо mini-app/dist
+   * (см. host-routing в app.ts). Пусто = все получают mini-app/dist.
+   * Пример: "tg-edem.binetc.fun". Reverse proxy не трогаем — маршрутизация
+   * по Host на уровне приложения; CORS не нужен (same-origin через прокси).
+   */
+  TELEGRAM_HOSTS: (process.env.TELEGRAM_HOSTS || "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean),
+
+  /**
    * CORS.
    * В production список origin обязателен.
    */

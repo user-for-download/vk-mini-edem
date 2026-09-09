@@ -51,6 +51,9 @@ services:
       # Telegram Mini Apps: токен бота для валидации initData
       # (POST /api/v1/auth/telegram). Пусто = Telegram-auth выключен (503).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # Хосты Telegram-фронта (comma-separated): Host из списка получает
+      # telegram-app/dist вместо mini-app/dist. Пример: tg-edem.binetc.fun.
+      TELEGRAM_HOSTS: ${TELEGRAM_HOSTS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ALLOW_DEV_AUTH: "false"

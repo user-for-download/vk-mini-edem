@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
 COPY mini-app/package.json ./mini-app/
+COPY telegram-app/package.json ./telegram-app/
 # webapp в image не собирается, но его package.json нужен npm ci:
 # корневой package.json объявляет workspace "webapp", без него установка падает.
 COPY webapp/package.json ./webapp/
@@ -22,10 +23,12 @@ COPY tsconfig.json ./
 COPY packages/contracts ./packages/contracts
 COPY backend ./backend
 COPY mini-app ./mini-app
+COPY telegram-app ./telegram-app
 
 RUN cd packages/contracts && npm run build
 RUN cd backend && npx prisma generate && npm run build
 RUN cd mini-app && npm run build
+RUN cd telegram-app && npm run build
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
@@ -49,6 +52,8 @@ COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/packages/contracts/dist ./node_modules/@edem/contracts/dist
 COPY --from=builder /app/packages/contracts/package.json ./node_modules/@edem/contracts/
 COPY --from=builder /app/mini-app/dist ./mini-app/dist
+# Telegram mini-app (host-based Static в app.ts: TELEGRAM_HOSTS).
+COPY --from=builder /app/telegram-app/dist ./telegram-app/dist
 
 # The application does not need root privileges at runtime.
 RUN chown -R node:node /app

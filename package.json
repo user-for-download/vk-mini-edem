@@ -8,6 +8,7 @@
   },
   "workspaces": [
     "mini-app",
+    "telegram-app",
     "backend",
     "packages/*",
     "webapp"
@@ -16,7 +17,9 @@
     "dev": "npm run build:contracts && npm run db:generate && VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "BACKEND_PORT=${BACKEND_PORT:-3011} npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=mini-app",
-    "build": "npm run build:contracts && npm run db:generate && npm run build --workspace=backend && npm run build --workspace=mini-app && npm run build --workspace=webapp",
+    "dev:tg": "VITE_API_TARGET=${VITE_API_TARGET:-http://127.0.0.1:3011} npm run dev --workspace=telegram-app",
+    "build:tg": "npm run build --workspace=telegram-app",
+    "build": "npm run build:contracts && npm run db:generate && npm run build --workspace=backend && npm run build --workspace=mini-app && npm run build:tg && npm run build --workspace=webapp",
     "start": "node backend/dist/src/index.js",
     "build:contracts": "npm run build --workspace=packages/contracts",
     "db:push": "npm run db:push --workspace=backend",

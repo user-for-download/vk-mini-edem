@@ -9,6 +9,17 @@
 
 ### Added
 
+#### Telegram App — Фаза 1 (фундамент telegram-app)
+
+Новый workspace `telegram-app/` (React 19 + Vite 8 + `@telegram-apps/sdk-react@3.3.9` + `@telegram-apps/telegram-ui@2.1.13`). `telegram-ui` декларирует peer `react ^18`, но React 19 проверен рантайм-рендером (SSR-тест: AppRoot/List/Cell/Button рендерятся, `defaultProps` в dist отсутствуют); bun peer-зависимости не форсит — установка чистая. TON Connect не ставится (крипта не применима к райдшерингу).
+
+- **SDK init** (`src/init.ts`, `src/mockEnv.ts` — паттерны reactjs-template на актуальном скоупе): setDebug → initSDK → backButton.mount → initData.restore → miniApp.mount + themeParams.bindCssVars → viewport.mount. Mock окружения только при DEV (tree-shaken в проде): init data с `hash='dev-hash'` под dev-bypass бэкенда Фазы 0; `signature='dev-signature'` — схема launch params SDK 3.3.x требует поле signature. Отличия нового SDK от шаблона (@tma.js 3.0.8): `miniApp.mount()` внутри монтирует themeParams (двойной mount бросает «already mounting» — явный вызов убран, один mount на компонент); mount асинхронен (`await` перед `bindCssVars` — иначе «component is unmounted»); `mockTelegramEnv.onEvent` принимает кортеж `[method, payload]`, не `{name}`; AppRoot platform только `'base'|'ios'`; `retrieveRawInitData()` возвращает `string | undefined`. Все отличия задокументированы в коде.
+- **Портировано из mini-app**: `api/client.ts` 1:1 (single-flight refresh, ban/session-expired подписки, бан-парсинг), `store/useAuthStore.ts` (та же статус-машина bootstrap/refresh/background/banned/deleted; payload сменён на `retrieveRawInitData()` — RAW-строка без пересортировки, иначе HMAC), QueryClient-конфиг ретраев. VK-специфика (vk-bridge, launch params, vk-mini-apps-router) вырезана полностью.
+- **UI-шелл на telegram-ui**: AppRoot + AuthGate-эквивалент (спиннер/бан с причиной/удалён/ошибка с ретраем + подписки apiClient + visibilitychange) + заглушка главной «🚗 Едем» с именем авторизованного; `miniApp.ready.ifAvailable()` после монтирования; вне Telegram прод-сборка показывает EnvUnsupported.
+- **Host-based раздача прод-статики** (backend `app.ts`): Host из `TELEGRAM_HOSTS` (`tg-edem.binetc.fun`) получает `telegram-app/dist`, остальные — `mini-app/dist`; SPA-fallback и API-404 сохранены для обеих веток. BotFather не трогали — кнопка @edem_mini_bot уже указывает на root домена. Docker: сборка telegram-app + COPY dist; compose прокидывает `TELEGRAM_HOSTS`. Root: workspace + `dev:tg` (Vite :3012, proxy /api→:3011) + `build:tg` (включён в общий `build`).
+- **Проверки**: dev-флоу в headless Chromium — mock → dev-bypass → экран authenticated («Dev Telegram»), JS-ошибок нет; docker host-routing верифицирован по хэшам ассетов (TG `index-Db96N9ef.js` vs VK `index-CRqNeKdd.js`); публичный `https://tg-edem.binetc.fun/` отдаёт TG-сборку. Реальный токен убран из `backend/.env` (иначе отключает dev-bypass; прод-токен живёт только в root `.env` → compose).
+- **Тесты**: `store/__tests__/useAuthStore.test.ts` (7: happy path, RAW-passthrough assert побайтово, бан с/без причины, удалён, SDK без init data, сетевая ошибка). Backend 465/465, root typecheck 0 ошибок.
+
 #### Telegram Auth — Фаза 0 (переход на Telegram Mini Apps)
 
 Стратегия: VK заморожен (тег `vk-final`; снапшот с полной git-историей — репо `user-for-download/vk-mini-app-edem`, push всех веток и тегов), активная разработка — Telegram. VK-код в этом репо не трогается до паритета telegram-app (мини-апп остаётся референсом для портирования), демонтаж — отдельной фазой после.

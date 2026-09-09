@@ -1,0 +1,22 @@
+{
+  "name": "telegram-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=${VITE_TG_PORT:-3012} --host=0.0.0.0",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sentry/react": "^10.73.0",
+    "@tanstack/react-query": "^5.102.8",
+    "@telegram-apps/sdk-react": "^3.3.9",
+    "@telegram-apps/telegram-ui": "^2.1.13",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "zod": "^4.5.4",
+    "zustand": "^5.0.15"
+  }
+}

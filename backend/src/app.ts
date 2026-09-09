@@ -223,17 +223,39 @@ app.route("/api/v1/admin", adminRouter);
 app.get("/api/v1/ws", createWsHandler(upgradeWebSocket));
 
 if (env.isProduction) {
-  const distPath = path.resolve(process.cwd(), "mini-app/dist");
+  // Две SPA-раздачи по Host-заголовку: VK mini-app (root по умолчанию,
+  // заморожен) и Telegram mini-app (хосты из TELEGRAM_HOSTS —
+  // bot-кнопка @edem_mini_bot указывает на root tg-домена, поэтому
+  // префикс /tg/ не используется: чистые URL и deep-links).
+  const vkDistPath = path.resolve(process.cwd(), "mini-app/dist");
+  const tgDistPath = path.resolve(process.cwd(), "telegram-app/dist");
 
   // index.html читаем один раз при старте, а не на каждый SPA-запрос
-  let indexHtml: string | null = null;
-  try {
-    indexHtml = fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
-  } catch {
-    logger.error("Frontend build (index.html) not found in production mode");
-  }
+  const readIndex = (distPath: string, label: string): string | null => {
+    try {
+      return fs.readFileSync(path.join(distPath, "index.html"), "utf-8");
+    } catch {
+      logger.error({ distPath }, `Frontend build (index.html) not found for ${label}`);
+      return null;
+    }
+  };
+  const vkIndexHtml = readIndex(vkDistPath, "mini-app");
+  const tgIndexHtml =
+    env.TELEGRAM_HOSTS.length > 0 ? readIndex(tgDistPath, "telegram-app") : null;
 
-  app.use("/*", serveStatic({ root: path.relative(process.cwd(), distPath) }));
+  const vkStatic = serveStatic({ root: path.relative(process.cwd(), vkDistPath) });
+  const tgStatic = serveStatic({ root: path.relative(process.cwd(), tgDistPath) });
+
+  const isTelegramHost = (c: { req: { header: (name: string) => string | undefined } }): boolean => {
+    if (env.TELEGRAM_HOSTS.length === 0) return false;
+    const host = (c.req.header("host") || "").split(":")[0].toLowerCase();
+    return env.TELEGRAM_HOSTS.includes(host);
+  };
+
+  app.use("/*", async (c, next) => {
+    const mw = isTelegramHost(c) ? tgStatic : vkStatic;
+    return mw(c, next);
+  });
   app.get("*", (c) => {
     // Неизвестные API-запросы не должны попадать в SPA-fallback:
     // возвращаем 404 JSON в общем формате ошибок, а не index.html.
@@ -241,6 +263,7 @@ if (env.isProduction) {
       return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Not found" }, 404);
     }
 
+    const indexHtml = isTelegramHost(c) ? tgIndexHtml : vkIndexHtml;
     if (indexHtml) {
       return c.html(indexHtml);
     }
