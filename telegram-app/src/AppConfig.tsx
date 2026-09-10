@@ -4,7 +4,10 @@ import { useLaunchParams } from "@telegram-apps/sdk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGate } from "@/components/AuthGate";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { ApiError } from "@/api/client";
+import { Onboarding } from "@/components/Onboarding";
+import { WsProvider, TelegramRealtimeListener } from "@/providers/WebSocketProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,7 +84,8 @@ export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
       {/* ErrorBoundary — самый внешний рубеж, fallback без UI-кита. */}
       <ErrorBoundary fallback={ErrorFallback}>
         <AppRoot platform={platform}>
-          <AuthGate>{children}</AuthGate>
+          <OfflineBanner />
+          <AuthGate><Onboarding><WsProvider><TelegramRealtimeListener />{children}</WsProvider></Onboarding></AuthGate>
         </AppRoot>
       </ErrorBoundary>
     </QueryClientProvider>

@@ -1,6 +1,6 @@
 # Общая политика логов: stdout (pino/nginx/postgres) → docker json-file
 # с ротацией. Ограниченный объём = ограниченный срок хранения журналов
-# (в т.ч. PII: ip в rate-limit/ws-логах, vkUserId в vk_push) —
+# (в т.ч. PII: ip в rate-limit/ws-логах) —
 # требуется правовой частью (Политика конфиденциальности, раздел 7).
 # YAML-якорь подставляется в каждый сервис ниже.
 x-logging: &default-logging
@@ -41,26 +41,28 @@ services:
       NODE_ENV: production
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      VK_APP_SECRET: ${VK_APP_SECRET:?VK_APP_SECRET is required}
-      # VK API: отправка сообщений пользователям от имени сообщества (опционально)
-      VK_GROUP_ID: ${VK_GROUP_ID:-}
-      VK_GROUP_TOKEN: ${VK_GROUP_TOKEN:-}
-      # VK API: сервисный ключ мини-аппа для push-уведомлений (опционально)
-      # notifications.sendMessage. Пусто = push не отправляются, приложение работает.
-      VK_SERVICE_KEY: ${VK_SERVICE_KEY:-}
       # Telegram Mini Apps: токен бота для валидации initData
-      # (POST /api/v1/auth/telegram). Пусто = Telegram-auth выключен (503).
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # (POST /api/v1/auth/telegram). Обязателен: без него Telegram-вход
+      # закрыт, а staging-стенд бессмысленен.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       # Хосты Telegram-фронта (comma-separated): Host из списка получает
-      # telegram-app/dist вместо mini-app/dist. Пример: tg-edem.binetc.fun.
-      TELEGRAM_HOSTS: ${TELEGRAM_HOSTS:-}
+      # telegram-app/dist. Пример: tg-edem.binetc.fun.
+      # Обязателен: без него приложение отвечает 404.
+      TELEGRAM_HOSTS: ${TELEGRAM_HOSTS:?TELEGRAM_HOSTS is required}
+      # Окно свежести initData, секунды (дефолт backend 3600).
+      TG_INIT_DATA_TTL_SECONDS: ${TG_INIT_DATA_TTL_SECONDS:-3600}
+      # TG-доставка уведомлений: kill-switch (дефолт true) и окно дедупа, мс.
+      TELEGRAM_DELIVERY_ENABLED: ${TELEGRAM_DELIVERY_ENABLED:-true}
+      TG_NOTIFICATION_DEDUPE_WINDOW_MS: ${TG_NOTIFICATION_DEDUPE_WINDOW_MS:-60000}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ALLOW_DEV_AUTH: "false"
       APP_VERSION: ${APP_VERSION:-0.1.0}
       # Rate limits (дефолты совпадают с backend/src/env.ts)
-      VK_AUTH_RATE_WINDOW_MS: ${VK_AUTH_RATE_WINDOW_MS:-300000}
-      VK_AUTH_RATE_MAX: ${VK_AUTH_RATE_MAX:-5}
+      # TG-auth: в compose проброшен для override в локальном .env
+      # (dev-стенд: TG_AUTH_RATE_MAX=100000; прод — дефолт 5, не менять).
+      TG_AUTH_RATE_WINDOW_MS: ${TG_AUTH_RATE_WINDOW_MS:-300000}
+      TG_AUTH_RATE_MAX: ${TG_AUTH_RATE_MAX:-5}
       REFRESH_RATE_WINDOW_MS: ${REFRESH_RATE_WINDOW_MS:-600000}
       REFRESH_RATE_MAX: ${REFRESH_RATE_MAX:-10}
       PUBLIC_READ_RATE_WINDOW_MS: ${PUBLIC_READ_RATE_WINDOW_MS:-60000}

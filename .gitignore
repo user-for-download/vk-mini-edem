@@ -8,6 +8,9 @@ backend/src/generated/
 coverage/
 .DS_Store
 *.log
+# Runtime audit journals (migration runs, tg-migration-23): durable output
+# of the deployment host, not source. Never commit run artifacts.
+backend/logs/
 .env
 !.env.example
 backend/.env

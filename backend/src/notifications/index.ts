@@ -6,6 +6,10 @@ import {
   publicReadLimiter,
 } from "../middleware/rateLimit.js";
 import { z } from "zod";
+import {
+  notificationSchema,
+  notificationsPageSchema,
+} from "@edem/contracts";
 
 export const notificationsRouter = new Hono<AuthEnv>();
 
@@ -64,7 +68,20 @@ notificationsRouter.get("/my", publicReadLimiter, async (c) => {
     where: { userId: user.id, isRead: false },
   });
 
-  return c.json({ items, nextCursor, unreadCount });
+  // Контракт ждёт createdAt ISO-строкой (z.string().datetime()),
+  // Prisma отдаёт Date — сериализуем до parse, иначе Zod бросает и роут
+  // отвечает 500 на любой непустой inbox.
+  const serialized = items.map((n) => ({
+    ...n,
+    createdAt: n.createdAt.toISOString(),
+  }));
+  return c.json(
+    notificationsPageSchema.parse({
+      items: serialized,
+      nextCursor,
+      unreadCount,
+    }),
+  );
 });
 
 notificationsRouter.patch("/:id/read", notificationReadLimiter, async (c) => {
@@ -81,7 +98,12 @@ notificationsRouter.patch("/:id/read", notificationReadLimiter, async (c) => {
     data: { isRead: true },
   });
 
-  return c.json(updated);
+  return c.json(
+    notificationSchema.parse({
+      ...updated,
+      createdAt: updated.createdAt.toISOString(),
+    }),
+  );
 });
 
 notificationsRouter.patch("/read-all", notificationReadLimiter, async (c) => {

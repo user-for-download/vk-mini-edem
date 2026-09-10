@@ -9,8 +9,7 @@ the defaults from `src/env.ts`.
 
 This applies to `PORT`/`BACKEND_PORT`, `JWT_ACCESS_TTL_SECONDS`,
 `JWT_REFRESH_TTL_SECONDS`, `ADMIN_JWT_TTL_SECONDS`, all `*_RATE_WINDOW_MS` and
-`*_RATE_MAX` settings, and the optional `VK_GROUP_ID`. An unset `VK_GROUP_ID`
-disables community messaging; an explicitly configured value must be positive.
+`*_RATE_MAX` settings, and `TG_INIT_DATA_TTL_SECONDS`.
 
 ## Auth rate limits
 
@@ -18,7 +17,7 @@ Auth endpoints use independent IP-based limiters:
 
 | Variable pair | Endpoint | Default |
 |---|---|---|
-| `VK_AUTH_RATE_WINDOW_MS` / `VK_AUTH_RATE_MAX` | `POST /api/v1/auth/vk` | 5 minutes / 5 requests |
+| `TG_AUTH_RATE_WINDOW_MS` / `TG_AUTH_RATE_MAX` | `POST /api/v1/auth/telegram` | 5 minutes / 5 requests |
 | `REFRESH_RATE_WINDOW_MS` / `REFRESH_RATE_MAX` | `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` | 10 minutes / 10 requests |
 | `ADMIN_LOGIN_RATE_WINDOW_MS` / `ADMIN_LOGIN_RATE_MAX` | `POST /api/v1/admin/auth/login` | 5 minutes / 5 requests |
 
@@ -74,30 +73,28 @@ ADMIN_LOGIN_RATE_WINDOW_MS=300000
 ADMIN_LOGIN_RATE_MAX=5
 ```
 
-## VK push notifications
+## Telegram notification delivery
 
-`VK_SERVICE_KEY` is the **service access key** of the mini-app (not the
-community token). It is used by `notifications.sendMessage` to deliver real
-push notifications to users on key events (booking confirmed/rejected, trip
-cancelled, trip completed). The service key is obtained in the VK console
-(dev.vk.com → Mini-app settings → Service access key) and is a secret —
-treat it like `JWT_SECRET`: do not log, do not commit, rotate on leak.
+Notifications are delivered **in-app**: every critical event is persisted to
+the DB (`Notification` inbox) and pushed over WebSocket while the app is open.
+There is no external push channel — Bot API delivery is blocked by product
+decision (see `docs/adr/telegram-notification-delivery.md`), the delivery
+service only resolves the deep-link and records observability
+(`src/services/telegramNotifications.ts`).
 
-- Unset/empty `VK_SERVICE_KEY` disables VK push: critical notifications are
-  still persisted to the DB and delivered over WebSocket (while the app is
-  open), but no push is sent. The rest of the business flow is unaffected.
-- The mini-app requests the corresponding user permission via
-  `VKWebAppAllowNotifications` (VK Bridge). Without that consent, VK rejects
-  the push at the API level.
-- Push is independent from community messaging (`VK_GROUP_ID` /
-  `VK_GROUP_TOKEN`, `messages.send`) and from the per-user
-  `notificationsEnabled` DB toggle. Critical events are pushed regardless of
-  the per-user toggle; community messaging has its own consent flow.
+- `TELEGRAM_DELIVERY_ENABLED` (default `true`) is the kill-switch: `false`
+  marks deliveries `disabled`, the inbox record is still created.
+- `TG_NOTIFICATION_DEDUPE_WINDOW_MS` (default `60000`) is the dedupe window
+  against duplicate deliveries of the same event.
+- Delivery never throws: a failure is logged (`tg_delivery_failed`) and does
+  not affect the caller's business transaction (the inbox row is already in
+  the DB).
 
-Example environment entry:
+Example environment entries:
 
 ```dotenv
-VK_SERVICE_KEY=replace-with-the-mini-app-service-access-key
+TELEGRAM_DELIVERY_ENABLED=true
+TG_NOTIFICATION_DEDUPE_WINDOW_MS=60000
 ```
 
 ## Metrics access
@@ -126,7 +123,7 @@ METRICS_TOKEN=replace-with-a-long-random-secret
 
 The backend logs structured JSON (pino) to **stdout** — no local log files,
 no in-app rotation. Log records may embed limited PII (IP in rate-limit/WS
-warnings, `vkUserId` in VK push/messenger logs, `userId` in business events).
+warnings, `telegramUserId` in delivery logs, `userId` in business events).
 
 Retention is enforced at the infrastructure level, not by the app:
 

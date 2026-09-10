@@ -15,10 +15,6 @@ export const userSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(100),
   avatar: z.string().url(),
-  // Числовой VK ID. Отдаётся дозированно (только участникам активной брони),
-  // чтобы клиент мог построить ссылку на личные сообщения vk.com/im?sel=<id>.
-  // В публичных выдачах поле отсутствует.
-  vkUserId: z.number().int().positive().optional(),
   rating: z.number().min(0).max(5),
   reviewsCount: z.number().int().min(0),
   tripsCount: z.number().int().min(0),

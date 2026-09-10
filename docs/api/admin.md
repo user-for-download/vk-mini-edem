@@ -106,7 +106,7 @@ createdAt (ISO)`. `banReason` — причина бана; `null` для бан�
 пользователя **не** отменяются (осознанно). Забаненный пользователь
 получает `403 { code: "FORBIDDEN", message: "Account is banned",
 banReason }` от `requireAuth` на всех аутентифицированных endpoint'ах,
-а также при логине (`/auth/vk` — токены не выдаются, активные
+а также при логине (`/auth/telegram` — токены не выдаются, активные
 refresh-токены отзываются) и в `/auth/refresh`; сервис сразу закрывает
 все открытые WebSocket-соединения пользователя (код `4403`) и
 отклоняет WS-аутентификацию (проверка `bannedAt` в БД при
@@ -224,7 +224,7 @@ reply (string|null), repliedAt (ISO|null), createdAt, userId, userName`.
 
 Обращения создаются пользователями через `POST /api/v1/feedback`
 (авторизованные) и `POST /api/v1/feedback/appeal` (забаненные, без токена —
-личность по подписи VK launch-параметров); см. `docs/api/feedback.md`.
+личность по подписи Telegram initData); см. `docs/api/feedback.md`.
 
 ### GET /api/v1/admin/feedback/:id
 

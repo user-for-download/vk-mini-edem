@@ -38,12 +38,12 @@ export async function init(options: {
       // (в @tma.js 3.0.x из шаблона был объект { name }).
       onEvent([method], next) {
         if (method === "web_app_request_theme") {
-          let tp: ThemeParams = {};
+          let tp: ThemeParams;
           if (firstThemeSent) {
             tp = themeParams.state();
           } else {
             firstThemeSent = true;
-            tp ||= retrieveLaunchParams().tgWebAppThemeParams;
+            tp = retrieveLaunchParams().tgWebAppThemeParams;
           }
           return emitEvent("theme_changed", { theme_params: tp });
         }
@@ -84,8 +84,11 @@ export async function init(options: {
   }
 
   if (viewport.mount.isAvailable()) {
-    viewport.mount().then(() => {
+    try {
+      await viewport.mount();
       viewport.bindCssVars();
-    });
+    } catch (error) {
+      console.warn("[Telegram] Viewport initialization failed", error);
+    }
   }
 }

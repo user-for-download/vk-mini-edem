@@ -62,30 +62,12 @@ describe("userSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should parse user with vkUserId (participant-scoped DM link)", () => {
-    const result = userSchema.safeParse({ ...validUser, vkUserId: 174028905 });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.vkUserId).toBe(174028905);
-    }
-  });
-
-  it("should parse user without vkUserId (public responses omit it)", () => {
+  it("should parse user without platform id (identity lives in auth layer)", () => {
     const result = userSchema.safeParse(validUser);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.vkUserId).toBeUndefined();
+      expect("vkUserId" in result.data).toBe(false);
     }
-  });
-
-  it("should reject user with non-positive vkUserId", () => {
-    expect(userSchema.safeParse({ ...validUser, vkUserId: 0 }).success).toBe(false);
-    expect(userSchema.safeParse({ ...validUser, vkUserId: -5 }).success).toBe(false);
-  });
-
-  it("should reject user with non-integer vkUserId", () => {
-    const result = userSchema.safeParse({ ...validUser, vkUserId: 1.5 });
-    expect(result.success).toBe(false);
   });
 });
 

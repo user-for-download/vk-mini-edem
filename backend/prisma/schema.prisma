@@ -15,11 +15,10 @@ datasource db {
 
 model User {
   id                   String    @id @default(uuid())
-  vkUserId             Int?      @unique
+  // VK-идентификатор удалён (tg-migration-26): платформа только Telegram.
   // Telegram-идентификатор (Mini App / bot). BigInt: TG user id давно
-  // превысил Int32 (~7 млрд), Int не подходит. Nullable + unique: у
-  // VK-легаси-пользователей его нет. Синхронизация параллельных запусков —
-  // как у vkUserId (upsert по unique + P2002-ретрай в auth-роуте).
+  // превысил Int32 (~7 млрд), Int не подходит. Синхронизация параллельных
+  // запусков — upsert по unique + P2002-ретрай в auth-роуте.
   telegramUserId       BigInt?   @unique
   name                 String
   avatar               String

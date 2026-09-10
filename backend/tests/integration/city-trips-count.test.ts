@@ -61,14 +61,14 @@ async function adminRequest(
   });
 }
 
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-let vkSeq = 9_400_000;
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+let tgSeq = 9_400_000n;
 
 async function createUserWithCar(): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `CityCountDriver-${++vkSeq}`,
-      vkUserId: vkSeq,
+      name: `CityCountDriver-${++tgSeq}`,
+      telegramUserId: tgSeq,
       avatar: "https://i.pravatar.cc/200?img=5",
     },
   });
@@ -77,7 +77,7 @@ async function createUserWithCar(): Promise<string> {
       userId: user.id,
       model: "Test",
       color: "white",
-      plate: `CC${vkSeq}`,
+      plate: `CC${tgSeq}`,
     },
   });
   return user.id;

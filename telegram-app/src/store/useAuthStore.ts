@@ -38,6 +38,11 @@ interface AuthState {
    * null. Не логируется. В dev вне Telegram — mock-строка из mockEnv.ts.
    */
   initData: string | null;
+  /**
+   * Последняя ошибка bootstrap (для различения UI: 429 rate-limit,
+   * сеть, 503 not configured). Null — ошибки не было или был успех.
+   */
+  lastAuthError: { status?: number; code?: string } | null;
   bootstrap: () => Promise<void>;
   refreshSession: () => Promise<void>;
   handleBackgroundState: (isHidden: boolean) => void;
@@ -114,6 +119,7 @@ function applyAuthenticated(set: (state: Partial<AuthState>) => void, response: 
     },
     banReason: null,
     initData: null,
+    lastAuthError: null,
   });
 }
 
@@ -145,13 +151,17 @@ function applyDeleted(set: (state: Partial<AuthState>) => void) {
   });
 }
 
-function applyUnauthenticated(set: (state: Partial<AuthState>) => void) {
+function applyUnauthenticated(set: (state: Partial<AuthState>) => void, error?: unknown) {
   apiClient.setSession(null);
   set({
     status: "unauthenticated",
     user: null,
     session: null,
     initData: null,
+    lastAuthError:
+      error instanceof ApiError
+        ? { status: error.status, code: error.code }
+        : { status: undefined, code: error instanceof Error && error.message.includes("init data") ? "INIT_DATA_UNAVAILABLE" : undefined },
   });
 }
 
@@ -161,6 +171,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   banReason: null,
   initData: null,
+  lastAuthError: null,
 
   bootstrap: async () => {
     if (bootstrapPromise) {
@@ -196,7 +207,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return;
         }
         console.error("[Auth] Bootstrap failed:", error);
-        applyUnauthenticated(set);
+        applyUnauthenticated(set, error);
       }
     })().finally(() => {
       bootstrapPromise = null;
@@ -325,6 +336,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: null,
       banReason: null,
       initData: null,
+      lastAuthError: reason === "Session expired" ? { code: "SESSION_EXPIRED" } : null,
     });
   },
 

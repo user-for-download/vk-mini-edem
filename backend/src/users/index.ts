@@ -64,8 +64,9 @@ usersRouter.delete("/me", requireUser, mutationLimiter, async (c) => {
         data: { status: "cancelled" },
       });
       await tx.car.deleteMany({ where: { userId: user.id } });
-      // Keep the signed VK identity as a tombstone: clearing it would allow the
-      // next VK login to create a second account for the same person.
+      // Keep the signed Telegram identity as a tombstone: clearing it would
+      // allow the next Telegram login to create a second account for the
+      // same person.
       await tx.user.update({
         where: { id: user.id },
         data: {
@@ -243,6 +244,69 @@ usersRouter.post("/me/car", requireUser, profileUpdateLimiter, upsertCar);
  * Алиас для обновления машины.
  */
 usersRouter.patch("/me/car", requireUser, profileUpdateLimiter, upsertCar);
+
+/**
+ * Удаление машины текущего пользователя.
+ *
+ * Инвариант trips-creation (trips/index.ts: создание поездки требует car,
+ * иначе NO_CAR): водитель с активными поездками без машины — неконсистентное
+ * состояние (карточки поездок показывают авто водителя). Поэтому при наличии
+ * active-поездок удаление блокируется 409 ACCOUNT_HAS_ACTIVE_OBLIGATIONS —
+ * зеркально DELETE /users/me. Завершённые/отменённые поездки — история,
+ * удалению не мешают. Брони пассажира машину не затрагивают (авто нужно
+ * только водителю), их не проверяем.
+ *
+ * Account-safe identity: requireUser отклоняет 401 без токена и 403
+ * забаненным/удалённым до handler'а; удаляется ТОЛЬКО car своего userId
+ * (чужие данные недоступны по построению). Нет авто → 404 NOT_FOUND.
+ * Возвращаем обновлённого пользователя (как upsertCar) — клиент синкает
+ * кэш и стор одним ответом.
+ */
+usersRouter.delete("/me/car", requireUser, profileUpdateLimiter, async (c) => {
+  const user = c.get("user");
+
+  const activeTrip = await db.trip.findFirst({
+    where: { driverId: user.id, status: "active" },
+    select: { id: true },
+  });
+  if (activeTrip) {
+    return c.json(
+      {
+        code: ERROR_CODES.ACCOUNT_HAS_ACTIVE_OBLIGATIONS,
+        message: "Resolve active trips first",
+      },
+      409,
+    );
+  }
+
+  const existing = await db.car.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+  if (!existing) {
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "Car not found" },
+      404,
+    );
+  }
+
+  await db.car.delete({ where: { userId: user.id } });
+
+  const updated = await db.user.findUnique({
+    where: { id: user.id },
+    include: { car: true },
+  });
+
+  // requireUser только что вернул пользователя из БД — строка существует.
+  if (!updated) {
+    return c.json(
+      { code: ERROR_CODES.NOT_FOUND, message: "User not found" },
+      404,
+    );
+  }
+
+  return c.json(serializeUser(updated));
+});
 
 /**
  * Публичный профиль пользователя.

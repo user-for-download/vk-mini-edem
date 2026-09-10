@@ -27,16 +27,16 @@ async function ensureCity(name: string): Promise<string> {
   return created.id;
 }
 
-// Детерминированный vkUserId (audit: test isolation): монотонный счётчик
+// Детерминированный telegramUserId (audit: test isolation): монотонный счётчик
 // вместо Math.random — ретраи/повторные прогоны дают предсказуемые id.
-let vkSeq = 8_000_000;
+let tgSeq = 8_000_000n;
 
 async function createUserWithCar(name: string): Promise<string> {
-  const seq = ++vkSeq;
+  const seq = ++tgSeq;
   const user = await db.user.create({
     data: {
       name: `${name}-${seq}`,
-      vkUserId: seq,
+      telegramUserId: seq,
       avatar: "https://i.pravatar.cc/200?img=1",
     },
   });

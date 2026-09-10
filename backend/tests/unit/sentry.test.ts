@@ -38,7 +38,6 @@ const envMocks = vi.hoisted(() => ({
   isProduction: false,
   ALLOW_DEV_AUTH: false,
   PORT: 3000,
-  VK_APP_SECRET: "s",
   DATABASE_URL: "",
   JWT_SECRET: "",
   CORS_ORIGINS: "",

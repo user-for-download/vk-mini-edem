@@ -33,9 +33,9 @@ const { db } = await import("../../src/db.js");
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const ADMIN_TOKEN = "test-admin-token-limiter-gaps";
 
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
 // Диапазон 5_400_000+ не пересекается с другими integration-suite.
-let vkSeq = 5_400_000;
+let tgSeq = 5_400_000n;
 
 function mockAuth(userId: string) {
   // Формат high-fixes-01: mock-access-token-<userId>-<exp> + регистрация
@@ -54,8 +54,8 @@ function extractAdminCookie(response: Response): string {
 async function createUser(name: string): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `${name}-${++vkSeq}`,
-      vkUserId: vkSeq,
+      name: `${name}-${++tgSeq}`,
+      telegramUserId: tgSeq,
       avatar: "https://i.pravatar.cc/200?img=9",
     },
   });
@@ -198,7 +198,7 @@ describe("users: PATCH /me и /me/car — profileUpdateLimiter", () => {
           body: JSON.stringify({
             model: "Lada",
             color: "white",
-            plate: `RG${vkSeq}`,
+            plate: `RG${tgSeq}`,
           }),
         });
       }

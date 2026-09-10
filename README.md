@@ -1,46 +1,43 @@
-# Edem — Сервис попутных поездок (VK Mini App)
+# Edem — Сервис попутных поездок (Telegram Mini App)
 
-Монорепозиторий проекта **Edem** (аналог BlaBlaCar для VK Mini Apps). Приложение позволяет водителям предлагать поездки, а пассажирам — бронировать места, оставлять отзывы и просматривать историю своих поездок.
+Монорепозиторий проекта **Edem** (аналог BlaBlaCar для Telegram Mini Apps). Приложение позволяет водителям предлагать поездки, а пассажирам — бронировать места, оставлять отзывы и просматривать историю своих поездок.
 
 ## 🌟 Основные возможности
 
 - **Поиск поездок**: поиск с фильтрацией по городам, дате, цене и тегам, offset-пагинация (`page`/`limit`); собственные поездки исключаются из выдачи (при пустой странице клиент догружает следующие); уже отправившиеся поездки в выдачу не попадают.
 - **Создание поездок**: для водителей с указанием цены, количества мест, тегов и комментария.
-- **Бронирование мест**: пассажиры бронируют места в активных поездках; защита от гонки броней на уровне БД (partial unique index + Serializable-транзакции).
+- **Бронирование мест**: пассажиры выбирают место и бронируют в активных поездках; защита от гонки броней на уровне БД (partial unique index + Serializable-транзакции).
 - **Заявки пассажиров**: водитель подтверждает или отклоняет заявки, место удерживается в статусе `pending`.
-- **Связь через ЛС ВКонтакте**: после создания брони и после подтверждения у пассажира и водителя появляется кнопка «Написать в VK», открывающая диалог ВКонтакте с контрагентом (`vk.com/im?sel={vkUserId}`). Свой чат не строится — используются сообщения VK. `vkUserId` отдаётся дозированно, только участникам активной брони.
 - **Отзывы и рейтинги**: система рейтингов водителей и пассажиров, отзывы после начала или завершения поездки в обе стороны (пассажир → водитель и водитель → пассажир). Отзывы проходят модерацию: создаются в статусе `pending` и публикуются после одобрения администратором — публичные списки и рейтинг учитывают только опубликованные; автор получает уведомление об одобрении/отклонении и видит статус в «Мои отзывы» профиля. Текст отзыва — до 150 символов.
-- **Уведомления**: встроенные уведомления + WebSocket-пуши (новая заявка, статус брони, отмена поездки) и **реальные push ВКонтакте** через `notifications.sendMessage` на ключевые события (подтверждение/отклонение брони, отмена поездки, завершение) — приходят даже при закрытом приложении, тап открывает нужный экран (deep-link по `fragment`). Сервисный ключ `VK_SERVICE_KEY` опционален; без него push не отправляются, остальная доставка работает.
+- **Уведомления**: персистентный in-app inbox + WebSocket-hint для foreground-клиентов (новая заявка, статус брони, отмена поездки, завершение). Критичные события persist'ятся независимо от тумблера; повторы дедуплицируются; deep-link — allowlist маршрутов Telegram-приложения. Фоновая рассылка через Bot API заблокирована продуктовым решением (см. `docs/adr/telegram-notification-delivery.md`).
 - **Управление автомобилями**: добавление и редактирование информации об авто для водителей.
 - **Админ-панель** (`webapp/`): отдельное веб-приложение на React 19 + shadcn/ui — дашборд с метриками, пользователи (бан/разбан, сброс онбординга), поездки (отмена), брони (смена статуса), отзывы (модерация: одобрение/отклонение/удаление, фильтр по статусу), обратная связь (просмотр + ответ пользователю), жалобы (фильтр и moderation transitions), read-only настройки. Вход по статичному `ADMIN_TOKEN`, сессия — httpOnly cookie с JWT (12 ч).
-- **Интеграция с VK**: авторизация через подписанные launch params VK, имитация только в Dev/Test, VKUI, WebSocket и опциональные сообщения от имени сообщества.
-- **Онбординг**: при первом входе — нативные информационные экраны VK (`VKWebAppShowSlidesSheet`, 3 слайда). Показывается один раз: любой исход (просмотр, пропуск, закрытие) помечает обучение пройденным — флаг хранится на бэкенде (`User.onboardingVersion`, завершение через `POST /api/v1/users/me/onboarding`). Версионирование: повышение `ONBOARDING_VERSION` в мини-аппе заново показывает слайды всем пользователям по одному разу; админка может сбросить флаг (`PATCH /api/v1/admin/users/:id/onboarding-reset`). Изображения слайдов — временные заглушки (`mini-app/src/assets/onboarding/`, 832×555, base64 через Vite `?inline`, ленивый чанк).
+- **Интеграция с Telegram**: авторизация через подписанную initData (HMAC-SHA256, TTL), dev-bypass только в Dev/Test, telegram-ui, WebSocket с auth первым сообщением.
+- **Онбординг**: при первом входе — экраны согласия (соглашение + приватность, 14+). Показывается один раз: принятие сохраняет версию на бэкенде (`User.onboardingVersion`, завершение через `POST /api/v1/users/me/onboarding`); отказ ведёт на удаление данных. Админка может сбросить флаг (`PATCH /api/v1/admin/users/:id/onboarding-reset`).
 
 ## 📁 Структура монорепозитория
 
 ```edem/
-├── mini-app/                    # Frontend: React + VKUI + Vite (Service Worker отключён для VK WebView)
-│   ├── public/                  # Иконки PWA
+├── telegram-app/                # Frontend: React + telegram-ui + Vite (Telegram Mini App)
 │   ├── src/
 │   │   ├── api/                 # HTTP-клиент (таймауты, Zod-валидация ответов) + API-запросы
-│   │   ├── components/          # Компоненты интерфейса (+ ErrorBoundary, ViewErrorBoundary)
+│   │   ├── components/          # Компоненты интерфейса (+ ErrorBoundary, Onboarding, OfflineBanner)
 │   │   ├── hooks/               # Кастомные React-хуки
-│   │   ├── panels/              # Панели навигации (VKUI)
-│   │   ├── modals/              # Модальные окна
-│   │   ├── providers/           # WebSocket-провайдер, модальные окна
+│   │   ├── pages/               # Страницы (поиск, поездки, брони, профиль, отзывы, поддержка)
+│   │   ├── providers/           # WebSocket-провайдер
 │   │   ├── queries/             # TanStack Query-хуки
-│   │   ├── router/              # Роутинг (vk-mini-apps-router)
-│   │   ├── store/               # Zustand сторы
-│   │   └── views/               # Экраны (Views)
-│   └── vite.config.ts           # Vite + VK WebView-compatible build configuration
+│   │   ├── router/              # Роутинг (react-router) + deep-links (startapp)
+│   │   ├── store/               # Zustand сторы (auth/session)
+│   │   └── onboarding/          # Версионирование онбординга
+│   └── vite.config.ts           # Vite build configuration
 │
 ├── backend/                     # Backend: Hono + Prisma ORM + PostgreSQL
 │   ├── prisma/
 │   │   ├── schema.prisma        # Модели: User, RefreshToken, Notification, Car, Trip, City, RideRequest, Booking, Review, Report, Feedback
-│   │   ├── migrations/          # Prisma-миграции (единый snapshot)
-│   │   └── seed.ts              # Наполнение тестовыми данными (24 юзера incl. бан/удаление, 30 поездок, заявки, жалобы)
+│   │   ├── migrations/          # Prisma-миграции
+│   │   └── seed.ts              # Наполнение тестовыми данными (TG-пользователи, поездки, заявки, жалобы)
 │   ├── src/
-│   │   ├── auth/                # VK-авторизация (подпись launch params + диагностика дрейфа часов), JWT + refresh-токены (ротация, хэш в БД), admin JWT
+│   │   ├── auth/                # Telegram-авторизация (подпись initData HMAC+TTL), JWT + refresh-токены (ротация, хэш в БД), admin JWT
 │   │   ├── admin/               # Админ-API /api/v1/admin (login/session/logout, guard по httpOnly cookie, модерация)
 │   │   ├── middleware/          # Rate limiting, sanitize (DOMPurify), requireUser
 │   │   ├── trips/               # Поездки (+ пагинация, статусы, авто-завершение)
@@ -51,9 +48,10 @@
 │   │   ├── ws/                  # WebSocket (auth, рассылка событий)
 │   │   ├── workers/             # Фон: авто-завершение просроченных поездок
 │   │   ├── serializers/         # Сериализация ответов
-│   │   ├── services/            # Бизнес-сервисы (уведомления, wsManager с reaper-очисткой)
+│   │   ├── services/            # Бизнес-сервисы (TG-доставка уведомлений, wsManager с reaper-очисткой)
+│   │   ├── migrations/          # Инвентаризация/аудит миграции аккаунтов (dry-run)
 │   │   ├── utils/               # Sentry-хелперы (initSentry с PII-стриппингом, captureWarning/Exception), timingSafeEqual
-│   │   ├── app.ts               # Hono-приложение (роуты /api/v1, security-заголовки)
+│   │   ├── app.ts               # Hono-приложение (роуты /api/v1, security-заголовки, Telegram-only static)
 │   │   └── index.ts             # Серверный entry point (initSentry, graceful shutdown)
 │   ├── .env                     # Переменные окружения (dev)
 │   └── .env.test                # Переменные окружения для тестов (отдельная БД edem_test)
@@ -65,7 +63,7 @@
 │       ├── lib/                 # api-client (same-origin /api, 401 → редирект на /login)
 │       └── routes.tsx           # TanStack Router: публичный /login + защищённые админ-роуты (проверка сессии)
 │
-├── e2e/                         # Full-cycle E2E-тесты (Playwright + Chromium), см. e2e/README.md
+├── e2e/                         # Telegram parity E2E (Playwright + Chromium), см. e2e/README.md
 │
 ├── packages/
 │   └── contracts/               # Общий пакет Zod-схем, DTO и WS-контрактов
@@ -81,14 +79,14 @@
 
 ### Запуск проекта (Фронтенд + Бэкенд)
 ```bash
-bun install
+npm install
 cp backend/.env.example backend/.env
 docker compose -f docker-compose.local.yml up -d
 npm run dev
 ```
-Команда параллельно запустит бэкенд на порту 3011 и frontend из workspace `mini-app` на порту 3010. Единственная Vite-конфигурация — `mini-app/vite.config.ts`; она проксирует `/api`, включая WebSocket `/api/v1/ws`, на бэкенд. Порты можно изменить через `BACKEND_PORT`, `VITE_PORT` и `VITE_API_TARGET`.
+Команда параллельно запустит бэкенд на порту 3011 и Telegram-фронтенд из workspace `telegram-app` на порту 3012. Vite проксирует `/api`, включая WebSocket `/api/v1/ws`, на бэкенд. Порты можно изменить через `BACKEND_PORT`, `VITE_TG_PORT` и `VITE_API_TARGET`.
 
-Backend читает `backend/.env`; Vite читает `mini-app/.env` и переменные текущего shell. Корневой `.env` предназначен для Docker Compose.
+Backend читает `backend/.env`. Корневой `.env` предназначен для Docker Compose.
 
 ### Запуск админ-панели
 ```bash
@@ -96,7 +94,7 @@ npm run dev --workspace=webapp   # админ-панель на http://localhost
 ```
 Dev-сервер webapp проксирует `/api` на бэкенд (`:3011`), поэтому admin-cookie работают same-origin без настройки CORS. Вход — по `ADMIN_TOKEN` из `backend/.env` (пустой токен = панель выключена). В production проксируйте на одном домене и статику webapp, и `/api` на бэкенд (см. раздел деплоя).
 
-Канонический workflow использует npm workspaces (`npm run`); рантайм везде — Node 22. Установка зависимостей — через Bun (`bun install`, lockfile `bun.lock`, в CI с `--frozen-lockfile` + кэшем): ~10 с против ~минуты `npm ci`. `package-lock.json` оставлен как фолбэк для npm.
+Канонический workflow использует npm workspaces (`npm run`); рантайм везде — Node 22. Установка зависимостей — `npm ci` по `package-lock.json`.
 
 ### Запуск в Docker (бэкенд в контейнере)
 ```bash
@@ -104,19 +102,14 @@ docker compose up -d --build   # сборка и запуск db + backend (:300
 docker compose -f docker-compose.local.yml up -d # локальный PostgreSQL (:5433)
 docker compose stop backend    # остановить контейнер бэкенда (оставить БД)
 ```
-Требуется корневой `.env` с переменными `POSTGRES_PASSWORD`, `JWT_SECRET`, `VK_APP_SECRET`, `CORS_ORIGINS` (образец — `.env.example`). Миграции применяются автоматически при старте контейнера. Reseed внутри контейнера:
+Требуется корневой `.env` с переменными `POSTGRES_PASSWORD`, `JWT_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_HOSTS`, `CORS_ORIGINS` (образец — `.env.example`). Миграции применяются автоматически при старте контейнера. Reseed внутри контейнера:
 ```bash
 docker exec -it vk-mini-edem-backend-1 node --import tsx prisma/seed.ts
 ```
 
-### Установка зависимостей
-```bash
-bun install   # быстро (~10 с); фолбэк — npm ci по package-lock.json
-```
-
 ### Сборка приложения (включая общий пакет)
 ```bash
-npm run build          # contracts → prisma generate → backend → mini-app (Vite build)
+npm run build          # contracts → backend → telegram-app → webapp
 npm run build:contracts  # только contracts
 ```
 
@@ -129,7 +122,7 @@ npm run db:seed           # Заполнить БД тестовыми данн�
 npm run db:seed:cities    # Только справочник городов (идемпотентно; безопасен для prod)
 npm run prisma:validate   # Валидация schema.prisma
 ```
-Подключение — через pg driver-адаптер `@prisma/adapter-pg` (`backend/src/db.ts`): URL из `DATABASE_URL`, параметры пула заданы в коде (node-pg игнорирует `connection_limit`/`pool_timeout` из URL — это параметры старого Rust-движка). Конфигурация CLI — `backend/prisma.config.ts`: в Prisma 7 `datasource.url` из схемы и автозагрузка `.env` удалены, URL берётся из окружения, `.env` подгружается явно. Сгенерированный клиент (`backend/src/generated/`) компилируется tsc в `dist`; после `git pull` с изменённой схемой выполните `npm run db:generate`.
+Подключение — через pg driver-адаптер `@prisma/adapter-pg` (`backend/src/db.ts`): URL из `DATABASE_URL`. Конфигурация CLI — `backend/prisma.config.ts`. Сгенерированный клиент (`backend/src/generated/`) компилируется tsc в `dist`; после `git pull` с изменённой схемой выполните `npm run db:generate`.
 
 Быстрый старт на свежей БД:
 ```bash
@@ -141,10 +134,11 @@ npm run db:seed --workspace=backend
 ### Проверки и тесты
 ```bash
 npm run typecheck        # tsc --noEmit во всех воркспейсах
-npm run test             # Юнит-тесты (Vitest): contracts + backend
-npm run lint             # typecheck всех воркспейсов + ESLint frontend
+npm run test             # Юнит-тесты (Vitest): contracts + backend + telegram-app
+npm run lint             # typecheck всех воркспейсов
 npm run format:check     # базовая проверка текстовых файлов и JSON без перезаписи
-npm run build            # contracts → backend → mini-app
+npm run build            # contracts → backend → telegram-app → webapp
+node e2e/telegram-parity.mjs  # E2E parity (нужны backend :3011, TG-front :3012, dev-БД)
 ```
 
 Тесты backend запускаются на отдельной БД `edem_test` (см. `backend/.env.test`), поэтому рабочая БД не затрагивается. При локальном Compose создайте её через `docker exec vk-mini-edem-db-dev psql -U edem -c "CREATE DATABASE edem_test;"`, затем выполните `npm run db:test:push --workspace=backend`. GitHub Actions поднимает PostgreSQL 16 с готовой `edem_test` автоматически и выполняет те же lint, format, build и test-проверки на Node 22.
@@ -156,16 +150,16 @@ npm run build            # contracts → backend → mini-app
 ```env
 DATABASE_URL="postgresql://user:password@host:port/db?schema=public"
 NODE_ENV=development
-ALLOW_DEV_AUTH=true            # Dev-имитация VK-подписи (только не в production); mock refresh-токены работают end-to-end
+ALLOW_DEV_AUTH=true            # Dev-bypass initData hash=dev-hash (только не в production); mock refresh-токены работают end-to-end
 JWT_SECRET=your-jwt-secret-key-32-chars-long
-VK_APP_SECRET=your-vk-app-secret
+TELEGRAM_BOT_TOKEN=            # Пусто в dev = dev-bypass; в production обязателен
 SENTRY_DSN=                    # Sentry DSN (пусто — Sentry выключен)
-CORS_ORIGINS=http://localhost:3010
+CORS_ORIGINS=http://localhost:3012
 BACKEND_PORT=3011
 JWT_ACCESS_TTL_SECONDS=900
 JWT_REFRESH_TTL_SECONDS=2592000
-VK_AUTH_RATE_WINDOW_MS=300000
-VK_AUTH_RATE_MAX=5
+TG_AUTH_RATE_WINDOW_MS=300000
+TG_AUTH_RATE_MAX=5
 REFRESH_RATE_WINDOW_MS=600000
 REFRESH_RATE_MAX=10
 ADMIN_TOKEN=                     # статичный токен админ-панели (пусто — панель выключена)
@@ -175,7 +169,7 @@ LOG_LEVEL=debug
 Все числовые настройки должны быть положительными целыми числами. Ноль,
 отрицательные, дробные и частично числовые значения останавливают запуск с
 ошибкой конфигурации; отсутствующие переменные используют значения по умолчанию
-из `backend/src/env.ts`. Полный контракт описан в `backend/ENVIRONMENT.md`.
+из `backend/src/env.ts`.
 
 Для тестов — `backend/.env.test` с `DATABASE_URL`, указывающим на `edem_test`. Файл отслеживается в git и содержит только локальные тестовые значения; реальные секреты в него добавлять нельзя. Корневой `.env.example` предназначен для Docker Compose, а `backend/.env.example` — для локального backend.
 
@@ -185,7 +179,7 @@ LOG_LEVEL=debug
 
 | Метод | Путь | Описание |
 |---|---|---|
-| POST | `/api/v1/auth/vk` | Вход через VK (дефолт 5 req/5 мин, `VK_AUTH_RATE_*`) |
+| POST | `/api/v1/auth/telegram` | Вход через Telegram initData (дефолт 5 req/5 мин, `TG_AUTH_RATE_*`) |
 | POST | `/api/v1/auth/refresh` | Ротация refresh-токена; reuse → отзыв всех токенов (дефолт 10 req/10 мин, `REFRESH_RATE_*`) |
 | POST | `/api/v1/auth/logout` | Отзыв refresh-токена |
 | GET | `/api/v1/trips` | Список активных поездок (пагинация `{items, pagination}`); уехавшие поездки скрыты |
@@ -213,7 +207,7 @@ LOG_LEVEL=debug
 | PATCH | `/api/v1/users/me` | Обновление профиля |
 | PATCH | `/api/v1/users/me/car` | Управление авто |
 | PATCH | `/api/v1/users/me/notification-settings` | Настройки уведомлений |
-| POST | `/api/v1/users/me/onboarding` | Завершение онбординга: сохраняет версию показанных слайдов (`{version}` — строка 1..50 символов) |
+| POST | `/api/v1/users/me/onboarding` | Завершение онбординга: сохраняет версию (`{version}` — строка 1..50 символов) |
 | GET | `/api/v1/users/:id` | Публичный профиль |
 | POST | `/api/v1/feedback` | Обращение в поддержку (тема ≤ 100, текст ≤ 2000; санитизация, rate limit) |
 | GET | `/api/v1/feedback` | Мои обращения с ответами поддержки (`reply`/`repliedAt`; новые первыми) |
@@ -233,7 +227,7 @@ LOG_LEVEL=debug
 | GET | `/api/v1/admin/users` | Список пользователей (поиск `q`, пагинация) |
 | PATCH | `/api/v1/admin/users/:id/ban` | Бан пользователя (`bannedAt` + обязательная причина `banReason` в теле `{ reason }`, 1–500 симв.); поездки не отменяются; открытые WS-соединения закрываются (4403) |
 | PATCH | `/api/v1/admin/users/:id/unban` | Разбан |
-| PATCH | `/api/v1/admin/users/:id/onboarding-reset` | Сброс флага онбординга (`onboardingVersion` → null): пользователь снова увидит слайды |
+| PATCH | `/api/v1/admin/users/:id/onboarding-reset` | Сброс флага онбординга (`onboardingVersion` → null): пользователь снова увидит экраны согласия |
 | GET | `/api/v1/admin/trips` | Список поездок (фильтр `status`, пагинация) |
 | PATCH | `/api/v1/admin/trips/:id/cancel` | Отмена поездки (только статус, без каскада); завершённые/отменённые — 409 |
 | GET | `/api/v1/admin/bookings` | Список броней (фильтр `status`, пагинация) |
@@ -262,15 +256,16 @@ LOG_LEVEL=debug
 ## 🔒 Безопасность
 
 - **Sanitization**: все мутации проходят через `getSanitizedBody` (isomorphic-dompurify, без HTML-тегов) — защита от XSS.
+- **Telegram-auth**: initData проверяется HMAC-SHA256 по `TELEGRAM_BOT_TOKEN` + TTL (`TG_INIT_DATA_TTL_SECONDS`); dev-bypass `hash=dev-hash` — только вне production при `ALLOW_DEV_AUTH`. Подпись/форма вне TTL → 401, ненастроенный роут → 503.
 - **Refresh-токены**: хранятся в БД хэшированными (SHA-256), одноразовые — при каждом `/refresh` старый отзывается, выдаётся новый (`rotateRefreshToken`, атомарный UPDATE с предикатом `revokedAt IS NULL` — из параллельных ротаций одного токена succeeds ровно одна). **Reuse detection**: предъявление уже ротированного токена отзывает ВСЕ активные токены пользователя (token family revocation); повторный `/logout` тем же токеном семью не отзывает.
-- **Rate limiting**: раздельные лимитеры для `/auth/vk`, `/auth/refresh` (`VK_AUTH_RATE_*`, `REFRESH_RATE_*`), логина админ-панели (`ADMIN_LOGIN_RATE_*`, анти-брутфорс), публичного чтения и мутаций (IP-based) и «дорогих» действий по аккаунту (user-based) — все настраиваются через ENV.
-- **Админ-панель**: вход по статичному `ADMIN_TOKEN` (timing-safe сравнение); сессия — httpOnly cookie `edem_admin_jwt` с JWT (`type=admin-access`, `sub=admin`, TTL 12 ч): токен недоступен JS (защита от XSS), user-токены `type=access` админским guard'ом отклоняются. Панель закрыта по умолчанию: без `ADMIN_TOKEN` все запросы получают 403 в любой среде. Забаненные пользователи (`bannedAt`) получают 403 на всех аутентифицированных endpoint'ах; бан также применяется при логине в `/auth/vk` (403 `{ code: "FORBIDDEN", banReason }` — токены не выдаются, активные refresh-токены отзываются), в `/auth/refresh` (403 + отзыв активных refresh-токенов), в `optionalAuth` (забаненный считается гостем) и в WebSocket-аутентификации (соединение закрывается с 4403), а при бане через админку открытые WS-соединения пользователя закрываются сразу. Mini-app при 403 `FORBIDDEN` показывает экран «Аккаунт заблокирован» с причиной бана (или «Причина не указана» для старых банов) и кнопкой «Обратная связь»: обращение уходит через публичный `POST /api/v1/feedback/appeal` (личность — по подписи VK launch-параметров, без выдачи токенов, лимит 5/час на IP) и видно в админке.
+- **Rate limiting**: раздельные лимитеры для `/auth/telegram`, `/auth/refresh` (`TG_AUTH_RATE_*`, `REFRESH_RATE_*`), логина админ-панели (`ADMIN_LOGIN_RATE_*`, анти-брутфорс), публичного чтения и мутаций (IP-based) и «дорогих» действий по аккаунту (user-based) — все настраиваются через ENV. За reverse proxy обязательны `TRUST_PROXY=true` + перезапись `X-Real-IP`, иначе все клиенты делят один IP-бакет.
+- **Админ-панель**: вход по статичному `ADMIN_TOKEN` (timing-safe сравнение); сессия — httpOnly cookie `edem_admin_jwt` с JWT (`type=admin-access`, `sub=admin`, TTL 12 ч): токен недоступен JS (защита от XSS), user-токены `type=access` админским guard'ом отклоняются. Панель закрыта по умолчанию: без `ADMIN_TOKEN` все запросы получают 403 в любой среде. Забаненные пользователи (`bannedAt`) получают 403 на всех аутентифицированных endpoint'ах; бан также применяется при логине в `/auth/telegram` (403 `{ code: "FORBIDDEN", banReason }` — токены не выдаются, активные refresh-токены отзываются), в `/auth/refresh` (403 + отзыв активных refresh-токенов), в `optionalAuth` (забаненный считается гостем) и в WebSocket-аутентификации (соединение закрывается с 4403), а при бане через админку открытые WS-соединения пользователя закрываются сразу. Mini-app при 403 `FORBIDDEN` показывает экран «Аккаунт заблокирован» с причиной бана (или «Причина не указана» для старых банов) и кнопкой «Обратная связь»: обращение уходит через публичный `POST /api/v1/feedback/appeal` (личность — по подписи initData, без выдачи токенов, лимит 5/час на IP) и видно в админке.
 - **Гонка броней**: partial unique index `active_seat_booking` + Serializable-изоляция → второй запрос получает 409, а не некорректные данные.
 - **Статусы брони**: только `pending → confirmed|declined`; отменённые, отклонённые и подтверждённые брони нельзя воскресить через водительский endpoint.
 - **Отзывы**: Serializable-транзакция с одним ретраем при P2034; разрешены только направления пассажир → водитель и водитель → подтверждённый пассажир. Модерация: отзыв создаётся `pending` и становится публичным только после одобрения администратором; публичные списки и рейтинг (`rating`/`reviewsCount`) учитывают только `published` (пересчёт — при одобрении и удалении, не при создании).
 - **Валидация**: Zod-схемы проверяют входы backend, критичные paginated-ответы fail closed при contract drift, а frontend валидирует API и WebSocket payloads.
-- **Приватность**: публичные профили не содержат госномер, публичные поездки не раскрывают точные адреса встречи. Числовой `vkUserId` (для кнопки «Написать в VK») отдаётся только участникам активной брони — `GET /trips/:id` (водителю и пассажиру с pending/confirmed), `GET /bookings/my`, `GET /bookings/trip/:tripId`; в публичных выдачах поле отсутствует.
-- **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors` (разрешены vk.com/vk.ru и m.vk.com/m.vk.ru — мини-апп грузится в iframe), `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
+- **Приватность**: публичные профили не содержат госномер, публичные поездки не раскрывают точные адреса встречи посторонним. Inbox-уведомления содержат только маршрут/статус; тела сообщений, токены и initData не логируются.
+- **Заголовки**: `X-Content-Type-Options`, CSP `frame-ancestors 'self'`, `Referrer-Policy`, `Permissions-Policy`, HSTS (в production).
 - **Ограничение тела запроса**: 100 KB.
 - **Время**: даты сериализуются в `Europe/Moscow` (в контейнере задано через `TZ`).
 - **Критичные уведомления** (смена статуса брони/поездки) создаются всегда, независимо от настройки `notificationsEnabled` пользователя.
@@ -283,22 +278,18 @@ LOG_LEVEL=debug
 
 Reaper (`startWsReaper`/`stopWsReaper`): каждые 30 с сервер закрывает соединения без pong дольше 60 с; остановка идемпотентна, «зомби»-тики после остановки не чистят соединения (graceful shutdown).
 
-## 🌐 PWA
-
-PWA-плагин и Service Worker отключены в `mini-app/vite.config.ts` для деплоя в VK Mini App. Это предотвращает загрузку устаревшей версии приложения после обновления сборки. Авторизованные данные намеренно не кэшируются.
-
 ## 🛠 Технологии
 
-- **Frontend**: React 19, VKUI v8, Zustand, TanStack Query, vk-mini-apps-router, Vite 8, Sentry
+- **Frontend**: React 19, telegram-ui, Zustand, TanStack Query, react-router, Vite 8, Sentry
 - **Админ-панель**: React 19, Vite 8, Tailwind CSS 4, shadcn/ui, TanStack Router + Query, lucide-react, sonner
 - **Backend**: Hono, Node.js 22, Prisma ORM, PostgreSQL, jose (JWT), Zod, pino, @sentry/node, isomorphic-dompurify
 - **Монорепозиторий**: npm workspaces, TypeScript, Vitest
-- **E2E**: Playwright + Chromium (`e2e/full-cycle.mjs`)
+- **E2E**: Playwright + Chromium (`e2e/telegram-parity.mjs`)
 - **CI**: GitHub Actions (checkout/setup-node v5, Node 22, PostgreSQL 16 как сервис)
 
 ## 🚀 Деплой (Production)
 
-Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (mini-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) проксирует на backend:3000, а PostgreSQL наружу не публикуется.
+Архитектура: **всё на одном сервере** — бэкенд отдаёт API + статику (telegram-app/dist) + WebSocket. Внешний HTTPS-терминатор (Traefik/nginx) проксирует на backend:3000, а PostgreSQL наружу не публикуется. Детали — в [`docs/deployment/telegram-production-config.md`](docs/deployment/telegram-production-config.md).
 
 Адрес публикации порта настраивается через `BACKEND_BIND_ADDR` в корневом `.env`:
 
@@ -306,8 +297,10 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 - `0.0.0.0` — Traefik/nginx на отдельном хосте; обязательно ограничьте TCP-порт `3000` firewall-правилами так, чтобы к нему обращался только Traefik/nginx.
 
 ```
-Пользователь → VK (WebView/iframe) → https://<your-domain> → Traefik (443) → backend:3000
+Пользователь → Telegram (WebView) → https://<your-domain> → Traefik (443) → backend:3000
 ```
+
+Прокси обязан: пробрасывать `Host` без изменений (Host-роутинг фронта), **перезаписывать** `X-Real-IP`/`X-Forwarded-For` на `$remote_addr` + `TRUST_PROXY=true` в бэкенде (иначе общий IP-бакет лимитеров), поддерживать `Upgrade` для `/api/v1/ws`.
 
 ### Известные ограничения перед production
 
@@ -315,42 +308,36 @@ PWA-плагин и Service Worker отключены в `mini-app/vite.config.t
 - Детали поездки и заявки водителя имеют отдельные loading/error/retry состояния; при отсутствии сети приложение явно предупреждает, что сохранённые данные могут быть устаревшими.
 - Даты поездок и date-only фильтры нормализуются через фиксированный `Europe/Moscow`; формы сохраняют только несекретные черновики и очищают их после успешной отправки.
 - Rate limiting и WebSocket fan-out хранят состояние в памяти процесса и не подходят для нескольких backend-инстансов без Redis/pub-sub или ограничения deployment до одного инстанса.
-- Haptic feedback VK Bridge вызывается только после успешных действий и безопасно отключается на неподдерживаемых клиентах.
 
 ### Аудит состояния
 
-Полный аудит исходников выполнен 18 августа 2026, все найденные findings
-(2 High, 7 Medium, 26 Low) устранены 21 августа 2026.
-
-Проверено:
+Полный аудит Telegram-миграции выполнен в задачах 18 (безопасность, без critical/high) и 21 (rehearsal). Проверено:
 
 ```bash
 npm run typecheck    # все workspace: успешно
-npm run test         # все workspace: успешно (164 теста)
-npm run lint         # typecheck + ESLint frontend: успешно
+npm run test         # все workspace: успешно
+npm run lint         # typecheck всех воркспейсов: успешно
 npm run format:check # успешно
 npm run bundle:check # gzip-бюджет: успешно
-npm run build        # contracts + backend + production frontend: успешно
+npm run build        # contracts → backend → telegram-app → webapp: успешно
 docker compose build # образ на node:22-alpine собирается
 ```
 
 Paginated endpoints проверяют ответы shared Zod-схемами и возвращают controlled `500` при contract drift; интеграционные fixture используют общий лимит мест.
 
-### Требования VK Mini Apps
+### Требования Telegram Mini Apps
 
 - **HTTPS обязателен** в production (кроме localhost).
-- Сервер должен **разрешать iframe** — бэкенд отдаёт CSP `frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru` (не `X-Frame-Options: DENY`).
-- `VKWebAppInit` вызывается в `main.tsx`; подпись launch params проверяется на бэкенде (`verifyVkLaunchSignature`, HMAC-SHA256 + `vk_ts` ≤ 5 мин; дрейф часов > 1 мин логируется и отправляется в Sentry для диагностики). Принимается только полный `searchParams` из launch-параметров — реконструкция подписи по отдельным полям не поддерживается.
-- Клиентские `firstName`, `lastName` и `photo` не используются как доказательство личности; статус `isVerified` не выводится из неподписанных полей. При этом они используются как отображаемые данные при входе: мини-апп достаёт профиль через VK Bridge `VKWebAppGetUserInfo` (таймаут 3 с) и отправляет поля вместе с `/auth/vk` (launch-параметры VK — fallback по каждому полю). Имя и фото сохраняются в профиль: аватар принимается только по https с VK CDN (`*.userapi.com`, `*.vk.com`, `*.vk.ru`, …) и синхронизируется при каждом входе, а имя заменяет только placeholder «Пользователь VK …» — вручную отредактированное имя не перезаписывается.
-- Swipe-back синхронизируется через `VKWebAppSetSwipeSettings`, а сообщения навигации принимаются только от родительского VK-контейнера из разрешённых origin.
-- Опциональная отправка сообщений через `messages.send` использует `VK_GROUP_ID` и `VK_GROUP_TOKEN`; токен отправляется в POST body.
+- InitData проверяется HMAC-SHA256 по `TELEGRAM_BOT_TOKEN` + TTL (`TG_INIT_DATA_TTL_SECONDS`, дефолт 3600); dev-bypass `hash=dev-hash` — только вне production при `ALLOW_DEV_AUTH`.
+- Клиент передаёт initData ровно как её отдал Telegram (без пересортировки/перекодировки), иначе HMAC не сойдётся.
+- Bot API фоновая рассылка заблокирована продуктовым решением (см. `docs/adr/telegram-notification-delivery.md`).
 
 ### Шаги деплоя
 
 1. **Собрать**:
    ```bash
-   bun install
-   npm run build        # contracts → backend (dist) → mini-app (dist, base: './')
+   npm install
+   npm run build        # contracts → backend (dist) → telegram-app (dist) → webapp (dist)
    ```
 2. **Применить миграции**:
    ```bash
@@ -367,8 +354,7 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
    ```
    Или через Docker: `docker compose up -d --build` (backend на :3000, админ-панель webapp на :3014, миграции применяются при старте).
 
-Полный чеклист релиза (секреты, VK-консоль, проверки после деплоя) — в
-[`docs/deployment/production-checklist.md`](docs/deployment/production-checklist.md).
+Полный чеклист релиза — в [`docs/deployment/telegram-staging-checklist.md`](docs/deployment/telegram-staging-checklist.md).
 
 ### Переменные окружения (production)
 
@@ -376,10 +362,9 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL (в Docker — `postgresql://edem:...@db:5432/edem`) |
 | `JWT_SECRET` | ✅ | ≥ 32 символов (проверяется в production) |
-| `VK_APP_SECRET` | ✅ | Защищённый ключ приложения из консоли VK (dev.vk.com → Настройки) |
-| `VK_SERVICE_KEY` | — | Сервисный ключ мини-аппа для push-уведомлений (`notifications.sendMessage`). Пусто — push не отправляются, остальная доставка (WebSocket/БД) работает. Секрет. |
-| `VK_GROUP_ID` / `VK_GROUP_TOKEN` | — | Сообщество для опциональных сообщений от него (`messages.send`). Пусто — сообщество-сообщения не отправляются |
-| `CORS_ORIGINS` | ✅ | Разрешённые origin (для iframe VK: `https://vk.com,https://m.vk.com,https://vk.ru,https://m.vk.ru`) |
+| `TELEGRAM_BOT_TOKEN` | ✅ | Токен бота для валидации initData (compose требует) |
+| `TELEGRAM_HOSTS` | ✅ | Хост Telegram-фронта (compose требует) |
+| `CORS_ORIGINS` | ✅ | Разрешённые origin (same-origin через прокси) |
 | `NODE_ENV` | ✅ | `production` |
 | `PORT` | — | По умолчанию 3000 |
 | `SENTRY_DSN` | — | Мониторинг ошибок |
@@ -387,17 +372,9 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
 | `ADMIN_TOKEN` | — | Статичный токен админ-панели; пусто — панель выключена. Задайте длинный случайный секрет |
 | `ADMIN_JWT_TTL_SECONDS` | — | TTL админ-сессии (по умолчанию 43200 = 12 ч) |
 
-### Консоль VK (dev.vk.com)
-
-1. Создать мини-апп → получить числовой **app_id**.
-2. В настройках указать **URL мини-аппа** (например, `https://<your-domain>`) для платформ mobile/web/mvk.
-3. Скопировать **защищённый ключ** → в `VK_APP_SECRET`.
-4. Тестировать: `https://vk.com/app<app_id>`.
-5. Для публикации в каталоге — отправить на модерацию (каждое обновление — повторная модерация).
-
 ### WebSocket за Traefik/nginx
 
-Прокси должен поддерживать upgrade (Traefik — из коробки). Клиент подключается к `wss://<host>/api/v1/ws`.
+Прокси должен поддерживать upgrade (Traefik — из коробки). Клиент подключается к `wss://<host>/api/v1/ws`, JWT — первым `auth`-сообщением, анонимные сокеты закрываются кодом 4401.
 
 ### Админ-панель (production)
 
@@ -410,3 +387,9 @@ Paginated endpoints проверяют ответы shared Zod-схемами и
 3. Внешний reverse proxy: домен админки (например, `admin.<your-domain>`) → `:3014`, проксировать **весь** трафик, включая `/api`.
 
 `Secure`-флаг cookie определяется по `X-Forwarded-Proto` (nginx пробраскивает его от вышестоящего прокси, иначе — по схеме соединения): по HTTPS cookie ставится с `Secure`, по HTTP — без него, логин работает в обоих случаях. В dev ту же роль выполняет Vite-прокси (`webapp/vite.config.ts`, порт 3013).
+
+---
+
+## Архив миграции
+
+VK Mini App удалён в задачах tg-migration-24–27 (полная копия сохранена в отдельном репозитории). Исторические записи миграции: `docs/migration/`, `docs/adr/`, `docs/security/telegram-migration-audit.md`.

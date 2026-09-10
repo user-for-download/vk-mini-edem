@@ -27,7 +27,7 @@ async function ensureCity(name: string): Promise<string> {
 }
 
 describe("Overlap protection", () => {
-  let vkSeq = 4_200_000;
+  let tgSeq = 4_200_000n;
   let driverId: string;
   let driver2Id: string;
   let passengerId: string;
@@ -39,13 +39,13 @@ describe("Overlap protection", () => {
         const user = await db.user.create({
           data: {
             name: `${name}-${Date.now()}`,
-            vkUserId: ++vkSeq,
+            telegramUserId: ++tgSeq,
             avatar: "https://i.pravatar.cc/200?img=9",
           },
         });
         return user.id;
       } catch (error) {
-        // Остатки от прошлого упавшего прогона: пробуем следующий vkUserId.
+        // Остатки от прошлого упавшего прогона: пробуем следующий telegramUserId.
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === "P2002"
@@ -127,7 +127,7 @@ describe("Overlap protection", () => {
         userId: driverId,
         model: "Tesla",
         color: "red",
-        plate: `OV${vkSeq}`,
+        plate: `OV${tgSeq}`,
       },
     });
     await db.car.create({
@@ -135,7 +135,7 @@ describe("Overlap protection", () => {
         userId: driver2Id,
         model: "Tesla",
         color: "blue",
-        plate: `OV${vkSeq + 1}`,
+        plate: `OV${tgSeq + 1n}`,
       },
     });
   });

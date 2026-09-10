@@ -10,6 +10,7 @@ export * from "./schemas/admin.schema.js";
 export * from "./schemas/city.schema.js";
 export * from "./schemas/ride-request.schema.js";
 export * from "./schemas/report.schema.js";
+export * from "./schemas/notification.schema.js";
 
 // DTO
 export * from "./dto/auth.dto.js";

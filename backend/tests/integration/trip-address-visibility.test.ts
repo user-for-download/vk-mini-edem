@@ -13,20 +13,20 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
  * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
- * уникальные vkUserId.
+ * уникальные telegramUserId.
  */
 describe("GET /trips/:id — address visibility", () => {
   let driverId: string;
   let tripId: string;
   const createdUserIds: string[] = [];
-  // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-  let vkSeq = 1_700_000;
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+  let tgSeq = 1_700_000n;
 
   const createTripForDriver = async () => {
     const driver = await db.user.create({
       data: {
         name: `AddrDriver-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=3",
       },
     });
@@ -56,7 +56,7 @@ describe("GET /trips/:id — address visibility", () => {
     const user = await db.user.create({
       data: {
         name: `${name}-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=5",
       },
     });

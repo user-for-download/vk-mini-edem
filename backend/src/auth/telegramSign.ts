@@ -8,10 +8,9 @@
 //    ключ=значение — сравнивается с параметром hash.
 // 3. Свежесть auth_date проверяется против expiresIn (анти-replay).
 //
-// Отличие от VK (vkSign.ts): replay-кэш НЕ нужен — initData законно живёт
-// в клиенте всё время сессии Mini App и может быть предъявлено повторно
-// в пределах TTL (перезапуск, догрузка). VK-кэш существовал из-за
-// одноразовой природы 5-минутного окна vk_ts+sign.
+// Replay-кэш не нужен: initData законно живёт в клиенте всё время сессии
+// Mini App и может предъявляться повторно в пределах TTL (перезапуск,
+// догрузка). Свежесть ограничена окном expiresIn (анти-replay).
 import {
   isAuthDateInvalidError,
   isExpiredError,
@@ -44,8 +43,8 @@ export interface TelegramAuthResult {
 }
 
 // Точное значение dev-хэша. Сравнение строгое (===) по распарсенному
-// параметру hash — как DEV_SIGN в vkSign.ts (includes() по сырой строке
-// открывал бы обход подстрокой в значении другого параметра).
+// параметру hash: includes() по сырой строке открывал бы обход подстрокой
+// в значении другого параметра.
 const DEV_HASH = "dev-hash";
 
 function extractUser(userJson: string | null): TelegramInitUser | null {
@@ -89,7 +88,7 @@ function extractUser(userJson: string | null): TelegramInitUser | null {
  *
  * Токен не задан + ALLOW_DEV_AUTH (dev/test) → dev-bypass: точное
  * совпадение hash=dev-hash и валидный user.id из JSON. Произвольный id
- * принимается (как и в VK dev-sign) — это одноразовый dev-инструмент,
+ * принимается — это одноразовый dev-инструмент,
  * в production ALLOW_DEV_AUTH всегда false, а реальная ветка требует
  * TELEGRAM_BOT_TOKEN. Вызывающий роут отвечает 503, если токен не задан
  * и dev-режим выключен (роут «не сконфигурирован» ≠ «невалидная подпись»).

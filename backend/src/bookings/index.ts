@@ -50,7 +50,6 @@ class BookingError extends Error {
 
 import { logBusinessEvent } from "../logger/business.js";
 import { createNotification } from "../services/notification.service.js";
-import { sendVkMessage } from "../services/vkMessenger.js";
 import { wsManager } from "../ws/manager.js";
 
 type BookingFull = Prisma.BookingGetPayload<{
@@ -239,8 +238,8 @@ bookingsRouter.get("/my", async (c) => {
         status: b.trip.status as "active" | "cancelled" | "completed",
         departureAt: b.trip.departureAt.toISOString(),
 
-        // VK ID водителя — для кнопки «Написать» в ЛС (свои брони).
-        driver: serializeUser(b.trip.driver, { includeVkUserId: true }),
+        // Профиль водителя (платформенный ID наружу не отдаётся).
+        driver: serializeUser(b.trip.driver),
 
         tags: b.trip.tags,
         comment: b.trip.comment || undefined,
@@ -386,7 +385,7 @@ bookingsRouter.get("/history", async (c) => {
 
 /**
  * Заявки на поездку для водителя (cursor-based пагинация).
- * Этот эндпоинт нужен для TripRequestsPanel в mini-app.
+ * Этот эндпоинт нужен экрану TripRequestsPage (заявки на мою поездку).
  *
  * Параметры:
  * - limit: 1–50 (по умолчанию 50), значения вне диапазона клампаются;
@@ -445,9 +444,9 @@ bookingsRouter.get("/trip/:tripId", async (c) => {
   const nextCursor = hasMore ? items[items.length - 1].id : null;
 
   const response = {
-    // VK ID пассажира виден водителю его поездки — для кнопки «Написать».
+    // Профили пассажиров (платформенные ID наружу не отдаются).
     items: items.map((booking) =>
-      serializeBooking(booking, { includeVkUserId: true }),
+      serializeBooking(booking),
     ),
     pagination: { nextCursor, hasMore, limit },
   };
@@ -710,15 +709,8 @@ bookingsRouter.post("/", mutationLimiter, createBookingLimiter, async (c) => {
       `Получена новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}`,
     );
 
-    // Отправляем водителю личное сообщение ВКонтакте от имени сообщества.
-    // Сервис глотает ошибки внутри (токен не настроен, пользователь не
-    // разрешил сообщения, сеть недоступна) — флоу бронирования не ломается.
-    if (booking.trip.driver.vkUserId) {
-      void sendVkMessage(
-        booking.trip.driver.vkUserId,
-        `🚗 Новая заявка на место ${seat} в поездке ${booking.trip.fromCity} → ${booking.trip.toCity}.\nОткрыть приложение «Едем» и рассмотреть заявку.`,
-      );
-    }
+    // Внешняя доставка водителю — только через утверждённый канал
+    // (Bot API заблокирован, см. ADR). In-app запись выше + WS-hint ниже.
 
     wsManager.sendToUser(booking.trip.driverId, {
       type: "booking:new",

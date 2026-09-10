@@ -29,19 +29,19 @@ const { wsManager } = await import("../../src/services/wsManager.js");
  *
  * Паттерны репо (см. refresh-rotation.test.ts, ws-manager.test.ts):
  * app.request() вместо supertest, фейковые WSContext (send/close — vi.fn()),
- * уникальные vkUserId (INT4-счётчик).
+ * уникальные telegramUserId (INT4-счётчик).
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 const createdUserIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-let vkSeq = 9_100_000;
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+let tgSeq = 9_100_000n;
 
 async function createUser(options: { banned?: boolean } = {}): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `BanUser-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `BanUser-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=8",
       ...(options.banned ? { bannedAt: new Date() } : {}),
     },

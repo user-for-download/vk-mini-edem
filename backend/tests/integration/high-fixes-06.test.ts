@@ -19,12 +19,12 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  *
  * Паттерны репо (booking-conflicts.test.ts, trip-city-id.test.ts,
  * review-moderation.test.ts): app.request(), dev-авторизация mock-токеном,
- * уникальные vkUserId, очистка в afterEach.
+ * уникальные telegramUserId, очистка в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-// vkUserId — INT4: диапазон 9_710_000+ не пересекается с другими suites.
-let vkSeq = 9_710_000;
+// telegramUserId — BigInt: диапазон 9_710_000+ не пересекается с другими suites.
+let tgSeq = 9_710_000n;
 
 async function ensureCity(name: string): Promise<string> {
   const nameNormalized = name.trim().toLowerCase();
@@ -35,11 +35,11 @@ async function ensureCity(name: string): Promise<string> {
 }
 
 async function createDriver(): Promise<string> {
-  const seq = ++vkSeq;
+  const seq = ++tgSeq;
   const user = await db.user.create({
     data: {
       name: `hf06-driver-${seq}`,
-      vkUserId: seq,
+      telegramUserId: seq,
       avatar: "https://i.pravatar.cc/200?img=1",
     },
   });
@@ -50,11 +50,11 @@ async function createDriver(): Promise<string> {
 }
 
 async function createPassenger(): Promise<string> {
-  const seq = ++vkSeq;
+  const seq = ++tgSeq;
   const user = await db.user.create({
     data: {
       name: `hf06-passenger-${seq}`,
-      vkUserId: seq,
+      telegramUserId: seq,
       avatar: "https://i.pravatar.cc/200?img=9",
     },
   });

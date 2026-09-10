@@ -7,22 +7,22 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  * POST /api/v1/feedback — обращения пользователей в поддержку.
  *
  * Паттерны репо: app.request(), dev-авторизация mock-токеном
- * (tests/dev-mock-auth.js: allowlist + TTL), уникальные vkUserId, очистка в afterEach.
+ * (tests/dev-mock-auth.js: allowlist + TTL), уникальные telegramUserId, очистка в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 describe("POST /api/v1/feedback", () => {
   let userId: string;
-  // vkUserId — INT4: безопасный счётчик вместо Date.now().
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now().
   // Диапазон не должен пересекаться с другими интеграционными тестами
   // (1_500_000…5_300_000, 7_700_000) — они идут параллельно в одну БД.
-  let vkSeq = 8_100_000;
+  let tgSeq = 8_100_000n;
 
   beforeEach(async () => {
     const user = await db.user.create({
       data: {
         name: `Feedback-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=3",
       },
     });

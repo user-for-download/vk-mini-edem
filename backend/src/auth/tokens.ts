@@ -34,7 +34,7 @@ export async function signAccessToken(userId: string): Promise<string> {
  *
  * Если `existingJti` передан (ротация на /refresh) — запись в БД
  * уже создана внутри `rotateRefreshToken`, дублировать не нужно.
- * Иначе (первичный логин /vk) — сохраняем хеш jti в RefreshToken.
+ * Иначе (первичный логин /telegram) — сохраняем хеш jti в RefreshToken.
  */
 export async function signRefreshToken(
   userId: string,

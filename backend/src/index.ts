@@ -18,7 +18,7 @@ if (env.isProduction && env.ALLOW_DEV_AUTH) {
 
 if (env.ALLOW_DEV_AUTH) {
   logger.warn(
-    "DEV auth is enabled (mock tokens & dev-sign accepted). " +
+    "DEV auth is enabled (mock tokens & dev-hash accepted). " +
     "Do NOT use in production."
   );
 }

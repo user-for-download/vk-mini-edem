@@ -39,8 +39,8 @@ describe("GET /api/v1/admin/feedback", () => {
   let userId: string;
   let adminCookie: string;
   const createdFeedbackIds: string[] = [];
-  // Диапазон vkUserId не пересекается с другими интеграционными тестами.
-  let vkSeq = 8_200_000;
+  // Диапазон telegramUserId не пересекается с другими интеграционными тестами.
+  let tgSeq = 8_200_000n;
 
   beforeEach(async () => {
     adminCookie = await loginAndGetCookie();
@@ -48,7 +48,7 @@ describe("GET /api/v1/admin/feedback", () => {
     const user = await db.user.create({
       data: {
         name: `FeedbackAdmin-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=4",
       },
     });

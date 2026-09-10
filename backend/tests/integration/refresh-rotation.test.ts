@@ -33,7 +33,7 @@ async function createUser(seq: number): Promise<string> {
   const user = await db.user.create({
     data: {
       name: `RefreshUser-${seq}`,
-      vkUserId: 3_300_000 + seq,
+      telegramUserId: BigInt(3_300_000 + seq),
       avatar: "https://i.pravatar.cc/200?img=7",
     },
   });

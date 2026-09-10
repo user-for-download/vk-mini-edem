@@ -11,7 +11,7 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  * если админ ещё не ответил; иначе — текст и ISO-дату ответа.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
-let vkSeq = 8_400_000;
+let tgSeq = 8_400_000n;
 
 describe("GET /api/v1/feedback (user-side list)", () => {
   let userId: string;
@@ -21,7 +21,7 @@ describe("GET /api/v1/feedback (user-side list)", () => {
     const user = await db.user.create({
       data: {
         name: `FeedbackList-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=5",
       },
     });
@@ -30,7 +30,7 @@ describe("GET /api/v1/feedback (user-side list)", () => {
     const other = await db.user.create({
       data: {
         name: `FeedbackOther-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=6",
       },
     });

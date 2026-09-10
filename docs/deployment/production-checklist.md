@@ -1,78 +1,12 @@
 # Production Checklist
 
-Пошаговый чеклист релиза Edem в прод. Общие правила отката — в
-[`liquidity-safety-rollback.md`](./liquidity-safety-rollback.md)
-(миграции forward-only, бэкап — на уровне VM).
+ superseded (tg-migration-27): VK Mini App удалён, этот чеклист заменён.
 
-## 0. Предусловия (один раз)
+Актуальные документы:
 
-- [ ] Домен + HTTPS-терминатор (Traefik/nginx) с валидным сертификатом.
-      Прямой доступ к портам 3000/3014 извне закрыт firewall'ом
-      (`BACKEND_BIND_ADDR`/`WEBAPP_BIND_ADDR` по умолчанию `127.0.0.1`).
-- [ ] VK-консоль (dev.vk.com): мини-апп создан, URL мини-аппа
-      (`https://<домен>`) указан для mobile/web/mvk, скопированы
-      **защищённый ключ** → `VK_APP_SECRET` и **сервисный ключ** →
-      `VK_SERVICE_KEY` (push-уведомления). Каталог = модерация VK;
-      каждое обновление проходит повторную модерацию.
-- [ ] Root `.env`: `POSTGRES_PASSWORD` (длинный случайный),
-      `JWT_SECRET` (≥ 32 символов, `openssl rand -hex 32`; в production
-      `env.ts` роняет запуск при более коротком),
-      `ADMIN_TOKEN` (длинный случайный; пусто = админка выключена),
-      `CORS_ORIGINS=https://vk.com,https://m.vk.com,https://vk.ru,https://m.vk.ru`.
-- [ ] Опционально: `SENTRY_DSN` (мониторинг ошибок),
-      `VK_GROUP_ID`/`VK_GROUP_TOKEN` (сообщения от сообщества),
-      `VITE_SUPPORT_CHAT_URL`/`VITE_SUPPORT_REPORT_URL`
-      (кнопки поддержки в мини-аппе; пусто = кнопки скрыты).
-- [ ] Онбординг: заменить 3 заглушки в `mini-app/src/assets/onboarding/`
-      реальными изображениями 832×555, ≤ 500 КБ (требование VK).
-- [ ] Правовые тексты: финализировать с юристом Политику/Условия
-      (`mini-app/.../AboutPanel/TermsPanel.tsx` и `PrivacyPanel.tsx`)
-      и заполнить плейсхолдеры `[...]` — реквизиты оператора, e-mail
-      (152-ФЗ: имя, фото, данные авто — персональные данные; также
-      решить: уведомление Роскомнадзора, сроки хранения, возраст 14+).
-- [ ] Аккаунт создаётся при входе (до акцепта ConsentGate): отказавшийся
-      может удалить свои данные сам (кнопка на экране отказа), но просто
-      закрывший приложение — нет. Решить судьбу «неакцептовавших»
-      профилей (TTL-очистка или ручное обезличивание) с юристом.
-- [ ] Решено осознанно: один инстанс backend (rate-limit и WS fan-out —
-      in-memory; горизонтальное масштабирование только через Redis/pub-sub).
-- [ ] Ротация логов: compose уже задаёт `json-file` (10m × 3) для всех
-      сервисов; при запуске вне compose — эквивалентный лимит сборщика
-      (journald `SystemMaxUse` и т.п.), иначе срок хранения журналов
-      (в т.ч. с ip/vkUserId) станет неограниченным и разойдётся с
-      Политикой (раздел 7).
-
-## 1. Деплой
-
-```bash
-# 1. Секреты и конфиг (см. раздел 0)
-cp .env.example .env && nano .env
-
-# 2. Сборка и запуск (миграции применяются при старте backend)
-docker compose up -d --build
-
-# 3. Справочник городов — ОБЯЗАТЕЛЬНО на свежей БД.
-# Полный db:seed в проде ЗАПРЕЩЁН (создаёт 24 демо-юзера и 30 поездок).
-# db:seed:cities идемпотентен и безопасен: только создаёт/переименовывает
-# 25 городов, админские города и PK не трогает.
-docker compose exec backend node --import tsx prisma/seed-cities.ts
-```
-
-## 2. Проверка после деплоя
-
-- [ ] `GET /health/ready` → 200 через публичный прокси (API, SPA-fallback,
-      WebSocket upgrade — по runbook).
-- [ ] Админка: логин по `ADMIN_TOKEN` через `admin.<домен>` → `:3014`,
-      сессия и дашборд отвечают 200.
-- [ ] Smoke-тест ключевых флоу вручную или e2e против релизного окружения:
-      `node e2e/full-cycle.mjs` и `node e2e/liquidity-safety.mjs`
-      (известный flake full-cycle на шаге 3 — date-picker — не блокер).
-- [ ] Внешний uptime-мониторинг на `/health/ready` настроен.
-
-## 3. После релиза
-
-- [ ] `SENTRY_DSN` проверен (тестовая ошибка доходит до Sentry без PII).
-- [ ] Процедура ротации `ADMIN_TOKEN` зафиксирована.
-- [ ] Rate-limit'ы под реальный трафик — через env (см. `backend/ENVIRONMENT.md`).
-- [ ] План апгрейда транзитивных Prisma-зависимостей
-      (`npm audit`: 4 high; `--force` во время деплоя запрещён).
+- [`telegram-staging-checklist.md`](./telegram-staging-checklist.md) — сборка,
+  окружение, деплой, smoke, операции;
+- [`telegram-production-config.md`](./telegram-production-config.md) — точная
+  production-конфигурация (env, прокси, БД, порядок rollout);
+- [`telegram-go-no-go.md`](./telegram-go-no-go.md) — пороги и sign-off;
+- [`telegram-canary-report.md`](./telegram-canary-report.md) — вердикт canary.

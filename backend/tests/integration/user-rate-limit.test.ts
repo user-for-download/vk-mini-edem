@@ -25,7 +25,7 @@ async function ensureCity(name: string): Promise<string> {
 }
 
 describe("User-based rate limits (create trip)", () => {
-  let vkSeq = 5_300_000;
+  let tgSeq = 5_300_000n;
   let driverId: string;
   const createdTripIds: string[] = [];
 
@@ -35,7 +35,7 @@ describe("User-based rate limits (create trip)", () => {
         const user = await db.user.create({
           data: {
             name: `RateLimitDriver-${Date.now()}`,
-            vkUserId: ++vkSeq,
+            telegramUserId: ++tgSeq,
             avatar: "https://i.pravatar.cc/200?img=9",
           },
         });
@@ -57,7 +57,7 @@ describe("User-based rate limits (create trip)", () => {
         userId: driverId,
         model: "Tesla",
         color: "red",
-        plate: `RL${vkSeq}`,
+        plate: `RL${tgSeq}`,
       },
     });
   });
@@ -121,7 +121,7 @@ describe("User-based rate limits (create trip)", () => {
     const other = await db.user.create({
       data: {
         name: `RateLimitOther-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=9",
       },
     });
@@ -130,7 +130,7 @@ describe("User-based rate limits (create trip)", () => {
         userId: other.id,
         model: "Tesla",
         color: "blue",
-        plate: `RL${vkSeq + 1}`,
+        plate: `RL${tgSeq + 1n}`,
       },
     });
 

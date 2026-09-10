@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "telegram-mini-app": {
+      "source": "sickn33/agentic-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/telegram-mini-app/SKILL.md",
+      "computedHash": "149427fce0781be918a5405cff0f218b1fa49418dcb4aefb1eac608b536d795d"
+    }
+  }
+}

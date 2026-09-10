@@ -190,14 +190,15 @@ describe("GET /metrics", () => {
     expect(res.status).toBe(404);
   });
 
-  it("adds a production-ready CSP without blocking VK framing", async () => {
+  it("adds a production-ready CSP for Telegram-only framing", async () => {
     const res = await app.request("/health/live");
     const csp = res.headers.get("Content-Security-Policy");
 
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("connect-src 'self' ws: wss:");
     expect(csp).toContain("img-src 'self' data: blob: https:");
-    expect(csp).toContain("frame-ancestors 'self' https://vk.com");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).not.toContain("vk.com");
     expect(csp).toContain("object-src 'none'");
   });
 });

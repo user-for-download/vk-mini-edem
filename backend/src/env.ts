@@ -46,12 +46,6 @@ export function positiveIntEnv(name: string, fallback: number): number {
   return parsed;
 }
 
-function optionalPositiveIntEnv(name: string): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw === "") return 0;
-  return positiveIntEnv(name, 0);
-}
-
 /**
  * Явный allowlist пользователей, которым разрешены dev mock-токены
  * (DEV_AUTH_USER_ALLOWLIST: comma-separated user id).
@@ -128,30 +122,13 @@ export const env = {
    * В development могут быть эфемерными, если не заданы.
    */
   JWT_SECRET: secretEnv("JWT_SECRET"),
-  VK_APP_SECRET: secretEnv("VK_APP_SECRET"),
-
-  /**
-   * Интеграция с VK API для отправки сообщений пользователям
-   * (messages.send от имени сообщества). Опциональна: если не задана —
-   * сообщения не отправляются, приложение продолжает работать.
-   */
-  VK_GROUP_ID: optionalPositiveIntEnv("VK_GROUP_ID"),
-  VK_GROUP_TOKEN: process.env.VK_GROUP_TOKEN || "",
-
-  /**
-   * Сервисный ключ доступа мини-аппа для отправки push-уведомлений
-   * через VK API notifications.sendMessage (см. services/vkPush.ts).
-   * Опционален: если не задан — push не отправляются, приложение
-   * продолжает работать. Секрет: не логировать, не коммитить.
-   */
-  VK_SERVICE_KEY: process.env.VK_SERVICE_KEY || "",
 
   /**
    * Токен Telegram-бота (выдаёт @BotFather). Нужен для серверной
    * валидации initData Telegram Mini Apps (HMAC-SHA256, @telegram-apps/
    * init-data-node). Опционален: пустое значение = Telegram-auth выключен
-   * (POST /auth/telegram отвечает 503) — приложение продолжает работать
-   * на VK. В dev/test при ALLOW_DEV_AUTH без токена работает dev-bypass
+   * (POST /auth/telegram отвечает 503). В dev/test при ALLOW_DEV_AUTH
+   * без токена работает dev-bypass
    * (hash=dev-hash, см. auth/telegramSign.ts). Секрет: не логировать,
    * не коммитить. Намеренно НЕ secretEnv: эфемерный токен бессмыслен,
    * роут должен быть закрыт, пока токен не задан (как ADMIN_TOKEN).
@@ -167,15 +144,15 @@ export const env = {
   TG_INIT_DATA_TTL_SECONDS: positiveIntEnv("TG_INIT_DATA_TTL_SECONDS", 3600),
 
   /**
-   * Rate limit Telegram-auth (зеркально VK-лимитеру: те же дефолты).
+   * Rate limit Telegram-auth.
    */
   TG_AUTH_RATE_WINDOW_MS: positiveIntEnv("TG_AUTH_RATE_WINDOW_MS", 5 * 60 * 1000),
   TG_AUTH_RATE_MAX: positiveIntEnv("TG_AUTH_RATE_MAX", 5),
 
   /**
-   * Хосты Telegram-версии фронта (comma-separated): запросы со Host из
-   * этого списка получают telegram-app/dist вместо mini-app/dist
-   * (см. host-routing в app.ts). Пусто = все получают mini-app/dist.
+   * Хосты Telegram-фронта (comma-separated): запросы со Host из
+   * этого списка получают telegram-app/dist (см. static в app.ts).
+   * Пусто = приложение отвечает 404.
    * Пример: "tg-edem.binetc.fun". Reverse proxy не трогаем — маршрутизация
    * по Host на уровне приложения; CORS не нужен (same-origin через прокси).
    */
@@ -183,6 +160,24 @@ export const env = {
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean),
+
+  /**
+   * Kill-switch TG-доставки уведомлений (tg-migration-15): при false
+   * deliverTelegramNotification фиксирует пропуск в логе, inbox-записи
+   * продолжают создаваться. Дефолт true — доставка включена.
+   */
+  TELEGRAM_DELIVERY_ENABLED: boolEnv("TELEGRAM_DELIVERY_ENABLED", true),
+
+  /**
+   * Окно дедупликации идентичных TG-уведомлений в миллисекундах:
+   * повтор того же события (user+type+title+body) внутри окна не
+   * создаёт вторую inbox-запись. Легитимные разные события отличаются
+   * текстом и не подавляются. Дефолт 60 секунд.
+   */
+  TG_NOTIFICATION_DEDUPE_WINDOW_MS: positiveIntEnv(
+    "TG_NOTIFICATION_DEDUPE_WINDOW_MS",
+    60 * 1000,
+  ),
 
   /**
    * CORS.
@@ -224,8 +219,6 @@ export const env = {
   /**
    * Rate limit для auth (раздельные лимитеры на каждый endpoint).
    */
-  VK_AUTH_RATE_WINDOW_MS: positiveIntEnv("VK_AUTH_RATE_WINDOW_MS", 5 * 60 * 1000),
-  VK_AUTH_RATE_MAX: positiveIntEnv("VK_AUTH_RATE_MAX", 5),
   REFRESH_RATE_WINDOW_MS: positiveIntEnv("REFRESH_RATE_WINDOW_MS", 10 * 60 * 1000),
   REFRESH_RATE_MAX: positiveIntEnv("REFRESH_RATE_MAX", 10),
 

@@ -11,21 +11,21 @@ import { db } from "../../src/db.js";
  * Теперь фильтр всегда включает departureAt > now.
  *
  * Паттерны репо (см. smoke.test.ts, trip-address-visibility.test.ts):
- * app.request() вместо supertest, уникальные vkUserId (INT4-счётчик),
+ * app.request() вместо supertest, уникальные telegramUserId (INT4-счётчик),
  * поиск по своим поездкам через уникальный fromCity (БД общая на файл).
  */
 const SEARCH_CITY = "Тестовск";
 
 const createdUserIds: string[] = [];
 const createdTripIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-let vkSeq = 9_300_000;
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+let tgSeq = 9_300_000n;
 
 async function createDriver(): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `DepartedDriver-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `DepartedDriver-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=6",
     },
   });

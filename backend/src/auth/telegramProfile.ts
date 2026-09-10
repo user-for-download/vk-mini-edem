@@ -2,11 +2,10 @@
 // Извлечение отображаемого профиля (имя/фото) при входе через Telegram.
 //
 // Источник один — user-объект из ПОДПИСАННОЙ initData (после успешной
-// верификации в telegramSign.ts). В отличие от VK (где имя/фото приходят
-// неподписанным телом запроса), здесь данные подписаны Telegram.
+// верификации в telegramSign.ts): данным можно доверять
+// в идентификационных целях.
 //
-// Тем не менее применяем ту же санитизацию, что и в vkProfile.ts
-// (defense in depth): имя чистится от HTML и нормализуется, аватар
+// Тем не менее применяем санитизацию (defense in depth): имя чистится от HTML и нормализуется, аватар
 // принимается только по https с allowlist-хостов Telegram CDN —
 // пользовательский контент не должен попадать в БД «как есть».
 import { sanitizeValue } from "../middleware/sanitize.js";
@@ -37,7 +36,6 @@ function isAllowedAvatarHost(hostname: string): boolean {
 /**
  * Валидирует URL аватара: только https и только Telegram CDN.
  * Всё остальное (http, чужие домены, не-URL) → null.
- * Аналог sanitizeAvatarUrl из vkProfile.ts.
  */
 export function sanitizeTelegramAvatarUrl(
   raw: string | null | undefined,

@@ -15,13 +15,13 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
  * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
- * уникальные vkUserId.
+ * уникальные telegramUserId.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 describe("POST /api/v1/bookings — P2002 conflict handling", () => {
-  // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-  let vkSeq = 3_100_000;
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+  let tgSeq = 3_100_000n;
   let driverId: string;
   let passenger1Id: string;
   let passenger2Id: string;
@@ -62,7 +62,7 @@ describe("POST /api/v1/bookings — P2002 conflict handling", () => {
     const user = await db.user.create({
       data: {
         name: `${name}-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=9",
       },
     });

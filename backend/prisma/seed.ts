@@ -17,10 +17,12 @@ const prisma = new PrismaClient({
 });
 
 /**
- * Стандартный VK-плейсхолдер «нет фото».
- * Используется для всех сид-пользователей (совпадает с бэкенд-фолбэком).
+ * Дефолтный плейсхолдер «нет фото»: inline SVG (data-URI), без внешних CDN.
+ * Используется для всех сид-пользователей (совпадает с бэкенд-фолбэком
+ * DEFAULT_AVATAR_URL из src/constants.ts).
  */
-const DEFAULT_AVATAR_URL = "https://vk.com/images/camera_200.png?ava=1";
+const DEFAULT_AVATAR_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23E5E7EB'/%3E%3Ccircle cx='100' cy='75' r='38' fill='%239CA3AF'/%3E%3Cpath d='M30 185c8-40 36-60 70-60s62 20 70 60z' fill='%239CA3AF'/%3E%3C/svg%3E";
 
 interface SeedCar {
   model: string;
@@ -30,7 +32,7 @@ interface SeedCar {
 
 interface SeedUser {
   id: string;
-  vkUserId: number;
+  telegramUserId: bigint;
   name: string;
   avatar: string;
   rating: number;
@@ -253,7 +255,7 @@ const users: SeedUser[] = [
   // Водители
   {
     id: "u-1",
-    vkUserId: 100001,
+    telegramUserId: 100001n,
     name: "Илья Северов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.9,
@@ -266,7 +268,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-2",
-    vkUserId: 100002,
+    telegramUserId: 100002n,
     name: "Марина Ковалёва",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.8,
@@ -279,7 +281,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-3",
-    vkUserId: 100003,
+    telegramUserId: 100003n,
     name: "Алексей Громов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 5.0,
@@ -292,7 +294,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-5",
-    vkUserId: 100005,
+    telegramUserId: 100005n,
     name: "Дмитрий Соколов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.7,
@@ -305,7 +307,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-6",
-    vkUserId: 100006,
+    telegramUserId: 100006n,
     name: "Ольга Павлова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.9,
@@ -318,7 +320,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-7",
-    vkUserId: 100007,
+    telegramUserId: 100007n,
     name: "Сергей Орлов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.6,
@@ -330,7 +332,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-8",
-    vkUserId: 100008,
+    telegramUserId: 100008n,
     name: "Анна Волкова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 5.0,
@@ -343,7 +345,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-9",
-    vkUserId: 100009,
+    telegramUserId: 100009n,
     name: "Николай Зайцев",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.5,
@@ -355,7 +357,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-10",
-    vkUserId: 100010,
+    telegramUserId: 100010n,
     name: "Виктор Морозов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.8,
@@ -368,7 +370,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-11",
-    vkUserId: 100011,
+    telegramUserId: 100011n,
     name: "Татьяна Белова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.9,
@@ -381,7 +383,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-12",
-    vkUserId: 100012,
+    telegramUserId: 100012n,
     name: "Андрей Лебедев",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.7,
@@ -393,7 +395,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-13",
-    vkUserId: 100013,
+    telegramUserId: 100013n,
     name: "Ирина Козлова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.8,
@@ -407,7 +409,7 @@ const users: SeedUser[] = [
   // Пассажиры
   {
     id: "u-4",
-    vkUserId: 100004,
+    telegramUserId: 100004n,
     name: "Елена Смирнова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.7,
@@ -418,7 +420,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-14",
-    vkUserId: 100014,
+    telegramUserId: 100014n,
     name: "Павел Никитин",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.6,
@@ -429,7 +431,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-15",
-    vkUserId: 100015,
+    telegramUserId: 100015n,
     name: "Наталья Фёдорова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 5.0,
@@ -441,7 +443,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-16",
-    vkUserId: 100016,
+    telegramUserId: 100016n,
     name: "Михаил Тарасов",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.8,
@@ -452,7 +454,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-17",
-    vkUserId: 100017,
+    telegramUserId: 100017n,
     name: "Светлана Егорова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.9,
@@ -463,7 +465,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-18",
-    vkUserId: 100018,
+    telegramUserId: 100018n,
     name: "Артём Киселёв",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.5,
@@ -475,7 +477,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-19",
-    vkUserId: 100019,
+    telegramUserId: 100019n,
     name: "Дарья Петрова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.8,
@@ -487,7 +489,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-20",
-    vkUserId: 100020,
+    telegramUserId: 100020n,
     name: "Роман Соловьёв",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.7,
@@ -498,7 +500,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-21",
-    vkUserId: 100021,
+    telegramUserId: 100021n,
     name: "Ксения Абрамова",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.9,
@@ -509,7 +511,7 @@ const users: SeedUser[] = [
   },
   {
     id: "u-22",
-    vkUserId: 100022,
+    telegramUserId: 100022n,
     name: "Олег Гусев",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.6,
@@ -521,7 +523,7 @@ const users: SeedUser[] = [
   // Демо админ-флоу бана: забанен 2 дня назад с обязательной причиной.
   {
     id: "u-23",
-    vkUserId: 100023,
+    telegramUserId: 100023n,
     name: "Игорь Забаненный",
     avatar: DEFAULT_AVATAR_URL,
     rating: 2.1,
@@ -535,7 +537,7 @@ const users: SeedUser[] = [
   // Демо мягкого удаления: аккаунт удалён 5 дней назад.
   {
     id: "u-24",
-    vkUserId: 100024,
+    telegramUserId: 100024n,
     name: "Удалённый Аккаунт",
     avatar: DEFAULT_AVATAR_URL,
     rating: 4.0,
@@ -1837,7 +1839,7 @@ async function main() {
     await prisma.user.create({
       data: {
         id: u.id,
-        vkUserId: u.vkUserId,
+        telegramUserId: u.telegramUserId,
         name: u.name,
         avatar: u.avatar,
         rating: u.rating,

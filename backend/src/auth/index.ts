@@ -1,7 +1,7 @@
 // backend/src/auth/index.ts
 import { Hono } from "hono";
 import { Prisma } from "../generated/prisma/client.js";
-import { authRequestSchema, refreshRequestSchema, telegramAuthRequestSchema } from "@edem/contracts";
+import { refreshRequestSchema, telegramAuthRequestSchema } from "@edem/contracts";
 import { z } from "zod";
 import { db } from "../db.js";
 import { env } from "../env.js";
@@ -10,8 +10,6 @@ import { ERROR_CODES } from "../errors.js";
 import { DEFAULT_AVATAR_URL } from "../constants.js";
 import { serializeUser } from "../serializers/index.js";
 
-import { verifyVkLaunchSignature } from "./vkSign.js";
-import { resolveVkProfile } from "./vkProfile.js";
 import { verifyTelegramInitData } from "./telegramSign.js";
 import { resolveTelegramProfile } from "./telegramProfile.js";
 import {
@@ -30,12 +28,6 @@ import { getSanitizedBody } from "../middleware/sanitize.js";
 
 export const authRouter = new Hono();
 
-const vkAuthLimiter = createRateLimiter({
-  windowMs: env.VK_AUTH_RATE_WINDOW_MS,
-  max: env.VK_AUTH_RATE_MAX,
-  keyPrefix: "auth-vk",
-});
-
 const refreshLimiter = createRateLimiter({
   windowMs: env.REFRESH_RATE_WINDOW_MS,
   max: env.REFRESH_RATE_MAX,
@@ -46,164 +38,6 @@ const tgAuthLimiter = createRateLimiter({
   windowMs: env.TG_AUTH_RATE_WINDOW_MS,
   max: env.TG_AUTH_RATE_MAX,
   keyPrefix: "auth-tg",
-});
-
-authRouter.post("/vk", vkAuthLimiter, async (c) => {
-  const body = await getSanitizedBody(c);
-  const parseResult = authRequestSchema.safeParse(body);
-
-  if (!parseResult.success) {
-    return c.json(
-      {
-        message: "Invalid request payload",
-        errors: z.formatError(parseResult.error),
-      },
-      400,
-    );
-  }
-
-  const { searchParams } = parseResult.data;
-
-  // Единственный поддерживаемый формат — полный searchParams из launch-параметров VK.
-  // Реконструкция query по отдельным полям (vkUserId/sign/ts) невозможна корректно:
-  // подпись VK считается по всем launch-параметрам (vk_app_id, vk_platform и др.),
-  // которых в payload нет — такой fallback всегда давал бы 401.
-  const queryToVerify = searchParams;
-
-  if (!queryToVerify) {
-    return c.json({ message: "Invalid auth payload" }, 400);
-  }
-
-  const { isValid, vkUserId } = verifyVkLaunchSignature(queryToVerify);
-
-  if (!isValid || !vkUserId) {
-    return c.json({ message: "Invalid or expired signature" }, 401);
-  }
-
-  // Отображаемые профильные данные: фронтенд достаёт имя/фото через
-  // VKWebAppGetUserInfo и присылает в теле запроса; launch-параметры VK —
-  // fallback. Данные не подписаны VK → только display (аватар — лишь с VK CDN),
-  // идентификация по подписанному vk_user_id.
-  const { name: vkName, avatar: vkAvatar } = resolveVkProfile(
-    {
-      firstName: parseResult.data.firstName,
-      lastName: parseResult.data.lastName,
-      photo: parseResult.data.photo,
-    },
-    queryToVerify,
-  );
-  const placeholderName = `Пользователь VK ${vkUserId}`;
-
-  // The unique VK ID is the synchronization point for concurrent launches.
-  //
-  // ВАЖНО: Prisma генерирует upsert как SELECT по vkUserId, затем INSERT
-  // (а не INSERT ... ON CONFLICT DO UPDATE). При ПУСТОМ update (аватар не
-  // пришёл из VK CDN) у INSERT нет ни ON CONFLICT, ни DO UPDATE: два
-  // конкурентных запуска одновременно видят «пользователя нет» и оба делают
-  // INSERT — один коммитится, второй получает P2002 (unique violation).
-  // Ретраем один раз: при повторе SELECT увидит созданную строку и upsert
-  // пойдёт по update-ветке. Данные не нарушаются (дублей не возникает),
-  // ретрай нужен, чтобы второй клиент не получил 500.
-  const upsertUser = () =>
-    db.user.upsert({
-      where: { vkUserId },
-      create: {
-        vkUserId,
-        name: vkName ?? placeholderName,
-        avatar: vkAvatar ?? DEFAULT_AVATAR_URL,
-        rating: 5.0,
-        reviewsCount: 0,
-        tripsCount: 0,
-        // VK-authed = verified. Аутентификация через подписанные параметры
-        // запуска VK — это и есть верификация; отдельной модерации не требуется.
-        isVerified: true,
-        verifiedAt: new Date(),
-      },
-      update: {
-        // Аватар не редактируется через API — при каждом входе синхронизируем
-        // с актуальным фото из VK. Tombstone удалённых не трогаем (проверка ниже).
-        ...(vkAvatar ? { avatar: vkAvatar } : {}),
-      },
-      include: { car: true },
-    });
-
-  // Tombstone удалённых хранит vkUserId для блокировки повторного входа:
-  // проверяем ДО upsert, чтобы отклонённый логин не мутировал запись.
-  const tombstone = await db.user.findUnique({
-    where: { vkUserId },
-    select: { id: true, deletedAt: true },
-  });
-  if (tombstone?.deletedAt) {
-    return c.json(
-      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
-      403,
-    );
-  }
-
-  let user;
-  try {
-    user = await upsertUser();
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      // Гонка конкурентных запусков: другой запрос успел создать пользователя.
-      user = await upsertUser();
-    } else {
-      throw error;
-    }
-  }
-
-  // Существующих пользователей с placeholder-именем («Пользователь VK …»)
-  // дописываем реальным VK-именем; вручную отредактированное имя
-  // (PATCH /users/me) не перезаписываем.
-  const finalUser =
-    vkName && user.name === placeholderName
-      ? await db.user.update({
-          where: { id: user.id },
-          data: { name: vkName },
-          include: { car: true },
-        })
-      : user;
-
-  // Проверка бана ДО выпуска токенов: единая точка отказа и для реальной
-  // VK-авторизации, и для dev-auth (ALLOW_DEV_AUTH) — обе ветки сходятся
-  // здесь после upsert. Забаненный пользователь не должен попадать
-  // в приложение; существующие refresh-токены отзываем, чтобы бан нельзя
-  // было обойти через другую активную сессию.
-  if (finalUser.bannedAt) {
-    const revokedCount = await revokeAllActiveTokens(finalUser.id);
-    logger.warn(
-      { userId: finalUser.id, revokedCount },
-      "[Auth] VK login rejected — user is banned",
-    );
-    return c.json(
-      {
-        code: ERROR_CODES.FORBIDDEN,
-        message: "Account is banned",
-        banReason: finalUser.banReason ?? null,
-      },
-      403,
-    );
-  }
-
-  if (finalUser.deletedAt) {
-    return c.json(
-      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
-      403,
-    );
-  }
-
-  const accessToken = await signAccessToken(finalUser.id);
-  const refreshToken = await signRefreshToken(finalUser.id); // Создаёт запись в БД
-
-  return c.json({
-    accessToken,
-    refreshToken,
-    expiresIn: env.JWT_ACCESS_TTL_SECONDS,
-    user: serializeUser(finalUser),
-  });
 });
 
 authRouter.post("/telegram", tgAuthLimiter, async (c) => {
@@ -242,13 +76,13 @@ authRouter.post("/telegram", tgAuthLimiter, async (c) => {
 
   // Display-данные: user-объект подписан Telegram (часть initData), но
   // всё равно проходит санитизацию и host-allowlist аватара
-  // (telegramProfile.ts — defense in depth, единообразно с VK-веткой).
+  // (telegramProfile.ts — defense in depth).
   const { name: tgName, avatar: tgAvatar } = resolveTelegramProfile(result.user);
   const placeholderName = `Пользователь Telegram ${telegramUserId}`;
 
-  // Каноника гонок — как у VK: уникальный telegramUserId, upsert как
+  // Каноника гонок: уникальный telegramUserId, upsert как
   // SELECT → INSERT (не ON CONFLICT) при пустом update → P2002 у второго
-  // из двух конкурентных запусков; один ретрай решает (см. /vk выше).
+  // из двух конкурентных запусков; один ретрай решает.
   const upsertUser = () =>
     db.user.upsert({
       where: { telegramUserId },
@@ -259,8 +93,8 @@ authRouter.post("/telegram", tgAuthLimiter, async (c) => {
         rating: 5.0,
         reviewsCount: 0,
         tripsCount: 0,
-        // Telegram-auth = верифицированный вход (подпись initData) —
-        // зеркально VK-ветке: isVerified true без отдельной модерации.
+        // Telegram-auth = верифицированный вход (подпись initData):
+        // isVerified true без отдельной модерации.
         isVerified: true,
         verifiedAt: new Date(),
       },
@@ -301,7 +135,7 @@ authRouter.post("/telegram", tgAuthLimiter, async (c) => {
   }
 
   // Placeholder-имена дописываем реальным именем Telegram; вручную
-  // отредактированное (PATCH /users/me) не перезаписываем. Зеркально VK.
+  // отредактированное (PATCH /users/me) не перезаписываем.
   const finalUser =
     tgName && user.name === placeholderName
       ? await db.user.update({

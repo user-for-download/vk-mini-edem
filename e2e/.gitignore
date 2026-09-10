@@ -1,3 +1,5 @@
-# E2E test artifacts
+# E2E test artifacts (run outputs, not source — never commit)
 shots/
+shots-tg/
 results.json
+results-tg.json

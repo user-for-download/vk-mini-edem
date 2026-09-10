@@ -23,19 +23,19 @@ const { signAccessToken } = await import("../../src/auth/tokens.js");
  *    plate длиннее 15 → 400. Без токена → 401.
  *
  * Паттерны репо (см. onboarding.test.ts): app.request(), уникальные
- * vkUserId (INT4-счётчик, диапазон 9_310_000 не пересекается
+ * telegramUserId (BigInt-счётчик, диапазон 9_310_000 не пересекается
  * с другими сьютами), чистка созданных пользователей в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 const createdUserIds: string[] = [];
-let vkSeq = 9_310_000;
+let tgSeq = 9_310_000n;
 
 async function createUser(): Promise<{ id: string; token: string }> {
   const user = await db.user.create({
     data: {
-      name: `CarPlateUser-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `CarPlateUser-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=11",
     },
   });

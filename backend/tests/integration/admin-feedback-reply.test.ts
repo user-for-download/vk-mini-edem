@@ -48,7 +48,7 @@ describe("Admin feedback reply — close the loop", () => {
   const createdFeedbackIds: string[] = [];
   const createdNotificationIds: string[] = [];
   // Не пересекаемся с admin-feedback.test.ts (8_200_000+) и с user-side suite.
-  let vkSeq = 8_300_000;
+  let tgSeq = 8_300_000n;
 
   beforeEach(async () => {
     adminCookie = await loginAndGetCookie();
@@ -56,7 +56,7 @@ describe("Admin feedback reply — close the loop", () => {
     const user = await db.user.create({
       data: {
         name: `FeedbackReply-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=8",
         notificationsEnabled: true,
       },

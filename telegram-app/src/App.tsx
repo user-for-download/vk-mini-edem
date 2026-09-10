@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { miniApp } from "@telegram-apps/sdk-react";
 import { AppConfig } from "@/AppConfig";
-import { HomePage } from "@/pages/HomePage";
+import { AppRouter } from "@/router/AppRouter";
 
 export default function App() {
   useEffect(() => {
@@ -11,7 +11,7 @@ export default function App() {
 
   return (
     <AppConfig>
-      <HomePage />
+      <AppRouter />
     </AppConfig>
   );
 }

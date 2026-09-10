@@ -1,87 +1,85 @@
 # E2E Tests
 
-Full-cycle E2E tests for the Edem VK Mini App using Playwright + Chromium.
+Telegram Mini App parity E2E (tg-migration-17, VK flows removed in
+tg-migration-25): Playwright + Chromium journey plus realtime check.
 
 ## Prerequisites
 
-- Frontend running on `E2E_BASE_URL` (default `http://localhost:3010`)
+- Telegram frontend on `E2E_TG_URL` (default `http://localhost:3012`,
+  `telegram-app` vite dev server)
 - Backend running on `http://localhost:3011`
 - Dev DB running (docker container `E2E_DB_CONTAINER`, default `vk-mini-edem-db-dev`)
 - `ALLOW_DEV_AUTH=true` in backend `.env`
-- Seeded users `100001` (driver) and `100004` (passenger); reseed with backend seed if missing
+- Admin token in `E2E_ADMIN_TOKEN` (default `dev-admin-token-12345`, must match
+  backend `ADMIN_TOKEN`) for review approve + feedback reply steps
 - Playwright browsers installed: `npx playwright install chromium`
 
 ## Running
 
 ```bash
-node e2e/full-cycle.mjs
+node e2e/telegram-parity.mjs
 
-# Liquidity/safety API flow
-node e2e/liquidity-safety.mjs
+# Realtime smoke (ws.v1 auth/ping-pong/reconnect against a live backend)
+node e2e/telegram-realtime.mjs
 ```
 
 ## Env overrides
 
 | Var | Default | Purpose |
 | --- | --- | --- |
-| `E2E_BASE_URL` | `http://localhost:3010` | Frontend base URL |
+| `E2E_TG_URL` | `http://localhost:3012` | Telegram frontend base URL |
 | `E2E_DB_CONTAINER` | `vk-mini-edem-db-dev` | Docker container for time-travel (`departureAt`) + cleanup |
 | `E2E_VERBOSE` | unset (`1` = verbose) | Log screenshot-helper failures instead of failing the step |
-| `E2E_API_URL` | `http://localhost:3011/api/v1` | Backend API base for the liquidity/safety flow |
-| `E2E_PASSENGER_ID` | `100004` | Seed/dev-auth passenger |
-| `E2E_DRIVER_ID` | `100001` | Seed/dev-auth driver |
+| `E2E_API_URL` | `http://localhost:3011/api/v1` | Backend API base |
+| `E2E_ADMIN_TOKEN` | `dev-admin-token-12345` | Admin API (must match backend `ADMIN_TOKEN`) |
 
-`vk_ts` auth timestamps are generated fresh on every `authUrl()` call (single
-timestamp per run expires after the 5-min server window on long runs).
+Rate budget: `/auth/telegram` is IP-limited (default 5/5min, shared by UI
+bootstraps and API logins). The script uses exactly one login per identity
+per run (UI bootstrap, peer API, page reloads re-bootstrap from storage) —
+back-to-back reruns within 5 minutes may hit 429. Wait out the window or
+raise `TG_AUTH_RATE_MAX` on the dev backend.
 
 ## Determinism
 
-- Each run uses unique data: `PRICE = 700 + ((Date.now() + pid) % 90)` plus a
-  unique review comment, so repeat runs never collide on cards/search.
-  The created trip `id` is captured from the POST /trips response (with a
-  URL fallback on the details step) — assertions key on the exact entity.
+- Each run uses unique data: `PRICE = 700 + ((Date.now() + pid) % 90)` plus
+  unique review/feedback texts and directory cities, so repeat runs never
+  collide on cards/search. The created trip `id` is captured from the URL
+  after UI publish — assertions key on the exact entity.
 - Prerequisite check runs first: `docker exec $E2E_DB_CONTAINER psql` must
   answer, otherwise the run exits 2 before creating any data.
-- Created trip + its reviews are deleted in a `finally` block (pass or fail);
-  bookings cascade via FK. **Cleanup failure fails the run** (recorded as a
-  result step and reflected in the exit code), so residue never leaks into
-  the next run silently.
+- Created trips + peer user + feedback are deleted in a `finally` block
+  (pass or fail). **Cleanup failure fails the run**, so residue never leaks
+  into the next run silently.
 - `pageerror` **and** `unhandledrejection` fail the run (non-zero exit even
-  at 15/15). Rejections are collected per page via an init script and
-  reported in `results.json`.
-- Cold-start warm-up: one non-counted `goto /` + 60s content wait right after
-  browser launch absorbs fresh-vite compile latency; the 15 recorded steps keep
-  normal timeouts.
+  at 16/16). Rejections are collected per page via an init script and
+  reported in `results-tg.json`.
+- Cold-start warm-up: one non-counted `goto /` + 120s content wait right after
+  browser launch absorbs fresh-vite compile latency.
 - No swallowed waits on key assertions — missing UI state fails the step
-  loudly. Fixed sleeps remain only as short (≤800ms), commented
-  animation/perception pauses (calendar open/close, snackbar settle).
-- Step 13 (complete trip) is state-based: asserts `UPDATE 1` rowcount, waits for
-  fresh `GET /trips/:id` after reload, then for the enabled «Завершить поездку»
-  button (`waitForFunction`) — no fixed sleeps. All navigations use
-  `waitUntil: commit` (WS pages sometimes never fire `load`); readiness is
-  asserted by strict content waits after each navigation.
+  loudly. `page.reload()` tests real server resync (not cache).
+- Mobile leg resizes the viewport in the same context (a new context would
+  burn the shared `/auth/telegram` IP budget on re-bootstrap).
 
-## Test Flow
+## Test Flow (`telegram-parity.mjs` runSteps in order)
 
-1. Driver auth (dev-sign) + home screen
-2. Search accordion collapsed by default
-3. Driver creates trip (Вологда→Череповец, завтра, unique price 700–789₽, 3 seats, tag)
-4. Trip visible in "My trips"
-5. Passenger auth + search screen
-6. Passenger finds the trip
-7. Trip details: tags without Card frame + no duplicate status
-8. Passenger books a seat
-9. Passenger sees "Application sent" status
-10. Driver confirms booking
-11. Passenger sees snackbar "Your application is confirmed!"
-12. Passenger sees "Seat booked" status
-13. Driver completes trip (departureTime in past)
-14. Passenger leaves review (5★ + comment)
-15. Mini-app: `/profile/notifications` → VK push notifications block (banner «Включить» or «Включены»)
-
-The separate `liquidity-safety.mjs` flow checks RideRequest creation, driver matching visibility (the created request must be present in the matching results, and must disappear after pausing), pause transition and cleanup. It does not create a booking automatically.
+1. Prereq: TG frontend serves the app (with cold-start warm-up)
+2. Auth: dev login, `Dev Telegram` profile (onboarding accepted once)
+3. Setup: driver car (psql upsert), directory cities, API counterparty
+4. Driver creates trip in UI (unique price, datalist cities) → `/trips/:id`
+5. Counterparty books seat 1 via API
+6. Driver approves (`Принять` → `Подтверждён`) in UI
+7. Inbox shows `booking_created`; mark-read works
+8. Reload on requests page → confirmed state resyncs from server
+9. Offline → `Нет подключения` banner; online → `Соединение восстановлено`
+10. Time-travel departure to past (docker psql) → UI complete → `Завершена`
+11. Counterparty review via API → admin approve → visible in UI `/reviews`
+12. Support ticket in UI → admin reply via API → `Ответ поддержки` in UI
+13. Settings toggle round-trip (`Настройки сохранены`)
+14. Malformed hash route falls back to search (`/trips`)
+15. 390px viewport resize: search finds counterparty trip card
+16. UI account deletion → `Профиль удалён` screen (tombstone)
 
 ## Artifacts
 
-- Screenshots: `e2e/shots/`
-- Results: `e2e/results.json`
+- Screenshots: `e2e/shots-tg/`
+- Results: `e2e/results-tg.json`

@@ -1,1 +1,1 @@
-export type { User } from "@edem/contracts";
+export type * from "@edem/contracts";

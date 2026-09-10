@@ -12,7 +12,7 @@
 1. Build and validate the image: `docker build -f backend/Dockerfile -t edem-backend:release .`.
 2. Apply migrations through the normal backend startup procedure.
 3. Verify `/health/ready`, API routes, admin cookie session, SPA fallback and WebSocket upgrade through the public proxy.
-4. Run `node e2e/liquidity-safety.mjs` and the existing `node e2e/full-cycle.mjs` against the release environment.
+4. Run `node e2e/telegram-parity.mjs` against the release environment.
 
 ## Rollback
 

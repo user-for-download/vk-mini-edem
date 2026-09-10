@@ -7,7 +7,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
-COPY mini-app/package.json ./mini-app/
 COPY telegram-app/package.json ./telegram-app/
 # webapp в image не собирается, но его package.json нужен npm ci:
 # корневой package.json объявляет workspace "webapp", без него установка падает.
@@ -22,12 +21,10 @@ RUN NODE_OPTIONS=--dns-result-order=ipv4first npm ci --maxsockets=2
 COPY tsconfig.json ./
 COPY packages/contracts ./packages/contracts
 COPY backend ./backend
-COPY mini-app ./mini-app
 COPY telegram-app ./telegram-app
 
 RUN cd packages/contracts && npm run build
 RUN cd backend && npx prisma generate && npm run build
-RUN cd mini-app && npm run build
 RUN cd telegram-app && npm run build
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
@@ -51,7 +48,6 @@ COPY --from=builder /app/backend/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/packages/contracts/dist ./node_modules/@edem/contracts/dist
 COPY --from=builder /app/packages/contracts/package.json ./node_modules/@edem/contracts/
-COPY --from=builder /app/mini-app/dist ./mini-app/dist
 # Telegram mini-app (host-based Static в app.ts: TELEGRAM_HOSTS).
 COPY --from=builder /app/telegram-app/dist ./telegram-app/dist
 

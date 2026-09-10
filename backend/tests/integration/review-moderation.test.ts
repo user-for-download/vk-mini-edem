@@ -41,7 +41,7 @@ const { devMockAccessToken } = await import("../dev-mock-auth.js");
  * app.request(), логин админа через POST /admin/auth/login с cookie
  * edem_admin_jwt, dev-авторизация пользователя mock-токеном
  * (tests/dev-mock-auth.js: allowlist + TTL),
- * уникальные vkUserId, очистка в afterEach.
+ * уникальные telegramUserId, очистка в afterEach.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const ADMIN_TOKEN = "test-admin-token-789";
@@ -72,15 +72,15 @@ const createdUserIds: string[] = [];
 const createdTripIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdReviewIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
 // Диапазон 9_600_000+ не пересекается с другими integration-suite.
-let vkSeq = 9_600_000;
+let tgSeq = 9_600_000n;
 
 async function createUser(name: string): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `${name}-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `${name}-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=9",
       // Явно включаем: уведомления об approve/reject — некритичный тип,
       // при notificationsEnabled=false createNotification их не создаст.

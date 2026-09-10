@@ -36,17 +36,24 @@ describe("health", () => {
   });
 });
 
+/** Dev-initData формата dev-bypass (hash=dev-hash, ALLOW_DEV_AUTH под vitest). */
+function devInitData(tgId: number, firstName = "Smoke"): string {
+  return new URLSearchParams([
+    ["user", JSON.stringify({ id: tgId, first_name: firstName })],
+    ["auth_date", String(Math.floor(Date.now() / 1000))],
+    ["hash", "dev-hash"],
+  ]).toString();
+}
+
 describe("auth bootstrap", () => {
   it("creates user and returns token", async () => {
     await cleanDb();
 
-    const response = await app.request("/api/v1/auth/vk", {
+    const response = await app.request("/api/v1/auth/telegram", {
       method: "POST",
       headers: JSON_HEADERS,
       body: JSON.stringify({
-        // Полный searchParams из launch-параметров VK (единственный поддерживаемый формат).
-        // В dev-режиме (ALLOW_DEV_AUTH) подпись sign=dev-sign принимается без проверки HMAC.
-        searchParams: "vk_user_id=111111&sign=dev-sign",
+        initData: devInitData(111111, "Смоук"),
       }),
     });
 
@@ -64,78 +71,23 @@ describe("auth bootstrap", () => {
     expect(body.user.name).toBeTruthy();
   });
 
-  it("client VK profile fields: display-only, avatar restricted to VK CDN", async () => {
-    await cleanDb();
-
-    const response = await app.request("/api/v1/auth/vk", {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify({
-        searchParams: "vk_user_id=111112&sign=dev-sign",
-        firstName: "Ирина",
-        lastName: "Козлова",
-        photo: "https://example.com/attacker-avatar.png",
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      user: {
-        name: string;
-        avatar: string;
-        isVerified: boolean;
-      };
-    };
-
-    // Имя — отображаемые данные: заполняется из полей клиента.
-    expect(body.user.name).toBe("Ирина Козлова");
-    // Аватар с чужого домена отклоняется (только https + VK CDN).
-    expect(body.user.avatar).toBe("https://vk.com/images/camera_200.png?ava=1");
-    // Идентификация от клиентских полей не зависит: пользователь, прошедший
-    // через VK launch-params (даже dev-bypass), считается верифицированным —
-    // это и есть суть «приложение ВК».
-    expect(body.user.isVerified).toBe(true);
-  });
-
-  it("accepts avatar from VK CDN (userapi.com)", async () => {
-    await cleanDb();
-
-    const response = await app.request("/api/v1/auth/vk", {
-      method: "POST",
-      headers: JSON_HEADERS,
-      body: JSON.stringify({
-        searchParams: "vk_user_id=111114&sign=dev-sign",
-        firstName: "Олег",
-        photo: "https://sun9-10.userapi.com/imp/xyz.jpg",
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as {
-      user: { name: string; avatar: string };
-    };
-    expect(body.user.name).toBe("Олег");
-    expect(body.user.avatar).toBe("https://sun9-10.userapi.com/imp/xyz.jpg");
-  });
-
-  it("creates one user for concurrent VK launches", async () => {
+  it("creates one user for concurrent Telegram launches", async () => {
     await cleanDb();
 
     const requests = await Promise.all(
-       Array.from({ length: 2 }, () =>
-        app.request("/api/v1/auth/vk", {
+      Array.from({ length: 2 }, () =>
+        app.request("/api/v1/auth/telegram", {
           method: "POST",
           headers: JSON_HEADERS,
           body: JSON.stringify({
-            searchParams: "vk_user_id=111113&sign=dev-sign",
+            initData: devInitData(111113),
           }),
         })
       )
     );
 
     // Диагностика флейков: без реальных статусов/тел 429/500/401 выглядят
-    // одинаково («expected false to be true») — CI с LOG_LEVEL=silent не
-    // показывает и серверный лог, поэтому печатаем сами.
+    // одинаково («expected false to be true»), поэтому печатаем сами.
     const results = await Promise.all(
       requests.map(async (response) => ({
         status: response.status,
@@ -144,11 +96,11 @@ describe("auth bootstrap", () => {
     );
 
     if (results.some((result) => result.status !== 200)) {
-      console.error("non-200 on concurrent VK launches:", results);
+      console.error("non-200 on concurrent Telegram launches:", results);
     }
 
     expect(results.map((result) => result.status)).toEqual([200, 200]);
-    const users = await db.user.findMany({ where: { vkUserId: 111113 } });
+    const users = await db.user.findMany({ where: { telegramUserId: 111113n } });
     expect(users).toHaveLength(1);
   });
 });
@@ -159,7 +111,7 @@ describe("trips", () => {
 
     const driver = await db.user.create({
       data: {
-        vkUserId: 222222,
+        telegramUserId: 222222n,
         name: "Driver",
         avatar: "https://i.pravatar.cc/200?img=1",
       },
@@ -225,7 +177,7 @@ describe("bookings smoke", () => {
 
     const passenger = await db.user.create({
       data: {
-        vkUserId: 333333,
+        telegramUserId: 333333n,
         name: "Passenger",
         avatar: "https://i.pravatar.cc/200?img=2",
       },
@@ -233,7 +185,7 @@ describe("bookings smoke", () => {
 
     const driver = await db.user.create({
       data: {
-        vkUserId: 444444,
+        telegramUserId: 444444n,
         name: "Driver",
         avatar: "https://i.pravatar.cc/200?img=3",
       },
@@ -288,7 +240,7 @@ describe("bookings smoke", () => {
 
     const passenger = await db.user.create({
       data: {
-        vkUserId: 555555,
+        telegramUserId: 555555n,
         name: "Passenger",
         avatar: "https://i.pravatar.cc/200?img=4",
       },
@@ -296,7 +248,7 @@ describe("bookings smoke", () => {
 
     const driver = await db.user.create({
       data: {
-        vkUserId: 666666,
+        telegramUserId: 666666n,
         name: "Driver",
         avatar: "https://i.pravatar.cc/200?img=5",
       },

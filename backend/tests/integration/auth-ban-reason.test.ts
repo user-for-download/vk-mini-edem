@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.hoisted(() => {
   process.env.REFRESH_RATE_WINDOW_MS = "900000";
   process.env.REFRESH_RATE_MAX = "1000";
-  process.env.VK_AUTH_RATE_WINDOW_MS = "900000";
-  process.env.VK_AUTH_RATE_MAX = "1000";
+  process.env.TG_AUTH_RATE_WINDOW_MS = "900000";
+  process.env.TG_AUTH_RATE_MAX = "1000";
 });
 
 const { app } = await import("../../src/app.js");
@@ -17,10 +17,10 @@ const { devMockRefreshToken } = await import("../dev-mock-auth.js");
 /**
  * Регрессия: «причина бана» в auth-слое.
  *
- * До расширения функциональности /auth/vk не проверял бан и выдавал токены
+ * До расширения функциональности /auth/telegram не проверял бан и выдавал токены
  * забаненному пользователю, а /auth/refresh отдавал 403 без указания причины.
  * Теперь:
- *  1) /auth/vk отказывает забаненному ДО выпуска токенов, отвечает 403
+ *  1) /auth/telegram отказывает забаненному ДО выпуска токенов, отвечает 403
  *     с body.code === "FORBIDDEN" и body.banReason, отзывает все активные
  *     refresh-токены пользователя.
  *  2) /auth/refresh (обе ветки: dev-mock и main) симметрично возвращает
@@ -28,15 +28,15 @@ const { devMockRefreshToken } = await import("../dev-mock-auth.js");
  *  3) Старые баны (bannedAt без banReason) → banReason: null — клиент
  *     показывает «Причина не указана».
  *
- * Паттерны репо (см. ban-enforcement.test.ts, vk-profile.test.ts):
- * app.request() вместо supertest, уникальные vkUserId, fake-WS не нужны.
+ * Паттерны репо (см. ban-enforcement.test.ts, telegram-auth.test.ts):
+ * app.request() вместо supertest, уникальные telegramUserId, fake-WS не нужны.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 const createdUserIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
 // Диапазон 9_300_000+ не пересекается с другими интеграционными тестами.
-let vkSeq = 9_300_000;
+let tgSeq = 9_300_000n;
 
 interface CreateBannedUserOptions {
   reason: string | null;
@@ -44,17 +44,17 @@ interface CreateBannedUserOptions {
 
 interface CreatedUser {
   id: string;
-  vkUserId: number;
+  telegramUserId: bigint;
 }
 
 async function createBannedUser(
   options: CreateBannedUserOptions
 ): Promise<CreatedUser> {
-  const vkUserId = ++vkSeq;
+  const telegramUserId = ++tgSeq;
   const user = await db.user.create({
     data: {
-      name: `BanReasonUser-${vkUserId}`,
-      vkUserId,
+      name: `BanReasonUser-${telegramUserId}`,
+      telegramUserId,
       avatar: "https://i.pravatar.cc/200?img=10",
       bannedAt: new Date(),
       // Prisma-уровень: null = legacy бан без причины. Подкрепляем сценарий
@@ -63,38 +63,37 @@ async function createBannedUser(
     },
   });
   createdUserIds.push(user.id);
-  return { id: user.id, vkUserId: user.vkUserId };
+  return { id: user.id, telegramUserId: user.telegramUserId };
 }
 
 async function createActiveUser(): Promise<CreatedUser> {
-  const vkUserId = ++vkSeq;
+  const telegramUserId = ++tgSeq;
   const user = await db.user.create({
     data: {
-      name: `BanReasonUser-Active-${vkUserId}`,
-      vkUserId,
+      name: `BanReasonUser-Active-${telegramUserId}`,
+      telegramUserId,
       avatar: "https://i.pravatar.cc/200?img=10",
     },
   });
   createdUserIds.push(user.id);
-  return { id: user.id, vkUserId: user.vkUserId };
+  return { id: user.id, telegramUserId: user.telegramUserId };
 }
 
-function devSearchParams(vkUserId: number): string {
-  // Минимальный набор параметров для dev-bypass: vk_user_id + sign=dev-sign.
-  // verifyVkLaunchSignature в dev-режиме (ALLOW_DEV_AUTH=true) принимает
-  // такой searchParams без проверки HMAC (см. vkSign.ts).
-  const params = new URLSearchParams({
-    vk_user_id: String(vkUserId),
-    sign: "dev-sign",
-  });
-  return params.toString();
+function devInitData(telegramUserId: bigint): string {
+  // Dev-bypass TG: hash=dev-hash. verifyTelegramInitData в dev-режиме
+  // (ALLOW_DEV_AUTH=true) принимает такое initData без проверки HMAC.
+  return new URLSearchParams([
+    ["user", JSON.stringify({ id: Number(telegramUserId), first_name: "Ban" })],
+    ["auth_date", String(Math.floor(Date.now() / 1000))],
+    ["hash", "dev-hash"],
+  ]).toString();
 }
 
-async function postVkLogin(vkUserId: number) {
-  return app.request("/api/v1/auth/vk", {
+async function postTelegramLogin(telegramUserId: bigint) {
+  return app.request("/api/v1/auth/telegram", {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ searchParams: devSearchParams(vkUserId) }),
+    body: JSON.stringify({ initData: devInitData(telegramUserId) }),
   });
 }
 
@@ -120,19 +119,19 @@ afterEach(async () => {
   }
 });
 
-describe("auth/vk: banned user rejected with banReason", () => {
+describe("auth/telegram: banned user rejected with banReason", () => {
   it("banned user with reason → 403 FORBIDDEN, no tokens issued, tokens revoked", async () => {
     // Arrange — пользователь с активной причиной бана.
     const reason = "Спам в чатах";
-    const { id: userId, vkUserId } = await createBannedUser({ reason });
-    // Создаём «прошлую» активную сессию, чтобы убедиться, что /auth/vk
+    const { id: userId, telegramUserId } = await createBannedUser({ reason });
+    // Создаём «прошлую» активную сессию, чтобы убедиться, что /auth/telegram
     // отзывает все ранее выданные токены.
     await signRefreshToken(userId);
     await signRefreshToken(userId);
     expect(await countActiveTokens(userId)).toBe(2);
 
     // Act
-    const res = await postVkLogin(vkUserId);
+    const res = await postTelegramLogin(telegramUserId);
 
     // Assert — 403 с кодом, причиной и без выпуска токенов.
     expect(res.status).toBe(403);
@@ -151,7 +150,7 @@ describe("auth/vk: banned user rejected with banReason", () => {
     expect(body.refreshToken).toBeUndefined();
     expect(body.user).toBeUndefined();
 
-    // Все активные refresh-токены пользователя отозваны в /auth/vk.
+    // Все активные refresh-токены пользователя отозваны в /auth/telegram.
     expect(await countActiveTokens(userId)).toBe(0);
   });
 
@@ -159,10 +158,10 @@ describe("auth/vk: banned user rejected with banReason", () => {
     // Arrange — пользователь забанен до миграции add_user_ban_reason:
     // bannedAt есть, banReason остался null. Клиент трактует null как
     // «Причина не указана» (см. ТЗ ban-reason-screen).
-    const { vkUserId } = await createBannedUser({ reason: null });
+    const { telegramUserId } = await createBannedUser({ reason: null });
 
     // Act
-    const res = await postVkLogin(vkUserId);
+    const res = await postTelegramLogin(telegramUserId);
 
     // Assert
     expect(res.status).toBe(403);
@@ -171,13 +170,13 @@ describe("auth/vk: banned user rejected with banReason", () => {
     expect(body.banReason).toBeNull();
   });
 
-  it("non-banned user with same vk_user_id still receives tokens (sanity)", async () => {
+  it("non-banned user with same telegramUserId still receives tokens (sanity)", async () => {
     // Arrange — обычный (не забаненный) пользователь: убеждаемся, что 403
     // наблюдается именно из-за бана, а не из-за побочных эффектов dev-логина.
-    const { vkUserId } = await createActiveUser();
+    const { telegramUserId } = await createActiveUser();
 
     // Act
-    const res = await postVkLogin(vkUserId);
+    const res = await postTelegramLogin(telegramUserId);
 
     // Assert — 200, токены выданы.
     expect(res.status).toBe(200);
@@ -187,16 +186,16 @@ describe("auth/vk: banned user rejected with banReason", () => {
   });
 });
 
-describe("auth/vk: ban check revokes pre-existing active sessions", () => {
-  it("pre-existing refresh tokens are revoked when /auth/vk detects ban", async () => {
+describe("auth/telegram: ban check revokes pre-existing active sessions", () => {
+  it("pre-existing refresh tokens are revoked when /auth/telegram detects ban", async () => {
     // Arrange — обычный пользователь с двумя активными сессиями (две записи
     // в RefreshToken). Затем он банится (имитируем «бан между сессиями»:
     // обновляем bannedAt/banReason напрямую в БД, как если бы это сделала
-    // админ-панель ранее). Фокус теста — поведение /auth/vk: при бане
+    // админ-панель ранее). Фокус теста — поведение /auth/telegram: при бане
     // активные токены должны быть отозваны revokeAllActiveTokens, чтобы
     // бан нельзя было обойти через другую сессию.
     const reason = "Нарушение правил сервиса";
-    const { id: userId, vkUserId } = await createActiveUser();
+    const { id: userId, telegramUserId } = await createActiveUser();
     const oldToken = await signRefreshToken(userId);
     await signRefreshToken(userId);
     expect(await countActiveTokens(userId)).toBe(2);
@@ -206,7 +205,7 @@ describe("auth/vk: ban check revokes pre-existing active sessions", () => {
     });
 
     // Act
-    const res = await postVkLogin(vkUserId);
+    const res = await postTelegramLogin(telegramUserId);
 
     // Assert — обе активные сессии отозваны, старый токен больше невалиден.
     expect(res.status).toBe(403);

@@ -20,19 +20,8 @@ const ignoredDirectories = new Set([
 const legacyTrailingWhitespace = new Set([
   "backend/src/services/notification.service.ts:34",
   "backend/src/trips/index.ts:516",
-  "mini-app/src/providers/WsProvider.tsx:36",
-  "mini-app/src/providers/WsProvider.tsx:131",
-  "mini-app/src/providers/WsProvider.tsx:198",
 ]);
-const legacyMissingFinalNewline = new Set([
-  "mini-app/src/api/notifications.api.ts",
-  "mini-app/src/components/EmptyState.tsx",
-  "mini-app/src/components/Skeleton/TripCardSkeleton.tsx",
-  "mini-app/src/components/ViewErrorBoundary.tsx",
-  "mini-app/src/helpers/transformVKBridgeAdaptivity.ts",
-  "mini-app/src/providers/useWsEvent.ts",
-  "mini-app/src/views/ActionView/panels/PassengerHistoryPanel/PassengerHistoryPanel.tsx",
-]);
+const legacyMissingFinalNewline = new Set([]);
 const textExtensions = new Set([
   ".cjs", ".css", ".example", ".js", ".json", ".md", ".mjs", ".prisma",
   ".scss", ".sh", ".ts", ".tsx", ".yaml", ".yml",

@@ -78,17 +78,11 @@ export function formatTimeRu(date: Date): string {
 
 export function serializeUser(
   user: UserWithCar,
-  options?: { includePlate?: boolean; includeVkUserId?: boolean },
+  options?: { includePlate?: boolean },
 ) {
   const isDeleted = Boolean(user.deletedAt);
   return {
     id: user.id,
-    // VK ID отдаётся только по явному флагу (участники активной брони),
-    // чтобы клиент мог построить ссылку на ЛС vk.com/im?sel=<id>.
-    // Удалённые пользователи никогда не раскрывают vkUserId (privacy).
-    ...(options?.includeVkUserId && !isDeleted && user.vkUserId != null
-      ? { vkUserId: user.vkUserId }
-      : {}),
     name: isDeleted ? "Удалённый пользователь" : user.name,
     avatar: isDeleted ? DEFAULT_AVATAR_URL : user.avatar || DEFAULT_AVATAR_URL,
     rating: user.rating,
@@ -150,7 +144,6 @@ export function serializeTrip(
     } | null;
     includePlate?: boolean;
     includePrivateDetails?: boolean;
-    includeVkUserId?: boolean;
   },
 ) {
   return {
@@ -175,7 +168,6 @@ export function serializeTrip(
     seatsAvailable: trip.seatsAvailable,
     driver: serializeUser(trip.driver, {
       includePlate: options?.includePlate,
-      includeVkUserId: options?.includeVkUserId,
     }),
     tags: trip.tags,
     comment: trip.comment ?? undefined,
@@ -196,21 +188,14 @@ export function serializeTrip(
   };
 }
 
-export function serializeBooking(
-  booking: BookingWithRelations,
-  options?: { includeVkUserId?: boolean },
-) {
+export function serializeBooking(booking: BookingWithRelations) {
   return {
     id: booking.id,
     seat: booking.seat,
     status: booking.status as BookingStatus,
     expiresAt: booking.expiresAt?.toISOString() ?? null,
     comment: booking.comment ?? undefined,
-    // VK ID пассажира — только для водителя его собственной поездки
-    // (ссылка «Написать»). По умолчанию поле не отдаётся.
-    passenger: serializeUser(booking.passenger, {
-      includeVkUserId: options?.includeVkUserId,
-    }),
+    passenger: serializeUser(booking.passenger),
     trip: serializeTrip(booking.trip),
   };
 }

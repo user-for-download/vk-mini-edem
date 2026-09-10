@@ -6,4 +6,4 @@ The operation returns `409 ACCOUNT_HAS_ACTIVE_OBLIGATIONS` when the user owns an
 
 On success, the server marks `deletedAt`, anonymizes user-facing profile data, removes the car, notifications, feedback and refresh-token rows, cancels owned RideRequests, and closes the user's WebSocket connections. Historical trips, bookings, reviews and reports remain linked to the anonymous tombstone for integrity.
 
-The signed `vkUserId` is retained as a tombstone so the same VK identity cannot silently create a second account. `/auth/vk` and `/auth/refresh` reject deleted accounts with `403` and no tokens.
+The signed `telegramUserId` is retained as a tombstone so the same Telegram identity cannot silently create a second account. `/auth/telegram` and `/auth/refresh` reject deleted accounts with `403` and no tokens.

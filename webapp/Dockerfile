@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/contracts/package.json ./packages/contracts/
 COPY backend/package.json ./backend/
-COPY mini-app/package.json ./mini-app/
+COPY telegram-app/package.json ./telegram-app/
 COPY webapp/package.json ./webapp/
 
 # IPv4-first + --maxsockets=2: см. backend/Dockerfile (LAN-DNS отдаёт AAAA-первых,

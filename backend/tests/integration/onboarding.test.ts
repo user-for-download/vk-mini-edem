@@ -27,22 +27,22 @@ const { signAccessToken } = await import("../../src/auth/tokens.js");
  *
  * Паттерны репо (см. ban-enforcement.test.ts, admin-moderation.test.ts):
  * app.request(), логин админки через POST /admin/auth/login с cookie
- * edem_admin_jwt, уникальные vkUserId (INT4-счётчик).
+ * edem_admin_jwt, уникальные telegramUserId (INT4-счётчик).
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const ADMIN_TOKEN = "test-admin-token-123";
 
 const createdUserIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
 // Диапазон не пересекается с другими интеграционными тестами (они идут
 // параллельно в одну БД): 9_300_000.
-let vkSeq = 9_300_000;
+let tgSeq = 9_300_000n;
 
 async function createUser(options: { onboardingVersion?: string } = {}): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `OnboardingUser-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `OnboardingUser-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=10",
       ...(options.onboardingVersion !== undefined
         ? { onboardingVersion: options.onboardingVersion }

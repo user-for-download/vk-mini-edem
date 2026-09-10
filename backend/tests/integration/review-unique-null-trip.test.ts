@@ -30,9 +30,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const NULL_TRIP_INDEX = "Review_authorId_targetUserId_nullTrip_key";
 
 describe("Review unique NULL-safety (F14)", () => {
-  // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
   // Диапазон 9_700_000+ не пересекается с другими integration-suite.
-  let vkSeq = 9_700_000;
+  let tgSeq = 9_700_000n;
 
   let driverId: string; // target отзыва (водитель поездки)
   let passengerId: string; // автор отзыва (подтверждённый пассажир)
@@ -60,8 +60,8 @@ describe("Review unique NULL-safety (F14)", () => {
   async function createUser(name: string): Promise<string> {
     const user = await db.user.create({
       data: {
-        name: `${name}-${vkSeq + 1}`,
-        vkUserId: ++vkSeq,
+        name: `${name}-${tgSeq + 1n}`,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=9",
       },
     });

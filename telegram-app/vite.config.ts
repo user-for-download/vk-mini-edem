@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       // PWA отключён и здесь: Service Worker кэширует старую версию и
-      // конфликтует с деплоем (паттерн mini-app, дока VK Mini Apps).
+      // конфликтует с деплоем.
       // Для Telegram WebView офлайн не критичен, белый экран — критичен.
     ],
     resolve: {

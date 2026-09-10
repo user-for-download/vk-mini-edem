@@ -12,7 +12,6 @@ const SENSITIVE_EXTRA_KEY_FRAGMENTS = [
   "authorization",
   "cookie",
   "apikey",
-  "vk_sign",
   "sign",
 ];
 

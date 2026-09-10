@@ -7,7 +7,7 @@ import { db } from "../../src/db.js";
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
  * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
- * уникальные vkUserId.
+ * уникальные telegramUserId.
  */
 describe("GET /reviews/user/:userId — cursor pagination", () => {
   let targetUserId: string;
@@ -15,14 +15,14 @@ describe("GET /reviews/user/:userId — cursor pagination", () => {
   // каждому NULL-trip отзыву — свой автор, иначе второй INSERT → P2002.
   // targetUserId общий, чтобы пагинационные ассёрты (25 items) держались.
   let authorIds: string[];
-  // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-  let vkSeq = 1_500_000;
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+  let tgSeq = 1_500_000n;
 
   beforeEach(async () => {
     const targetUser = await db.user.create({
       data: {
         name: `Target-${Date.now()}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=1",
       },
     });
@@ -34,7 +34,7 @@ describe("GET /reviews/user/:userId — cursor pagination", () => {
       const author = await db.user.create({
         data: {
           name: `Author-${Date.now()}-${i}`,
-          vkUserId: ++vkSeq,
+          telegramUserId: ++tgSeq,
           avatar: "https://i.pravatar.cc/200?img=2",
         },
       });

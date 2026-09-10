@@ -9,7 +9,7 @@ import { devMockAccessToken } from "../dev-mock-auth.js";
  *
  * Паттерны репо (см. smoke.test.ts): app.request() вместо supertest,
  * dev-авторизация mock-токеном (tests/dev-mock-auth.js: allowlist + TTL),
- * уникальные vkUserId.
+ * уникальные telegramUserId.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
@@ -20,8 +20,8 @@ interface TestUsers {
 }
 
 describe("trip lifecycle: cancel/complete", () => {
-  // vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-  let vkSeq = 2_200_000;
+  // telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+  let tgSeq = 2_200_000n;
   let users: TestUsers;
   let tripId: string;
   let bookingId: string;
@@ -32,7 +32,7 @@ describe("trip lifecycle: cancel/complete", () => {
     const user = await db.user.create({
       data: {
         name: `${name}-${now}`,
-        vkUserId: ++vkSeq,
+        telegramUserId: ++tgSeq,
         avatar: "https://i.pravatar.cc/200?img=7",
       },
     });

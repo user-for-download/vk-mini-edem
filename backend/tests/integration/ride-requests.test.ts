@@ -17,8 +17,8 @@ describe("RideRequest API", () => {
     fromCityId = randomUUID();
     toCityId = randomUUID();
     const users = await Promise.all([
-      db.user.create({ data: { name: `Ride requester ${suffix}`, vkUserId: 4100001 + suffix % 100000, avatar: "" } }),
-      db.user.create({ data: { name: `Ride driver ${suffix}`, vkUserId: 4200001 + suffix % 100000, avatar: "" } }),
+      db.user.create({ data: { name: `Ride requester ${suffix}`, telegramUserId: BigInt(4100001 + (suffix % 100000)), avatar: "" } }),
+      db.user.create({ data: { name: `Ride driver ${suffix}`, telegramUserId: BigInt(4200001 + (suffix % 100000)), avatar: "" } }),
     ]);
     userId = users[0].id;
     otherUserId = users[1].id;

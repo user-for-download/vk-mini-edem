@@ -493,9 +493,8 @@ tripsRouter.get("/:id", publicReadLimiter, optionalAuth, async (c) => {
       myBooking,
       includePlate: false,
       includePrivateDetails: canSeePrivateDetails,
-      // VK ID водителя видят только участники (водитель/активная бронь) —
-      // для кнопки «Написать» в ЛС.
-      includeVkUserId: canSeePrivateDetails,
+      // Приватные детали видят только участники (водитель/активная бронь).
+      // Платформенный ID водителя наружу не отдаётся.
     }),
   );
 });

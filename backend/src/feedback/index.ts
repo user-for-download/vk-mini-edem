@@ -2,12 +2,12 @@
 import { Hono } from "hono";
 import {
   createFeedbackDtoSchema,
-  feedbackAppealDtoSchema,
+  feedbackAppealRequestSchema,
 } from "@edem/contracts";
 import type { UserFeedbackDto } from "@edem/contracts";
 import { db } from "../db.js";
 import { requireUser, type AuthEnv } from "../auth/middleware.js";
-import { verifyVkLaunchSignature } from "../auth/vkSign.js";
+import { verifyTelegramInitData } from "../auth/telegramSign.js";
 import { logger } from "../logger.js";
 import { createRateLimiter, mutationLimiter, feedbackReadLimiter } from "../middleware/rateLimit.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
@@ -72,12 +72,22 @@ feedbackRouter.post("/", requireUser, mutationLimiter, async (c) => {
  * POST /api/v1/feedback/appeal — обращение забаненного пользователя (публичный).
  *
  * У забаненного нет токена (логин отклоняется 403), поэтому личность
- * подтверждается VK-подписью launch-параметров, токены не выдаются.
- * Dev-bypass sign=dev-sign обрабатывается внутри verifyVkLaunchSignature.
+ * подтверждается подписью Telegram initData (verifyTelegramInitData —
+ * та же проверка, что в /auth/telegram: HMAC/TTL, dev-bypass только
+ * вне production без токена бота), токены не выдаются.
+ * VK-ветка удалена вместе с VK-auth (tg-migration-26).
+ *
+ * Без доверия к display-полям: из подписанных данных используется ТОЛЬКО
+ * проверенный telegramUserId для поиска userId; имя/аватар из initData
+ * на идентификацию не влияют.
+ *
+ * Проверки бана нет: апелляция — канал связи именно забаненного пользователя.
+ * Tombstone удалённых отклоняется 403: удаление терминально, апелляция его
+ * не resurrect'ит.
  */
 feedbackRouter.post("/appeal", appealLimiter, async (c) => {
   const body = await getSanitizedBody(c);
-  const parseResult = feedbackAppealDtoSchema.safeParse(body);
+  const parseResult = feedbackAppealRequestSchema.safeParse(body);
 
   if (!parseResult.success) {
     return c.json(
@@ -90,32 +100,42 @@ feedbackRouter.post("/appeal", appealLimiter, async (c) => {
     );
   }
 
-  const { searchParams, subject, text } = parseResult.data;
-  const { isValid, vkUserId } = verifyVkLaunchSignature(searchParams);
+  const { subject, text } = parseResult.data;
+  const payload = parseResult.data;
 
-  if (!isValid || !vkUserId) {
+  // Идентификация ТОЛЬКО по проверенной подписи Telegram initData.
+  // Display-поля (имя/аватар из initData) игнорируются.
+  const { isValid, telegramUserId } = verifyTelegramInitData(payload.initData);
+  if (!isValid || telegramUserId === undefined) {
     return c.json({ message: "Invalid or expired signature" }, 401);
   }
-
-  const user = await db.user.findUnique({ where: { vkUserId } });
+  const user = await db.user.findUnique({ where: { telegramUserId } });
   if (!user) {
     return c.json(
       { code: ERROR_CODES.NOT_FOUND, message: "User not found" },
       404,
     );
   }
+  // Tombstone удалённых терминален: апелляция удалённого не resurrect'ит.
+  if (user.deletedAt) {
+    return c.json(
+      { code: ERROR_CODES.FORBIDDEN, message: "Account is deleted" },
+      403,
+    );
+  }
+  const userId = user.id;
 
   // Проверки бана нет: апелляция — канал связи именно забаненного пользователя.
   const feedback = await db.feedback.create({
-    data: { userId: user.id, subject: subject.trim(), text: text.trim() },
+    data: { userId, subject: subject.trim(), text: text.trim() },
   });
 
   logBusinessEvent("feedback-appeal.created", {
     feedbackId: feedback.id,
-    userId: user.id,
+    userId,
   });
   logger.info(
-    { feedbackId: feedback.id, userId: user.id },
+    { feedbackId: feedback.id, userId },
     "feedback appeal created",
   );
 

@@ -30,7 +30,7 @@ const { db } = await import("../../src/db.js");
  *    (с защитой от выхода за seatsTotal и повторным удержанием).
  *
  * Паттерны репо (см. admin-feedback.test.ts): app.request(), логин через
- * POST /admin/auth/login с cookie edem_admin_jwt, уникальные vkUserId.
+ * POST /admin/auth/login с cookie edem_admin_jwt, уникальные telegramUserId.
  */
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const ADMIN_TOKEN = "test-admin-token-123";
@@ -57,14 +57,14 @@ const createdUserIds: string[] = [];
 const createdTripIds: string[] = [];
 const createdBookingIds: string[] = [];
 const createdReviewIds: string[] = [];
-// vkUserId — INT4: безопасный счётчик вместо Date.now() (выходит за 32 бита).
-let vkSeq = 9_200_000;
+// telegramUserId — BigInt: безопасный счётчик вместо Date.now() (выходит за 32 бита).
+let tgSeq = 9_200_000n;
 
 async function createUser(name: string): Promise<string> {
   const user = await db.user.create({
     data: {
-      name: `${name}-${vkSeq + 1}`,
-      vkUserId: ++vkSeq,
+      name: `${name}-${tgSeq + 1n}`,
+      telegramUserId: ++tgSeq,
       avatar: "https://i.pravatar.cc/200?img=9",
     },
   });

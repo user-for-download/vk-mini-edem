@@ -60,9 +60,9 @@ const checkDist = async (distDir) => {
   return { label, oversized, initialKib };
 };
 
-// Both frontends ship to production: mini-app (VK client) and webapp (admin).
+// Shipped frontends: telegram-app (Mini App) and webapp (admin).
 // Root "npm run build" produces both dists, so both are budget-gated here.
-const dists = [path.resolve("mini-app/dist"), path.resolve("webapp/dist")];
+const dists = [path.resolve("telegram-app/dist"), path.resolve("webapp/dist")];
 const results = await Promise.all(dists.map((dist) => checkDist(dist)));
 
 const fatal = results.filter((result) => result.fatal).map((result) => result.fatal);

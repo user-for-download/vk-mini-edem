@@ -16,8 +16,8 @@
   access-токен (`requireUser`).
 - `POST /api/v1/feedback/appeal` — **публичный** канал для забаненных
   пользователей: токена у них нет (логин отклоняется 403), поэтому личность
-  подтверждается подписью VK launch-параметров — той же проверкой, что и в
-  `/auth/vk` (`verifyVkLaunchSignature`). Токены при этом **не выдаются**.
+  подтверждается подписью Telegram initData — той же проверкой, что и в
+  `/auth/telegram` (`verifyTelegramInitData`). Токены при этом **не выдаются**.
 
 ### POST /api/v1/feedback
 
@@ -55,15 +55,15 @@ repliedAt (ISO|null), createdAt (ISO)`. `reply === null` — админ ещё �
 
 ### POST /api/v1/feedback/appeal
 
-Обращение **забаненного** пользователя с экрана блокировки (mini-app:
+Обращение **забаненного** пользователя с экрана блокировки (Telegram-app:
 плашка «Аккаунт заблокирован» → «Обратная связь», тема предзаполняется
 «Обжалование блокировки»). Публичный, без токена.
 
-Тело (`feedbackAppealDtoSchema`):
+Тело (`feedbackTelegramAppealDtoSchema`):
 
 | Поле | Тип | Ограничения |
 |------|-----|-------------|
-| `searchParams` | string | trim, 1–4096 (`FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH`) — полная строка VK launch-параметров (`vk_user_id`, `sign`, `vk_ts`, …) |
+| `initData` | string | trim, 1–4096 (`FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH`) — сырая строка Telegram initData |
 | `subject` | string | trim, 1–100 |
 | `text` | string | trim, 1–2000 |
 
@@ -72,11 +72,11 @@ repliedAt (ISO|null), createdAt (ISO)`. `reply === null` — админ ещё �
 1. Rate-limit: отдельный лимитер **5 запросов в час на IP** (защита от
    спама без авторизации).
 2. Валидация тела → невалидно → `400 VALIDATION_FAILED`.
-3. `verifyVkLaunchSignature(searchParams)`: подпись невалидна/просрочена
-   или нет `vk_user_id` → `401 { message: "Invalid or expired signature" }`
-   (без деталей, по образцу `/auth/vk`). При `ALLOW_DEV_AUTH` принимается
-   `sign=dev-sign` (dev-окружение).
-4. Пользователь не найден по `vk_user_id` → `404 { code: "NOT_FOUND" }`.
+3. `verifyTelegramInitData(initData)`: подпись невалидна/просрочена
+   → `401 { message: "Invalid or expired signature" }`
+   (без деталей, по образцу `/auth/telegram`). При `ALLOW_DEV_AUTH` принимается
+   `hash=dev-hash` (dev-окружение).
+4. Пользователь не найден по `telegramUserId` → `404 { code: "NOT_FOUND" }`.
 5. Проверки бана **нет** — апелляция это канал связи именно забаненного.
    Обращение создаётся с привязкой к `userId`.
 
@@ -84,6 +84,6 @@ repliedAt (ISO|null), createdAt (ISO)`. `reply === null` — админ ещё �
 
 - `201 { id, createdAt }` — обращение создано (видно в админке).
 - `400` — невалидное тело (`VALIDATION_FAILED` + `issues`).
-- `401` — невалидная/просроченная VK-подпись.
-- `404` — пользователь с таким `vk_user_id` не найден.
+- `401` — невалидная/просроченная подпись initData.
+- `404` — пользователь с таким `telegramUserId` не найден.
 - `429` — превышен лимит 5/час (`RATE_LIMITED` + `retryAfterMs`).

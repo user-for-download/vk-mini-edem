@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   createFeedbackDtoSchema,
   createFeedbackResponseSchema,
-  feedbackAppealDtoSchema,
+  feedbackTelegramAppealDtoSchema as feedbackAppealDtoSchema,
   feedbackReplyBodySchema,
   userFeedbackDtoSchema,
-  FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH,
+  FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH,
   FEEDBACK_SUBJECT_MAX_LENGTH,
   FEEDBACK_TEXT_MAX_LENGTH,
 } from "../src/dto/feedback.dto";
@@ -121,8 +121,7 @@ describe("createFeedbackResponseSchema", () => {
 
 describe("feedbackAppealDtoSchema", () => {
   const validAppeal = {
-    searchParams:
-      "vk_user_id=123&vk_app_id=51271827&vk_is_app_user=1&sign=abc123",
+    initData: "user=%7B%22id%22%3A1%7D&auth_date=1788947253&hash=dev-hash",
     subject: "Обжалование блокировки",
     text: "Прошу пересмотреть решение о блокировке аккаунта.",
   };
@@ -132,8 +131,8 @@ describe("feedbackAppealDtoSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should reject missing searchParams", () => {
-    const { searchParams: _searchParams, ...rest } = validAppeal;
+  it("should reject missing initData", () => {
+    const { initData: _initData, ...rest } = validAppeal;
     const result = feedbackAppealDtoSchema.safeParse(rest);
     expect(result.success).toBe(false);
   });
@@ -150,18 +149,18 @@ describe("feedbackAppealDtoSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("should reject empty searchParams", () => {
+  it("should reject empty initData", () => {
     const result = feedbackAppealDtoSchema.safeParse({
       ...validAppeal,
-      searchParams: "",
+      initData: "",
     });
     expect(result.success).toBe(false);
   });
 
-  it("should reject whitespace-only searchParams", () => {
+  it("should reject whitespace-only initData", () => {
     const result = feedbackAppealDtoSchema.safeParse({
       ...validAppeal,
-      searchParams: "   \t  ",
+      initData: "   \t  ",
     });
     expect(result.success).toBe(false);
   });
@@ -184,13 +183,13 @@ describe("feedbackAppealDtoSchema", () => {
 
   it("should trim all fields on parse", () => {
     const result = feedbackAppealDtoSchema.safeParse({
-      searchParams: `  ${validAppeal.searchParams}  `,
+      initData: `  ${validAppeal.initData}  `,
       subject: "  Обжалование блокировки  ",
       text: "  Прошу пересмотреть решение о блокировке аккаунта.  ",
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.searchParams).toBe(validAppeal.searchParams);
+      expect(result.data.initData).toBe(validAppeal.initData);
       expect(result.data.subject).toBe("Обжалование блокировки");
       expect(result.data.text).toBe(
         "Прошу пересмотреть решение о блокировке аккаунта.",
@@ -198,18 +197,18 @@ describe("feedbackAppealDtoSchema", () => {
     }
   });
 
-  it("should reject searchParams longer than limit", () => {
+  it("should reject initData longer than limit", () => {
     const result = feedbackAppealDtoSchema.safeParse({
       ...validAppeal,
-      searchParams: "x".repeat(FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH + 1),
+      initData: "x".repeat(FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH + 1),
     });
     expect(result.success).toBe(false);
   });
 
-  it("should accept searchParams at exact limit", () => {
+  it("should accept initData at exact limit", () => {
     const result = feedbackAppealDtoSchema.safeParse({
       ...validAppeal,
-      searchParams: "x".repeat(FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH),
+      initData: "x".repeat(FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH),
     });
     expect(result.success).toBe(true);
   });

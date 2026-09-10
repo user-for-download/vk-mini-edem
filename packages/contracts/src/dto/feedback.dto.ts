@@ -7,9 +7,9 @@ import { z } from "zod";
  */
 export const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
 export const FEEDBACK_TEXT_MAX_LENGTH = 2000;
-// Launch-параметры VK (searchParams строка) для апелляции забаненного
-// пользователя: лимит с запасом покрывает полную строку query.
-export const FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH = 4096;
+// RAW initData Telegram (query-params строка) для TG-апелляции забаненного:
+// тот же cap 4096, что у telegramAuthRequestSchema (реальная initData ~1-2 КБ).
+export const FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH = 4096;
 
 export const createFeedbackDtoSchema = z.object({
   // .trim() — проверка (check) в zod 4: выполняется до min/max, поэтому
@@ -21,24 +21,40 @@ export const createFeedbackDtoSchema = z.object({
 
 export type CreateFeedbackDto = z.infer<typeof createFeedbackDtoSchema>;
 
-// ─── FeedbackAppealDto ──────────────────────────────────────────────────────
+// ─── FeedbackTelegramAppealDto ────────────────────────────────────────────
 /**
- * Апелляция забаненного пользователя (публичный эндпоинт, без токена).
- * Личность подтверждается VK-подписью launch-параметров (searchParams),
- * поэтому вместо userId передаётся исходная строка query. Лимиты subject/text
- * идентичны createFeedbackDtoSchema.
+ * TG-апелляция забаненного пользователя (публичный эндпоинт, без токена).
+ * Личность подтверждается подписью Telegram initData (verifyTelegramInitData,
+ * та же что в /auth/telegram). VK-вариант удалён (tg-migration-26).
+ *
+ * Безопасность (backend POST /feedback/appeal):
+ * - используется ТОЛЬКО проверенный telegramUserId из подписи; display-поля
+ *   внутри initData (имя/аватар) на идентификацию не влияют и игнорируются;
+ * - токены не выдаются; бан не проверяется (апелляция — канал забаненного),
+ *   tombstone удалённых отклоняется 403.
  */
-export const feedbackAppealDtoSchema = z.object({
-  searchParams: z
+export const feedbackTelegramAppealDtoSchema = z.object({
+  initData: z
     .string()
     .trim()
     .min(1)
-    .max(FEEDBACK_APPEAL_SEARCH_PARAMS_MAX_LENGTH),
+    .max(FEEDBACK_APPEAL_INIT_DATA_MAX_LENGTH),
   subject: z.string().trim().min(1).max(FEEDBACK_SUBJECT_MAX_LENGTH),
   text: z.string().trim().min(1).max(FEEDBACK_TEXT_MAX_LENGTH),
 });
 
-export type FeedbackAppealDto = z.infer<typeof feedbackAppealDtoSchema>;
+export type FeedbackTelegramAppealDto = z.infer<
+  typeof feedbackTelegramAppealDtoSchema
+>;
+
+// ─── FeedbackAppealRequest (Telegram-only, tg-migration-26) ───────────────
+/**
+ * Тело POST /feedback/appeal: только TG-вариант (initData).
+ * VK-вариант (searchParams) удалён вместе с VK-auth.
+ */
+export const feedbackAppealRequestSchema = feedbackTelegramAppealDtoSchema;
+
+export type FeedbackAppealRequest = z.infer<typeof feedbackAppealRequestSchema>;
 
 // ─── CreateFeedbackResponse ─────────────────────────────────────────────────
 export const createFeedbackResponseSchema = z

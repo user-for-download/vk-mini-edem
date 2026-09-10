@@ -28,7 +28,6 @@ jobs:
       # Append ?statement_cache_size=0 to disable Prisma's prepared statement caching
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/edem_test?statement_cache_size=0
       JWT_SECRET: ci-jwt-secret
-      VK_APP_SECRET: ci-vk-secret
       ALLOW_DEV_AUTH: "true"
       # Browser-загрузка не нужна ЭТОЙ job (юнит/интеграционные тесты);
       # E2E-браузеры ставит отдельная job e2e (npx playwright install chromium).
@@ -36,8 +35,6 @@ jobs:
       # error (не silent): unhandled_error с кодом Prisma должен быть виден
       # в логах CI при редких флейках интеграционных тестов.
       LOG_LEVEL: error
-      VK_AUTH_RATE_WINDOW_MS: "900000"
-      VK_AUTH_RATE_MAX: "1000"
       REFRESH_RATE_WINDOW_MS: "900000"
       REFRESH_RATE_MAX: "1000"
 
@@ -92,8 +89,8 @@ jobs:
       - name: Backend tests
         run: npm run --workspace backend test
 
-      - name: Mini-app tests
-        run: npm run --workspace mini-app test
+      - name: Telegram-app tests
+        run: npm run --workspace telegram-app test
 
       - name: Webapp tests
         run: npm run --workspace webapp test
@@ -110,16 +107,15 @@ jobs:
       NODE_ENV: development
       DATABASE_URL: postgresql://edem:edem_local@127.0.0.1:5433/edem
       JWT_SECRET: e2e-jwt-secret
-      VK_APP_SECRET: e2e-vk-secret
       ALLOW_DEV_AUTH: "true"
       BACKEND_PORT: "3011"
-      VITE_PORT: "3010"
+      VITE_TG_PORT: "3012"
       VITE_API_TARGET: http://127.0.0.1:3011
       LOG_LEVEL: error
       # Прогон создаёт/подтверждает брони и отзывы — лимиты ослаблены,
       # чтобы флоу не упирался в 429 на повторных ранах.
-      VK_AUTH_RATE_WINDOW_MS: "900000"
-      VK_AUTH_RATE_MAX: "1000"
+      TG_AUTH_RATE_WINDOW_MS: "900000"
+      TG_AUTH_RATE_MAX: "1000"
       REFRESH_RATE_WINDOW_MS: "900000"
       REFRESH_RATE_MAX: "1000"
       MUTATION_RATE_WINDOW_MS: "900000"
@@ -139,7 +135,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       # Dev-БД как локально: контейнер vk-mini-edem-db-dev на 127.0.0.1:5433.
-      # E2E_DB_CONTAINER в full-cycle.mjs указывает на него же (time-travel
+      # E2E_DB_CONTAINER в telegram-parity.mjs указывает на него же (time-travel
       # и cleanup через docker exec psql).
       - name: Start dev database (docker compose local)
         run: docker compose -f docker-compose.local.yml up -d db-dev
@@ -161,10 +157,10 @@ jobs:
           npm run --workspace backend dev > backend-dev.log 2>&1 &
           echo $! > backend.pid
 
-      - name: Start mini-app (vite)
+      - name: Start telegram-app (vite)
         run: |
-          npm run --workspace mini-app dev > mini-app-dev.log 2>&1 &
-          echo $! > mini-app.pid
+          npm run --workspace telegram-app dev > tg-dev.log 2>&1 &
+          echo $! > tg.pid
 
       - name: Wait for backend readiness
         run: |
@@ -179,18 +175,15 @@ jobs:
       - name: Wait for frontend readiness
         run: |
           for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1:3010/ > /dev/null; then
+            if curl -sf http://127.0.0.1:3012/ > /dev/null; then
               echo "frontend ready"; exit 0
             fi
             sleep 2
           done
-          echo "frontend did not become ready"; cat mini-app-dev.log; exit 1
+          echo "frontend did not become ready"; cat tg-dev.log; exit 1
 
-      - name: Run liquidity-safety E2E (API-level)
-        run: node e2e/liquidity-safety.mjs
-
-      - name: Run full-cycle E2E (browser)
-        run: node e2e/full-cycle.mjs
+      - name: Run telegram-parity E2E (browser)
+        run: node e2e/telegram-parity.mjs
 
       - name: Upload E2E artifacts
         if: always()
@@ -198,21 +191,21 @@ jobs:
         with:
           name: e2e-artifacts
           path: |
-            e2e/results.json
-            e2e/shots/
+            e2e/results-tg.json
+            e2e/shots-tg/
           if-no-files-found: ignore
 
       - name: Dump dev logs on failure
         if: failure()
         run: |
           echo "=== backend-dev.log ==="; tail -100 backend-dev.log || true
-          echo "=== mini-app-dev.log ==="; tail -100 mini-app-dev.log || true
+          echo "=== tg-dev.log ==="; tail -100 tg-dev.log || true
 
       - name: Stop dev servers
         if: always()
         run: |
           kill $(cat backend.pid) 2>/dev/null || true
-          kill $(cat mini-app.pid) 2>/dev/null || true
+          kill $(cat tg.pid) 2>/dev/null || true
           docker compose -f docker-compose.local.yml down -v || true
 
   # Docker: прод-образы должны собираться в CI (audit: production Docker
@@ -236,6 +229,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-dummy-password
           JWT_SECRET: ci-dummy-jwt-secret-value-32-chars-min
-          VK_APP_SECRET: ci-dummy-vk-secret
           CORS_ORIGINS: https://example.com
+          TELEGRAM_BOT_TOKEN: ci-dummy-tg-token
+          TELEGRAM_HOSTS: tg-ci.example.com
         run: docker compose config --quiet

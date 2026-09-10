@@ -62,8 +62,7 @@ const contentSecurityPolicy = [
   "worker-src 'self' blob:",
   `connect-src ${connectSources.join(" ")}`,
   "manifest-src 'self'",
-  "frame-src 'self' https://vk.com https://*.vk.com https://vk.ru https://*.vk.ru",
-  "frame-ancestors 'self' https://vk.com https://m.vk.com https://vk.ru https://m.vk.ru https://akashi.vk-portal.net",
+  "frame-ancestors 'self'",
 ].join("; ");
 
 app.use(
@@ -120,10 +119,10 @@ app.use("*", async (c, next) => {
 /**
  * Security headers.
  *
- * ВАЖНО для VK Mini Apps: VK загружает мини-апп в iframe на vk.com / m.vk.com,
- * а на десктопе — через прокси akashi.vk-portal.net.
- * Поэтому вместо X-Frame-Options: DENY (который заблокировал бы загрузку)
- * используем CSP frame-ancestors, разрешающий только VK-домены, прокси и self.
+ * Приложение открывается только в Telegram WebView (same-origin через
+ * reverse proxy), фрейминг чужими сайтами запрещён: X-Frame-Options не
+ * выставляем (устарел и конфликтует с WebView), вместо него CSP
+ * frame-ancestors ограничивает встраивание только собственным origin.
  */
 app.use("*", async (c, next) => {
   await next();
@@ -223,11 +222,9 @@ app.route("/api/v1/admin", adminRouter);
 app.get("/api/v1/ws", createWsHandler(upgradeWebSocket));
 
 if (env.isProduction) {
-  // Две SPA-раздачи по Host-заголовку: VK mini-app (root по умолчанию,
-  // заморожен) и Telegram mini-app (хосты из TELEGRAM_HOSTS —
-  // bot-кнопка @edem_mini_bot указывает на root tg-домена, поэтому
-  // префикс /tg/ не используется: чистые URL и deep-links).
-  const vkDistPath = path.resolve(process.cwd(), "mini-app/dist");
+  // Telegram-only SPA-раздача (tg-migration-25: VK mini-app удалён).
+  // Host-гейт оставлен: TELEGRAM_HOSTS ограничивает, какие хосты получают
+  // приложение; остальные — 404, а не чужой фронт.
   const tgDistPath = path.resolve(process.cwd(), "telegram-app/dist");
 
   // index.html читаем один раз при старте, а не на каждый SPA-запрос
@@ -239,11 +236,9 @@ if (env.isProduction) {
       return null;
     }
   };
-  const vkIndexHtml = readIndex(vkDistPath, "mini-app");
   const tgIndexHtml =
     env.TELEGRAM_HOSTS.length > 0 ? readIndex(tgDistPath, "telegram-app") : null;
 
-  const vkStatic = serveStatic({ root: path.relative(process.cwd(), vkDistPath) });
   const tgStatic = serveStatic({ root: path.relative(process.cwd(), tgDistPath) });
 
   const isTelegramHost = (c: { req: { header: (name: string) => string | undefined } }): boolean => {
@@ -253,8 +248,10 @@ if (env.isProduction) {
   };
 
   app.use("/*", async (c, next) => {
-    const mw = isTelegramHost(c) ? tgStatic : vkStatic;
-    return mw(c, next);
+    if (!isTelegramHost(c)) {
+      return c.text("Not found", 404);
+    }
+    return tgStatic(c, next);
   });
   app.get("*", (c) => {
     // Неизвестные API-запросы не должны попадать в SPA-fallback:
@@ -263,9 +260,8 @@ if (env.isProduction) {
       return c.json({ code: ERROR_CODES.NOT_FOUND, message: "Not found" }, 404);
     }
 
-    const indexHtml = isTelegramHost(c) ? tgIndexHtml : vkIndexHtml;
-    if (indexHtml) {
-      return c.html(indexHtml);
+    if (isTelegramHost(c) && tgIndexHtml) {
+      return c.html(tgIndexHtml);
     }
     return c.text("Frontend build not found", 404);
   });

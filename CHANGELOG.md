@@ -55,6 +55,18 @@
 - `backend/ENVIRONMENT.md`: раздел «Logging and retention» — где реально живёт retention (инфраструктура, не приложение) и требование держать в согласии с Политикой; `production-checklist.md` — пункт проверки при запуске вне compose.
 - `PrivacyPanel` §7: добавлен абзац про технические журналы (обезличенные идентификаторы, IP, ограниченный объём, автоматическая ротация).
 
+### Removed
+
+#### VK Platform Removal (удаление VK Mini App, tg-migration-24–26)
+
+- **`mini-app/` workspace удалён целиком** (VKUI, vk-bridge, VK-роутер, все панели/тесты). Полная копия с git-историей — репо `user-for-download/vk-mini-app-edem`, в этом репо тег `vk-final` (заморозка Фазы 0).
+- **Backend**: роут `/auth/vk`, `vkSign`/`vkProfile`, `vkPush`/`vkMessenger`, VK-вариант appeal (searchParams) и `vkUserId` из схем/DTO/сериализаторов/Sentry-скраббера удалены; миграция `20260910090000_drop_vk_user_id` (DROP INDEX `User_vkUserId_key` + DROP COLUMN). Tombstone-политика удалённых аккаунтов сохранена на `telegramUserId`.
+- **Раздача статики**: Telegram-only — Host из `TELEGRAM_HOSTS` получает `telegram-app/dist`, остальные хосты 404 (`app.ts`); compose/CI/Dockerfile/.env.example синхронизированы (VK-переменные убраны, `TELEGRAM_BOT_TOKEN`/`TELEGRAM_HOSTS` required).
+- **Уведомления/контакт**: VK push и кнопка «Написать в VK» удалены вместе с платформой; доставка — in-app inbox + WebSocket hint (deep-link allowlist), фоновая Bot API-рассылка заблокирована ADR `telegram-notification-delivery` (продуктовое решение); механизм контакта участников — открытый продуктовый вопрос.
+- **Миграция аккаунтов**: политика `account-migration-policy.md` — production-данных нет, корректный исход dry-run «migrate нечего» (writes=0), авто-линкинг запрещён; гейт удаления закрыт GO владельца 2026-09-10 (empty-prod exception, `docs/migration/vk-deletion-gate.md`).
+- **E2E**: VK-сьюты `full-cycle`/`liquidity-safety` заменены на `telegram-parity` (16/16, браузерный dev-bypass флоу) + `telegram-realtime`; артефакты прогонов (`results*.json`, `shots*/`) игнорируются.
+- **Verified**: typecheck всех workspace; тесты 234 contracts / 506 backend / 232 telegram-app / 8 webapp; `npm run build` + bundle budget (telegram-app 173.8 KiB, webapp 180.9 KiB initial gzip); `prisma validate`; e2e `telegram-parity` 16/16 (2026-09-10).
+
 ### Changed
 
 #### Car Plate Optional (номер-примета опционален)
