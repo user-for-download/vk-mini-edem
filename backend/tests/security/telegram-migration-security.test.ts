@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Лимитер /auth/telegram читается при импорте: поднимаем до импорта,
 // чтобы проверки границ не упирались в 429 (паттерн telegram-auth.test.ts).
+// ADMIN_TOKEN — тот же паттерн: без него (CI не имеет gitignored backend/.env)
+// админ-API «закрыт по умолчанию» и отвечает 403 на всё, а эти тесты
+// проверяют именно 401 без/с мусорной cookie (паттерн admin-moderation.test.ts).
 vi.hoisted(() => {
   process.env.TG_AUTH_RATE_WINDOW_MS = "900000";
   process.env.TG_AUTH_RATE_MAX = "1000";
   process.env.TRUST_PROXY = "true";
+  process.env.ADMIN_TOKEN = "test-admin-token-security";
 });
 
 const { app } = await import("../../src/app.js");

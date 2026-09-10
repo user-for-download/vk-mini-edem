@@ -120,6 +120,12 @@ jobs:
       REFRESH_RATE_MAX: "1000"
       MUTATION_RATE_WINDOW_MS: "900000"
       MUTATION_RATE_MAX: "1000"
+      # Шаги модерации отзыва и ответа на обращение логинятся в админку.
+      # Значение обязано совпадать с дефолтом E2E_ADMIN_TOKEN в
+      # telegram-parity.mjs (dev-admin-token-12345); в CI нет gitignored
+      # backend/.env, где токен задан локально, — без него админ-API
+      # закрыт по умолчанию (403 на login).
+      ADMIN_TOKEN: dev-admin-token-12345
 
     steps:
       - name: Checkout
