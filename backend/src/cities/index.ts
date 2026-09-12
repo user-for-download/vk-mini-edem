@@ -11,6 +11,7 @@ import {
 import { Prisma } from "../generated/prisma/client.js";
 import { db } from "../db.js";
 import { createRateLimiter } from "../middleware/rateLimit.js";
+import { devRateMax } from "../env.js";
 import { sanitizeValue } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { serializeCity } from "./serializers.js";
@@ -23,7 +24,7 @@ export const citiesRouter = new Hono();
  */
 const suggestLimiter = createRateLimiter({
   windowMs: 60_000,
-  max: 30,
+  max: devRateMax(30),
   keyPrefix: "cities-suggest",
 });
 

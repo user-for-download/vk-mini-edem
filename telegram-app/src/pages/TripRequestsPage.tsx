@@ -1,4 +1,4 @@
-import { Button, Cell, List, Placeholder, Section, Spinner } from "@telegram-apps/telegram-ui";
+import { Avatar, Button, Placeholder, Spinner } from "@telegram-apps/telegram-ui";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -42,7 +42,7 @@ export function TripRequestsPage() {
         >
           <div className="ButtonRow">
             {!forbidden && <Button onClick={() => void requests.refetch()}>Повторить</Button>}
-            <Button mode="outline" onClick={() => navigate("/trips/my")}>К моим поездкам</Button>
+            <Button mode="outline" onClick={() => navigate("/bookings?segment=driver")}>К моим поездкам</Button>
           </div>
           {!isOnline && <p>Проверьте подключение к интернету.</p>}
         </Placeholder>
@@ -58,23 +58,47 @@ export function TripRequestsPage() {
     <>
       <PageHeader title="Заявки пассажиров" />
       <OfflineBanner />
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
       {update.error && (
         <p className="FormError" role="alert">
           {bookingErrorMessage(update.error)}
         </p>
       )}
-      <List>
         {!items.length && <Placeholder header="Заявок нет" />}
         {pending.length > 0 && (
-          <Section header={`Ожидают решения (${pending.length})`}>
+          <div className="flex flex-col gap-3">
+            <span className="text-[13px] font-semibold text-[var(--tgui--hint_color)] px-1">
+              {`Ожидают решения (${pending.length})`}
+            </span>
             {pending.map((booking) => (
-              <div key={booking.id}>
-                <Cell subtitle={`${booking.passenger.name} · место ${booking.seat}${booking.comment ? ` · «${booking.comment}»` : ""}`}>
-                  Ожидает решения
-                </Cell>
-                <div className="ButtonRow">
+              <div
+                key={booking.id}
+                className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar
+                      size={40}
+                      src={booking.passenger.avatar}
+                      acronym={booking.passenger.name.slice(0, 1).toUpperCase()}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium text-[var(--tgui--text_color)] truncate">
+                        {booking.passenger.name}
+                      </div>
+                      <div className="text-[11px] text-[var(--tgui--hint_color)]">
+                        {`место ${booking.seat}${booking.comment ? ` · «${booking.comment}»` : ""}`}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="StatusPill shrink-0" data-tone="warning">
+                    Ожидает решения
+                  </span>
+                </div>
+                <div className="flex gap-2">
                   <Button
                     stretched
+                    size="s"
                     loading={update.isPending && update.variables?.id === booking.id}
                     disabled={update.isPending}
                     onClick={() => update.mutate({ id: booking.id, status: "confirmed" })}
@@ -82,8 +106,9 @@ export function TripRequestsPage() {
                     Принять
                   </Button>
                   <Button
-                    mode="outline"
+                    mode="bezeled"
                     stretched
+                    size="s"
                     loading={update.isPending && update.variables?.id === booking.id}
                     disabled={update.isPending}
                     onClick={() => update.mutate({ id: booking.id, status: "declined" })}
@@ -93,26 +118,49 @@ export function TripRequestsPage() {
                 </div>
               </div>
             ))}
-          </Section>
+          </div>
         )}
         {confirmed.length > 0 && (
-          <Section header={`Подтверждены (${confirmed.length})`}>
+          <div className="flex flex-col gap-3">
+            <span className="text-[13px] font-semibold text-[var(--tgui--hint_color)] px-1">
+              {`Подтверждены (${confirmed.length})`}
+            </span>
             {confirmed.map((booking) => (
-              <Cell key={booking.id} subtitle={`${booking.passenger.name} · место ${booking.seat}`}>
-                Подтверждён
-              </Cell>
+              <div
+                key={booking.id}
+                className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Avatar
+                    size={40}
+                    src={booking.passenger.avatar}
+                    acronym={booking.passenger.name.slice(0, 1).toUpperCase()}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-[var(--tgui--text_color)] truncate">
+                      {booking.passenger.name}
+                    </div>
+                    <div className="text-[11px] text-[var(--tgui--hint_color)]">
+                      {`место ${booking.seat}`}
+                    </div>
+                  </div>
+                </div>
+                <span className="StatusPill shrink-0" data-tone="success">
+                  Подтверждён
+                </span>
+              </div>
             ))}
-          </Section>
+          </div>
         )}
-      </List>
       {requests.hasNextPage && (
-        <Button stretched onClick={() => void requests.fetchNextPage()} disabled={requests.isFetchingNextPage}>
+        <Button stretched mode="bezeled" onClick={() => void requests.fetchNextPage()} disabled={requests.isFetchingNextPage}>
           Показать ещё
         </Button>
       )}
-      <Button mode="outline" stretched onClick={() => navigate("/trips/my")}>
+      <Button mode="bezeled" stretched onClick={() => navigate("/bookings?segment=driver")}>
         К моим поездкам
       </Button>
+      </div>
     </>
   );
 }

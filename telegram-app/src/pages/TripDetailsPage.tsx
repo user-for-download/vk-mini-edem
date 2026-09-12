@@ -151,6 +151,7 @@ export function TripDetailsPage() {
       {item.myBooking && (
         <Section header="Ваша заявка">
           <List>
+            <p>Вы записались попутчиком</p>
             <Cell
               subtitle={
                 item.myBooking.status === "confirmed"

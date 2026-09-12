@@ -1,5 +1,12 @@
 import { useRef, useState } from "react";
-import { Button, List, Placeholder, Section } from "@telegram-apps/telegram-ui";
+import {
+  Accordion,
+  Button,
+  Input,
+  Placeholder,
+  Textarea,
+} from "@telegram-apps/telegram-ui";
+import { MessageSquareText, Send } from "lucide-react";
 import {
   FEEDBACK_SUBJECT_MAX_LENGTH,
   FEEDBACK_TEXT_MAX_LENGTH,
@@ -72,41 +79,41 @@ function FeedbackCard({
   onToggle: () => void;
 }) {
   return (
-    <article className="ReviewCard">
-      <button
-        type="button"
-        className="FaqItem__question"
-        aria-expanded={opened}
-        onClick={onToggle}
-      >
+    <Accordion expanded={opened} onChange={onToggle}>
+      <Accordion.Summary Component="button">
         {feedback.subject}
         {feedback.reply && (
-          <span className="ReviewCard__badge">
-            {" "}
-            · Есть ответ
+          <span className="StatusPill" data-tone="info">
+            Есть ответ
           </span>
         )}
-      </button>
-      <p className="ReviewCard__route">
-        {new Date(feedback.createdAt).toLocaleDateString("ru-RU")}
-      </p>
-      {opened && (
-        <>
-          <p className="ReviewCard__text">{feedback.text}</p>
+      </Accordion.Summary>
+      <Accordion.Content>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[11px] text-[var(--tgui--hint_color)]">
+            {new Date(feedback.createdAt).toLocaleDateString("ru-RU")}
+          </span>
+          <p className="text-[13px] text-[var(--tgui--text_color)] leading-relaxed">
+            {feedback.text}
+          </p>
           {feedback.reply ? (
             <>
-              <p className="ReviewCard__head">Ответ поддержки</p>
-              <p className="ReviewCard__text">{feedback.reply}</p>
+              <span className="text-[13px] font-semibold text-[var(--tgui--text_color)] pt-1">
+                Ответ поддержки
+              </span>
+              <p className="text-[13px] text-[var(--tgui--text_color)] leading-relaxed">
+                {feedback.reply}
+              </p>
             </>
           ) : (
-            <p className="ReviewCard__route">
+            <span className="text-[12px] text-[var(--tgui--hint_color)]">
               Поддержка ещё не ответила. Мы свяжемся с вами здесь — список
               обновится автоматически.
-            </p>
+            </span>
           )}
-        </>
-      )}
-    </article>
+        </div>
+      </Accordion.Content>
+    </Accordion>
   );
 }
 
@@ -168,12 +175,14 @@ export function SupportPage() {
           header="Аккаунт заблокирован"
           description="Доступ к обращениям закрыт, но вы можете обжаловать блокировку ниже — обращение уйдёт в поддержку без входа в аккаунт."
         />
-        <Section>
-          <List>
-            <p className="ReviewCard__head">Обжалование блокировки</p>
+        <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+            <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+              Обжалование блокировки
+            </span>
             <AppealForm />
-          </List>
-        </Section>
+          </div>
+        </div>
       </>
     );
   }
@@ -182,30 +191,34 @@ export function SupportPage() {
     <>
       <PageHeader title="Поддержка" />
 
-      <Section>
-        <p className="ReviewCard__head">Частые вопросы</p>
-        <List>
-          {SUPPORT_FAQ.map((item) => {
-            const isOpen = openedFaqId === item.id;
-            return (
-              <div key={item.id} className="FaqItem">
-                <button
-                  type="button"
-                  className="FaqItem__question"
-                  aria-expanded={isOpen}
-                  onClick={() => setOpenedFaqId(isOpen ? null : item.id)}
-                >
-                  {item.question}
-                </button>
-                {isOpen && <p className="FaqItem__answer">{item.answer}</p>}
-              </div>
-            );
-          })}
-        </List>
-      </Section>
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-2">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Частые вопросы
+        </span>
+        {SUPPORT_FAQ.map((item) => {
+          const isOpen = openedFaqId === item.id;
+          return (
+            <Accordion
+              key={item.id}
+              expanded={isOpen}
+              onChange={(expanded) => setOpenedFaqId(expanded ? item.id : null)}
+            >
+              <Accordion.Summary Component="button">{item.question}</Accordion.Summary>
+              <Accordion.Content>
+                <p className="text-[13px] text-[var(--tgui--hint_color)] leading-relaxed">
+                  {item.answer}
+                </p>
+              </Accordion.Content>
+            </Accordion>
+          );
+        })}
+      </div>
 
-      <Section>
-        <p className="ReviewCard__head">Мои обращения</p>
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Мои обращения
+        </span>
         <QueryState
           loading={myFeedbacks.isLoading}
           error={myFeedbacks.error}
@@ -215,13 +228,15 @@ export function SupportPage() {
         >
           {!myFeedbacks.data || myFeedbacks.data.length === 0 ? (
             <>
-              <p className="ReviewEmpty__title">У вас пока нет обращений</p>
-              <p className="ReviewEmpty__subtitle">
+              <p className="text-[14px] font-semibold text-center text-[var(--tgui--text_color)]">
+                У вас пока нет обращений
+              </p>
+              <p className="text-[13px] text-center text-[var(--tgui--hint_color)]">
                 Здесь появятся ваши обращения и ответы поддержки
               </p>
             </>
           ) : (
-            <List>
+            <div className="flex flex-col gap-2">
               {myFeedbacks.data.map((feedback) => (
                 <FeedbackCard
                   key={feedback.id}
@@ -234,47 +249,49 @@ export function SupportPage() {
                   }
                 />
               ))}
-            </List>
+            </div>
           )}
         </QueryState>
-      </Section>
+      </div>
 
-      <Section>
-        <List>
-          <p className="ReviewCard__head">Связаться с нами</p>
+      <section aria-label="Связаться с нами" className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Связаться с нами
+        </span>
           <MutationError error={create.error} />
-          <label className="FormField" htmlFor="support-subject">
-            Тема
-            <input
+          <div className="FormField">
+            <label htmlFor="support-subject">Тема</label>
+            <Input
               id="support-subject"
-              className="TextInput"
+              before={<MessageSquareText size={16} className="text-[var(--tgui--hint_color)]" />}
               placeholder="Например: не приходит уведомление"
               value={subject}
               maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
+              status={formError ? "error" : "default"}
               onChange={(event) => {
                 setSubject(event.target.value);
                 if (formError) setFormError(null);
                 if (success) setSuccess(false);
               }}
             />
-          </label>
-          <label className="FormField" htmlFor="support-text">
-            Сообщение
-            <textarea
+          </div>
+          <div className="FormField">
+            <label htmlFor="support-text">Сообщение</label>
+            <Textarea
               id="support-text"
-              className="ProfileTextarea"
               rows={4}
               maxLength={FEEDBACK_TEXT_MAX_LENGTH}
               placeholder="Расскажите подробнее, что произошло"
               value={text}
               aria-invalid={Boolean(formError)}
+              status={formError ? "error" : "default"}
               onChange={(event) => {
                 setText(event.target.value);
                 if (formError) setFormError(null);
                 if (success) setSuccess(false);
               }}
             />
-          </label>
+          </div>
           {text.length > 0 && (
             <p className="ReviewCounter" aria-live="polite">
               {text.length}/{FEEDBACK_TEXT_MAX_LENGTH}
@@ -290,25 +307,25 @@ export function SupportPage() {
               Обращение отправлено — мы ответим вам как можно скорее
             </p>
           )}
-          <div className="ButtonRow">
-            <Button
-              stretched
-              loading={create.isPending}
-              disabled={!canSubmit}
-              onClick={submit}
-            >
-              Отправить
-            </Button>
-          </div>
-        </List>
-      </Section>
+          <Button
+            stretched
+            size="l"
+            before={<Send size={16} />}
+            loading={create.isPending}
+            disabled={!canSubmit}
+            onClick={submit}
+          >
+            Отправить
+          </Button>
+      </section>
 
-      <Section>
-        <List>
-          <p className="ReviewCard__head">Обжалование блокировки</p>
-          <AppealForm />
-        </List>
-      </Section>
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Обжалование блокировки
+        </span>
+        <AppealForm />
+      </div>
+      </div>
     </>
   );
 }

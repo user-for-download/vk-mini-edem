@@ -10,6 +10,7 @@ import {
   emitEvent,
   miniApp,
   backButton,
+  settingsButton,
 } from "@telegram-apps/sdk-react";
 
 /**
@@ -69,6 +70,7 @@ export async function init(options: {
   // монтирует themeParams, поэтому явный themeParams.mount() НЕ вызываем
   // (в @tma.js 3.0.x из шаблона этой зависимости не было).
   backButton.mount.ifAvailable();
+  settingsButton.mount.ifAvailable();
   initData.restore();
 
   if (miniApp.mount.isAvailable()) {

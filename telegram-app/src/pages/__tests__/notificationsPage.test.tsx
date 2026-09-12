@@ -103,8 +103,8 @@ describe("notificationRoute / isCriticalNotification (контракт parity)",
   it("deep-links известных событий ведут на существующие TG-маршруты", () => {
     expect(notificationRoute("booking_status_changed")).toBe("/bookings");
     expect(notificationRoute("trip_cancelled")).toBe("/bookings");
-    expect(notificationRoute("trip_status_changed")).toBe("/bookings/history");
-    expect(notificationRoute("booking_created")).toBe("/trips/my");
+    expect(notificationRoute("trip_status_changed")).toBe("/bookings?segment=history");
+    expect(notificationRoute("booking_created")).toBe("/bookings?segment=driver");
     expect(notificationRoute("review_approved")).toBe("/reviews");
     expect(notificationRoute("feedback_replied")).toBe("/profile/support");
   });

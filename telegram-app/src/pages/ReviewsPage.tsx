@@ -1,16 +1,21 @@
 import { useMemo, useRef, useState } from "react";
-import { Button, List, Section } from "@telegram-apps/telegram-ui";
+import {
+  Button,
+  Placeholder,
+  SegmentedControl,
+  Select,
+  Textarea,
+} from "@telegram-apps/telegram-ui";
+import { hapticFeedback } from "@telegram-apps/sdk-react";
 import { PageHeader } from "@/components/PageHeader";
 import { QueryState } from "@/components/QueryState";
+import { ReviewCard } from "@/components/ReviewCard";
 import { ApiError } from "@/api/client";
 import {
-  REVIEW_STATUS,
   REVIEW_TEXT_MAX_LENGTH,
-  type Review,
   type Trip,
   type User,
 } from "@edem/contracts";
-import type { MyReview } from "@/api/reviews.api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useProfileQuery } from "@/queries/profile";
 import {
@@ -32,39 +37,6 @@ const TABS: ReadonlyArray<{ value: ReviewsTab; label: string }> = [
   { value: "new", label: "Новая" },
   { value: "about", label: "Обо мне" },
 ];
-
-/** Подпись статуса — только для непубличных отзывов (порт VK ReviewCard). */
-function statusBadge(status: Review["status"]): string | null {
-  switch (status) {
-    case REVIEW_STATUS.PENDING:
-      return "На модерации";
-    case REVIEW_STATUS.REJECTED:
-      return "Отклонён";
-    default:
-      return null;
-  }
-}
-
-function ReviewCard({ review }: { review: Review | MyReview }) {
-  const badge = statusBadge(review.status);
-  return (
-    <article className="ReviewCard">
-      <p className="ReviewCard__head">
-        {review.author.name} · Оценка {review.rating}/5
-        {badge && (
-          <span className="ReviewCard__badge" data-status={review.status}>
-            {" "}
-            · {badge}
-          </span>
-        )}
-      </p>
-      <p className="ReviewCard__route">
-        {review.tripRoute} · {review.date}
-      </p>
-      <p className="ReviewCard__text">{review.text}</p>
-    </article>
-  );
-}
 
 function tripLabel(trip: Trip): string {
   return `${trip.fromCity} → ${trip.toCity} · ${trip.date}`;
@@ -210,21 +182,30 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
     text.trim().length > 0 &&
     !create.isPending;
 
+  const pickTab = (next: ReviewsTab) => {
+    if (next !== tab) {
+      hapticFeedback.selectionChanged.ifAvailable();
+      setTab(next);
+    }
+  };
+
   return (
     <>
       <PageHeader title="Отзывы" />
-      <div className="ReviewTabs" role="group" aria-label="Разделы отзывов">
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+      <div role="tablist" aria-label="Разделы отзывов">
+      <SegmentedControl>
         {TABS.map((option) => (
-          <Button
+          <SegmentedControl.Item
             key={option.value}
-            size="s"
-            mode={tab === option.value ? "filled" : "outline"}
-            aria-pressed={tab === option.value}
-            onClick={() => setTab(option.value)}
+            selected={tab === option.value}
+            aria-selected={tab === option.value}
+            onClick={() => pickTab(option.value)}
           >
             {option.label}
-          </Button>
+          </SegmentedControl.Item>
         ))}
+      </SegmentedControl>
       </div>
 
       {tab === "mine" && (
@@ -236,25 +217,20 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
           onRetry={() => void my.refetch()}
         >
           {!my.data || my.data.length === 0 ? (
-            <Section>
-              <p className="ReviewEmpty__title">Вы пока не оставили отзывов</p>
-              <p className="ReviewEmpty__subtitle">
-                Оставьте отзыв о поездке — это поможет другим выбрать маршрут
-              </p>
-              <div className="ButtonRow">
-                <Button stretched onClick={() => setTab("new")}>
-                  Оставить отзыв
-                </Button>
-              </div>
-            </Section>
+            <Placeholder
+              header="Вы пока не оставили отзывов"
+              description="Оставьте отзыв о поездке — это поможет другим выбрать маршрут"
+            >
+              <Button size="m" mode="bezeled" onClick={() => pickTab("new")}>
+                Оставить отзыв
+              </Button>
+            </Placeholder>
           ) : (
-            <Section>
-              <List>
-                {my.data.map((review) => (
-                  <ReviewCard key={review.id} review={review} />
-                ))}
-              </List>
-            </Section>
+            <div className="flex flex-col gap-3">
+              {my.data.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </div>
           )}
         </QueryState>
       )}
@@ -268,20 +244,16 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
           onRetry={() => void available.refetch()}
         >
           {trips.length === 0 || !selectedTrip ? (
-            <Section>
-              <p className="ReviewEmpty__title">Пока нет поездок для отзыва</p>
-              <p className="ReviewEmpty__subtitle">
-                Когда вы совершите поездку, она появится здесь
-              </p>
-            </Section>
+            <Placeholder
+              header="Пока нет поездок для отзыва"
+              description="Когда вы совершите поездку, она появится здесь"
+            />
           ) : (
-            <Section>
-              <List>
-                <label className="FormField" htmlFor="review-trip">
-                  Поездка
-                  <select
+            <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+                <div className="FormField">
+                  <label htmlFor="review-trip">Поездка</label>
+                  <Select
                     id="review-trip"
-                    className="ReviewSelect"
                     value={selectedTrip.id}
                     onChange={(event) => pickTrip(event.target.value)}
                   >
@@ -290,15 +262,14 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
                         {tripLabel(trip)}
                       </option>
                     ))}
-                  </select>
-                </label>
+                  </Select>
+                </div>
 
                 {isDriverTrip ? (
-                  <label className="FormField" htmlFor="review-target">
-                    Кому оставить отзыв
-                    <select
+                  <div className="FormField">
+                    <label htmlFor="review-target">Кому оставить отзыв</label>
+                    <Select
                       id="review-target"
-                      className="ReviewSelect"
                       value={targetUser?.id ?? ""}
                       onChange={(event) => {
                         setSelectedPassengerId(event.target.value);
@@ -310,8 +281,8 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
                           {passenger.name}
                         </option>
                       ))}
-                    </select>
-                  </label>
+                    </Select>
+                  </div>
                 ) : (
                   <p className="ReviewTarget">
                     Отзыв о {targetUser?.name ?? "водителе"}
@@ -342,23 +313,23 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
                   </div>
                 </div>
 
-                <label className="FormField" htmlFor="review-text">
-                  Комментарий
-                  <textarea
+                <div className="FormField">
+                  <label htmlFor="review-text">Комментарий</label>
+                  <Textarea
                     id="review-text"
-                    className="ProfileTextarea"
                     rows={3}
                     maxLength={REVIEW_TEXT_MAX_LENGTH}
                     placeholder="Расскажите, что понравилось или что стоит улучшить"
                     value={text}
                     aria-invalid={Boolean(formError)}
+                    status={formError ? "error" : "default"}
                     onChange={(event) => {
                       setText(event.target.value);
                       if (formError) setFormError(null);
                       if (success) setSuccess(false);
                     }}
                   />
-                </label>
+                </div>
                 {text.length > 0 && (
                   <p className="ReviewCounter" aria-live="polite">
                     {text.length}/{REVIEW_TEXT_MAX_LENGTH}
@@ -375,18 +346,16 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
                     Отзыв отправлен на модерацию — он появится в профиле после одобрения
                   </p>
                 )}
-                <div className="ButtonRow">
-                  <Button
-                    stretched
-                    loading={create.isPending}
-                    disabled={!canSubmit}
-                    onClick={submit}
-                  >
-                    Отправить отзыв
-                  </Button>
-                </div>
-              </List>
-            </Section>
+                <Button
+                  stretched
+                  size="l"
+                  loading={create.isPending}
+                  disabled={!canSubmit}
+                  onClick={submit}
+                >
+                  Отправить отзыв
+                </Button>
+            </div>
           )}
         </QueryState>
       )}
@@ -403,48 +372,41 @@ export function ReviewsPage({ initialTab = "mine" }: { initialTab?: ReviewsTab }
           }}
         >
           {profile.data && (
-            <Section>
-              <p className="ReviewRating">
-                Рейтинг {profile.data.rating.toFixed(1)} · {profile.data.reviewsCount}{" "}
-                отзывов
+            <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs text-center">
+              <p className="text-[17px] font-semibold text-[var(--tgui--text_color)]">
+                {`Рейтинг ${profile.data.rating.toFixed(1)} · ${profile.data.reviewsCount} отзывов`}
               </p>
-              <p className="ReviewRating__hint">
+              <p className="text-[12px] text-[var(--tgui--hint_color)] mt-1">
                 Рейтинг учитывает только опубликованные отзывы
               </p>
-            </Section>
+            </div>
           )}
           {aboutItems.length === 0 ? (
-            <Section>
-              <p className="ReviewEmpty__title">О вас пока нет отзывов</p>
-              <p className="ReviewEmpty__subtitle">
-                После поездок пассажиры и водители смогут оценить вас — отзывы появятся
-                здесь
-              </p>
-            </Section>
+            <Placeholder
+              header="О вас пока нет отзывов"
+              description="После поездок пассажиры и водители смогут оценить вас — отзывы появятся здесь"
+            />
           ) : (
-            <Section>
-              <List>
-                {aboutItems.map((review) => (
-                  <ReviewCard key={review.id} review={review} />
-                ))}
-              </List>
+            <div className="flex flex-col gap-3">
+              {aboutItems.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
               {about.hasNextPage && (
-                <div className="ButtonRow">
-                  <Button
-                    mode="outline"
-                    stretched
-                    loading={about.isFetchingNextPage}
-                    disabled={about.isFetchingNextPage}
-                    onClick={() => void about.fetchNextPage()}
-                  >
-                    Показать ещё
-                  </Button>
-                </div>
+                <Button
+                  mode="bezeled"
+                  stretched
+                  loading={about.isFetchingNextPage}
+                  disabled={about.isFetchingNextPage}
+                  onClick={() => void about.fetchNextPage()}
+                >
+                  Показать ещё
+                </Button>
               )}
-            </Section>
+            </div>
           )}
         </QueryState>
       )}
+      </div>
     </>
   );
 }

@@ -10,6 +10,7 @@ import { requireUser, type AuthEnv } from "../auth/middleware.js";
 import { verifyTelegramInitData } from "../auth/telegramSign.js";
 import { logger } from "../logger.js";
 import { createRateLimiter, mutationLimiter, feedbackReadLimiter } from "../middleware/rateLimit.js";
+import { devRateMax } from "../env.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { logBusinessEvent } from "../logger/business.js";
@@ -20,7 +21,7 @@ export const feedbackRouter = new Hono<AuthEnv>();
 // 403), поэтому эндпоинт публичный с жёстким лимитом по IP (5 раз в час).
 const appealLimiter = createRateLimiter({
   windowMs: 3600000,
-  max: 5,
+  max: devRateMax(5),
   keyPrefix: "feedback-appeal",
 });
 

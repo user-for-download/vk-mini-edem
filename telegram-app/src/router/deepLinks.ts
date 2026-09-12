@@ -44,9 +44,14 @@ export function parseTripStartParam(value: unknown): string | null {
  */
 export const START_PARAM_ROUTES: Readonly<Record<string, string>> = {
   trips: "/trips",
+  // Алиасы из референса (App.tsx): явный вход в поиск и создание поездки.
+  // /trips и есть поиск; создание — шторка /trips/my/new поверх водителя.
+  search: "/trips",
+  create: "/trips/my/new",
+  new: "/trips/my/new",
   bookings: "/bookings",
-  history: "/bookings/history",
-  my_trips: "/trips/my",
+  history: "/bookings?segment=history",
+  my_trips: "/bookings?segment=driver",
   profile: "/profile",
   reviews: "/reviews",
   support: "/profile/support",

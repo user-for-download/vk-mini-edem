@@ -116,7 +116,7 @@ try {
     } catch {
       // Онбординг уже принят — идём дальше.
     }
-    await page.getByText("Найти поездку").first().waitFor({ timeout: 30000 });
+    await page.getByText("Поиск попутных поездок").first().waitFor({ timeout: 30000 });
     return TG_URL;
   });
 
@@ -263,7 +263,8 @@ try {
       `UPDATE "Trip" SET "departureAt" = NOW() - INTERVAL '2 hours' WHERE id = '${tripId}'`,
     );
     if (out !== "UPDATE 1") throw new Error(`time-travel: ${out}`);
-    await hashUrl(page, "/trips/my");
+    // Поездки водителя — сегмент «За рулём» объединённого таба «Поездки».
+    await hashUrl(page, "/bookings?segment=driver");
     const finishButtons = page.getByRole("button", { name: "Завершить" });
     try {
       await finishButtons.first().click({ timeout: 30000 });
@@ -274,8 +275,7 @@ try {
       .getByText("Поездка будет перенесена в архив")
       .waitFor({ timeout: 15000 });
     await page.getByRole("button", { name: "Завершить" }).last().click();
-    // Завершённая поездка уходит из «Активных» в «Архив» (бэкенд-фильтр).
-    await page.getByRole("tab", { name: "Архив" }).click();
+    // Завершённая поездка остаётся в списке водителя с пилюлей «Завершена».
     await page.getByText("Завершена").first().waitFor({ timeout: 30000 });
     await shot(page, "trip-completed");
     return "status=completed";
@@ -313,7 +313,8 @@ try {
     }
     await hashUrl(page, "/reviews");
     // Полученные отзывы — на вкладке «Обо мне» (дефолт — «Мои»).
-    await page.getByRole("button", { name: "Обо мне" }).click();
+    // SegmentedControl рендерит табы с role="tab" (tgui), не кнопки.
+    await page.getByRole("tab", { name: "Обо мне" }).click();
     await page.getByText(REVIEW_TEXT).first().waitFor({ timeout: 30000 });
     return "published visible";
   });
@@ -356,10 +357,10 @@ try {
     return "toggle round-trip ok";
   });
 
-  await runStep("deeplink: мусорный маршрут падает на поиск", async () => {
+  await runStep("deeplink: мусорный маршрут падает на главную", async () => {
     await hashUrl(page, "/no-such-route-xyz");
     await page.getByText("Найти поездку").first().waitFor({ timeout: 30000 });
-    return "fallback=/trips";
+    return "fallback=/";
   });
 
   await runStep("mobile: 390px — поиск и карточка поездки", async () => {
@@ -369,11 +370,11 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     try {
       await hashUrl(page, "/trips");
-      await page.getByText("Найти поездку").first().waitFor({ timeout: 30000 });
-      // Свободная строка ищет по маршруту, не по цене — ищем свой город.
-      await page.locator("#trip-search").fill(CITY_FROM);
+      await page.getByText("Поиск попутных поездок").first().waitFor({ timeout: 30000 });
+      // Ищем по городу отправления — карточка ЧУЖОЙ поездки (контрагент,
+      // PRICE+1): свои поиск скрывает.
+      await page.locator("#search-from").fill(CITY_FROM);
       await page.getByRole("button", { name: "Найти" }).click();
-      // Карточка ЧУЖОЙ поездки (контрагент, PRICE+1): свои поиск скрывает.
       await page.getByText(`${PRICE + 1} ₽`).first().waitFor({ timeout: 30000 });
       await shot(page, "mobile-search");
     } finally {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Мокаем сетевую границу стора (authApi) и Telegram SDK (retrieveRawInitData) —
+// Мокаем сетевую границу стора (authApi) и границу SDK (telegram-adapter) —
 // тестируем «как стор реагирует на результат сети» и что initData передаётся
 // на бэкенд РОВНО как её отдал SDK (без пересортировки — иначе HMAC).
 vi.mock("@/api/auth.api", () => ({
@@ -10,18 +10,18 @@ vi.mock("@/api/auth.api", () => ({
   },
 }));
 
-vi.mock("@telegram-apps/sdk-react", () => ({
-  retrieveRawInitData: vi.fn(),
+vi.mock("@/utils/telegram-adapter", () => ({
+  getRawInitData: vi.fn(),
 }));
 
 import { ApiError } from "@/api/client";
 import { authApi } from "@/api/auth.api";
-import { retrieveRawInitData } from "@telegram-apps/sdk-react";
+import { getRawInitData } from "@/utils/telegram-adapter";
 import { useAuthStore } from "@/store/useAuthStore";
 import type { AuthResponse } from "@edem/contracts";
 
 const mockedLoginWithTelegram = vi.mocked(authApi.loginWithTelegram);
-const mockedRetrieveRawInitData = vi.mocked(retrieveRawInitData);
+const mockedGetRawInitData = vi.mocked(getRawInitData);
 
 // Сырая initData-строка EXACTLY как от Telegram/mockEnv (query-params,
 // urlencoded user JSON). RAW-passthrough тест ниже сверяет, что стор
@@ -66,8 +66,8 @@ function resetStore() {
     initData: null,
   });
   mockedLoginWithTelegram.mockReset();
-  mockedRetrieveRawInitData.mockReset();
-  mockedRetrieveRawInitData.mockReturnValue(RAW_INIT_DATA);
+  mockedGetRawInitData.mockReset();
+  mockedGetRawInitData.mockReturnValue(RAW_INIT_DATA);
 }
 
 describe("useAuthStore.bootstrap (Telegram)", () => {
@@ -140,9 +140,7 @@ describe("useAuthStore.bootstrap (Telegram)", () => {
   });
 
   it("SDK без init data (вне Telegram): unauthenticated, без сетевых вызовов", async () => {
-    mockedRetrieveRawInitData.mockImplementation(() => {
-      throw new Error("not in TMA");
-    });
+    mockedGetRawInitData.mockReturnValue(undefined);
 
     await useAuthStore.getState().bootstrap();
 

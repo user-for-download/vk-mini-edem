@@ -1,11 +1,30 @@
-// Рендер-тесты страниц поездок/броней (tg-migration-12): вкладки,
-// счётчики заявок, фильтры истории, полный набор фильтров поиска,
-// edit ride-request, confirm-guards. Паттерн reviewsPage.test.tsx.
-import { describe, expect, it, vi } from "vitest";
+// Рендер-тесты страниц поездок/броней: сегменты объединённой TripsPage,
+// счётчики заявок водителя, confirm-guards, фильтры поиска, edit
+// ride-request. Паттерн reviewsPage.test.tsx (SSR, без testing-library).
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoot } from "@telegram-apps/telegram-ui";
+
+// Дефолты для всех моков-хуков: пустые данные, чтобы каждый тест
+// переопределял только то, что проверяет.
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockUseInfiniteTrips.mockReturnValue(infiniteState([]));
+  mockUseInfiniteMyTrips.mockReturnValue(infiniteState([]));
+  mockUseMyBookings.mockReturnValue(queryState({ data: [] }));
+  mockUseHistory.mockReturnValue(queryState({ data: [] }));
+  mockUseRideRequests.mockReturnValue(queryState({ data: [] }));
+  mockUseAllCities.mockReturnValue(queryState({ data: [] }));
+  mockUseCancelTrip.mockReturnValue(mutation());
+  mockUseCompleteTrip.mockReturnValue(mutation());
+  mockUseCancelBooking.mockReturnValue(mutation());
+  mockUseCreateRideRequest.mockReturnValue(mutation());
+  mockUseUpdateRideRequest.mockReturnValue(mutation());
+  mockUseRideRequestStatus.mockReturnValue(mutation());
+  mockUseCancelRideRequest.mockReturnValue(mutation());
+});
 
 const {
   mockUseInfiniteTrips,
@@ -67,10 +86,9 @@ vi.mock("@/queries/useAllCities", () => ({
 }));
 
 import { SearchPage } from "@/pages/SearchPage";
-import { MyTripsPage } from "@/pages/MyTripsPage";
-import { PassengerBookingsPage } from "@/pages/PassengerBookingsPage";
-import { HistoryPage } from "@/pages/HistoryPage";
+import { TripsPage } from "@/pages/TripsPage";
 import { RideRequestsPage } from "@/pages/RideRequestsPage";
+import { ToastProvider } from "@/components/ToastProvider";
 
 function queryState(overrides: Record<string, unknown> = {}) {
   return {
@@ -98,10 +116,12 @@ function mutation(overrides: Record<string, unknown> = {}) {
   return { mutate: vi.fn(), isPending: false, error: null, ...overrides };
 }
 
-function render(element: ReactNode): string {
+function render(element: ReactNode, url = "/"): string {
   return renderToString(
     <AppRoot platform="base">
-      <MemoryRouter initialEntries={["/"]}>{element}</MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
+        <ToastProvider>{element}</ToastProvider>
+      </MemoryRouter>
     </AppRoot>,
   );
 }
@@ -111,7 +131,7 @@ function makeTrip(overrides: Record<string, unknown> = {}) {
     id: "t-1",
     fromCity: "Москва",
     toCity: "Тула",
-    date: "1 июня 2030",
+    date: "2030-06-01",
     time: "09:00",
     departureAt: "2030-06-01T09:00:00.000Z",
     durationMinutes: 120,
@@ -119,7 +139,7 @@ function makeTrip(overrides: Record<string, unknown> = {}) {
     price: 500,
     seatsTotal: 3,
     seatsAvailable: 2,
-    driver: { id: "u-me", name: "Я", rating: 5, reviewsCount: 1 },
+    driver: { id: "u-me", name: "Я", rating: 5, reviewsCount: 1, avatar: "https://t.me/a.png" },
     tags: [],
     status: "active",
     pendingRequestsCount: 2,
@@ -128,71 +148,20 @@ function makeTrip(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("MyTripsPage parity", () => {
-  it("renders tabs, request counts and guarded actions", () => {
-    mockUseInfiniteMyTrips.mockReturnValue(infiniteState([makeTrip()]));
-    mockUseCancelTrip.mockReturnValue(mutation());
-    mockUseCompleteTrip.mockReturnValue(mutation());
-    const html = render(<MyTripsPage />);
+describe("TripsPage parity", () => {
+  it("renders the three segments on the active tab", () => {
+    mockUseMyBookings.mockReturnValue(queryState({ data: [] }));
+    mockUseHistory.mockReturnValue(queryState({ data: [] }));
+    mockUseCancelBooking.mockReturnValue(mutation());
+    const html = render(<TripsPage />);
     expect(html).toContain("Активные");
-    expect(html).toContain("Архив");
-    expect(html).toContain("Заявки: 2");
-    // SSR разбивает текст комментарием: «Заявки<!-- --> (2)».
-    expect(html).toContain("(2)");
-    expect(html).toContain("Завершить");
-    expect(html).toContain("Отменить");
-    expect(html).toContain("Детали");
+    expect(html).toContain("История");
+    expect(html).toContain("За рулём");
+    // Пустые брони → плейсхолдер с подсказкой уйти в поиск.
+    expect(html).toContain("Вы ещё не забронировали поездку");
   });
 
-  it("shows the archive empty state", () => {
-    mockUseInfiniteMyTrips.mockReturnValue(infiniteState([]));
-    // SSR не кликает табы: дефолтная вкладка — активные, проверяем её
-    // пустое состояние; текст архива — статическая строка компонента.
-    const html = render(<MyTripsPage />);
-    expect(html).toContain("Архив");
-    expect(html).toContain("Пока пусто");
-  });
-});
-
-describe("HistoryPage parity", () => {
-  it("renders history filters and links into trip details", () => {
-    const booking = (id: string, category: string, city: string) => ({
-      id,
-      seat: 1,
-      status: "confirmed",
-      historyCategory: category,
-      trip: { id: `trip-${id}`, fromCity: city, toCity: "Тула", departureAt: "2030-06-01T09:00:00.000Z" },
-    });
-    mockUseHistory.mockReturnValue(
-      queryState({ data: [booking("b-1", "completed", "Москва"), booking("b-2", "cancelled", "Тверь")] }),
-    );
-    const html = render(<HistoryPage />);
-    expect(html).toContain("Все");
-    expect(html).toContain("Завершённые");
-    expect(html).toContain("Отменённые");
-    // SSR разбивает «→» комментариями: проверяем города по частям.
-    expect(html).toContain("Москва");
-    expect(html).toContain("Тверь");
-    expect(html).toContain("Тула");
-  });
-});
-
-describe("SearchPage parity", () => {
-  it("exposes the full filter set, not just q", () => {
-    mockUseInfiniteTrips.mockReturnValue(infiniteState([]));
-    const html = render(<SearchPage />);
-    expect(html).toContain("Откуда (город)");
-    expect(html).toContain("Куда (город)");
-    expect(html).toContain("Дата от");
-    expect(html).toContain("Дата до");
-    expect(html).toContain("Цена до");
-    expect(html).toContain("Не курить");
-    expect(html).toContain("Сбросить");
-  });
-});
-
-describe("PassengerBookingsPage parity", () => {
-  it("links into the trip and guards cancellation", () => {
+  it("shows active booking cards with guarded cancel", () => {
     mockUseMyBookings.mockReturnValue(
       queryState({
         data: [
@@ -200,16 +169,104 @@ describe("PassengerBookingsPage parity", () => {
             id: "b-1",
             seat: 2,
             status: "pending",
-            trip: { id: "t-9", fromCity: "Москва", toCity: "Тула" },
+            trip: makeTrip({ id: "t-9", fromCity: "Москва", toCity: "Тула" }),
           },
         ],
       }),
     );
+    mockUseHistory.mockReturnValue(queryState({ data: [] }));
     mockUseCancelBooking.mockReturnValue(mutation());
-    const html = render(<PassengerBookingsPage />);
-    expect(html).toContain("Открыть поездку");
-    expect(html).toContain("Отменить заявку");
+    const html = render(<TripsPage />);
+    expect(html).toContain("Детали поездки");
+    expect(html).toContain("Отменить");
+    expect(html).toContain("На рассмотрении");
     expect(html).toContain("место №2");
+  });
+
+  it("renders driver trips with request counters and guarded actions", () => {
+    mockUseMyBookings.mockReturnValue(queryState({ data: [] }));
+    mockUseHistory.mockReturnValue(queryState({ data: [] }));
+    mockUseInfiniteMyTrips.mockReturnValue(infiniteState([makeTrip()]));
+    mockUseCancelTrip.mockReturnValue(mutation());
+    mockUseCompleteTrip.mockReturnValue(mutation());
+    const html = render(<TripsPage />, "/bookings?segment=driver");
+    expect(html).toContain("Вы водитель");
+    expect(html).toContain("Заявки: 2");
+    expect(html).toContain("Управление поездкой");
+    expect(html).toContain("Завершить");
+    expect(html).toContain("Отменить");
+  });
+
+  it("renders history entries with status labels", () => {
+    mockUseMyBookings.mockReturnValue(queryState({ data: [] }));
+    mockUseHistory.mockReturnValue(
+      queryState({
+        data: [
+          {
+            id: "b-1",
+            seat: 1,
+            status: "confirmed",
+            historyCategory: "completed",
+            trip: {
+              id: "trip-b-1",
+              fromCity: "Москва",
+              toCity: "Тула",
+              date: "2030-06-01",
+              time: "09:00",
+              departureAt: "2030-06-01T09:00:00.000Z",
+              price: 500,
+              driver: { id: "u-d", name: "Иван", avatar: "https://t.me/a.png" },
+            },
+          },
+          {
+            id: "b-2",
+            seat: 1,
+            status: "confirmed",
+            historyCategory: "cancelled",
+            trip: {
+              id: "trip-b-2",
+              fromCity: "Тверь",
+              toCity: "Тула",
+              date: "2030-06-02",
+              time: "10:00",
+              departureAt: "2030-06-02T10:00:00.000Z",
+              price: 400,
+              driver: { id: "u-d2", name: "Пётр", avatar: "https://t.me/b.png" },
+            },
+          },
+        ],
+      }),
+    );
+    const html = render(<TripsPage />, "/bookings?segment=history");
+    expect(html).toContain("Завершённые");
+    expect(html).toContain("Отменённые");
+    expect(html).toContain("Поездка завершена");
+    expect(html).toContain("Поездка отменена");
+    expect(html).toContain("Москва");
+    expect(html).toContain("Тверь");
+  });
+});
+
+describe("SearchPage parity", () => {
+  it("exposes city inputs, date segments and filter entry", () => {
+    mockUseInfiniteTrips.mockReturnValue(infiniteState([]));
+    const html = render(<SearchPage />);
+    expect(html).toContain("Откуда (город или село)");
+    expect(html).toContain("Куда (город или село)");
+    expect(html).toContain("Все даты");
+    expect(html).toContain("Сегодня");
+    expect(html).toContain("Завтра");
+    expect(html).toContain("Фильтры");
+    expect(html).toContain("Ищу попутку");
+    expect(html).toContain("Найти");
+    expect(html).toContain("Найдено поездок");
+  });
+
+  it("applies a city preset from the URL", () => {
+    mockUseInfiniteTrips.mockReturnValue(infiniteState([]));
+    const html = render(<SearchPage />, "/trips?from=Вологда&to=Череповец&segment=today");
+    expect(html).toContain("Вологда");
+    expect(html).toContain("Череповец");
   });
 });
 

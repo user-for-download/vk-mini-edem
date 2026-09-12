@@ -15,22 +15,23 @@ import {
   adminReadLimiter,
 } from "../middleware/rateLimit.js";
 import { ERROR_CODES } from "../errors.js";
+import { devRateMax } from "../env.js";
 import { adminGuard } from "../admin/guard.js";
 import { serializeAdminReport, serializeReport } from "./serializers.js";
 
 const reportLimiter = createUserRateLimiter({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: devRateMax(10),
   keyPrefix: "report-create",
 });
 const reportReadLimiter = createUserRateLimiter({
   windowMs: 60_000,
-  max: 60,
+  max: devRateMax(60),
   keyPrefix: "report-read",
 });
 const reportAdminMutationLimiter = createRateLimiter({
   windowMs: 60_000,
-  max: 60,
+  max: devRateMax(60),
   keyPrefix: "report-admin-mutation",
 });
 const includeRelations = { reporter: true, adminActor: true } as const;

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Button, List, Placeholder, Section } from "@telegram-apps/telegram-ui";
+import { Button, Placeholder } from "@telegram-apps/telegram-ui";
+import { BellRing, CheckCheck, Settings2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { MutationError } from "@/components/MutationError";
 import { QueryState } from "@/components/QueryState";
@@ -36,10 +37,10 @@ export function isCriticalNotification(type: string): boolean {
  * (честно null, не выдуманный маршрут).
  */
 export const NOTIFICATION_ROUTES: Readonly<Record<string, string>> = {
-  booking_created: "/trips/my",
+  booking_created: "/bookings?segment=driver",
   booking_status_changed: "/bookings",
   trip_cancelled: "/bookings",
-  trip_status_changed: "/bookings/history",
+  trip_status_changed: "/bookings?segment=history",
   trip_details_changed: "/trips",
   ride_request_match: "/trips",
   review_approved: "/reviews",
@@ -75,34 +76,40 @@ function NotificationCard({
   const route = notificationRoute(notification.type);
   const critical = isCriticalNotification(notification.type);
   return (
-    <article className="NotificationCard" data-read={notification.isRead}>
-      <p className="NotificationCard__head">
-        {notification.title}
-        {critical && (
-          <span className="NotificationCard__badge" data-critical="true">
-            {" "}
-            · Важное
+    <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[15px] font-semibold text-[var(--tgui--text_color)]">
+          {notification.title}
+        </span>
+        {critical ? (
+          <span className="StatusPill shrink-0" data-tone="danger">
+            Важное
           </span>
-        )}
-        {!notification.isRead && !critical && (
-          <span className="NotificationCard__badge" data-critical="false">
-            {" "}
-            · Новое
+        ) : !notification.isRead ? (
+          <span className="StatusPill shrink-0" data-tone="info">
+            Новое
           </span>
-        )}
+        ) : null}
+      </div>
+      <p className="text-[13px] text-[var(--tgui--text_color)] leading-relaxed [overflow-wrap:anywhere]">
+        {notification.body}
       </p>
-      <p className="NotificationCard__text">{notification.body}</p>
-      <p className="NotificationCard__date">{formatDate(notification.createdAt)}</p>
-      <div className="NotificationCard__actions">
+      <span className="text-[11px] text-[var(--tgui--hint_color)]">
+        {formatDate(notification.createdAt)}
+      </span>
+      <div className="flex items-center gap-3 pt-1 border-t border-[var(--tgui--outline)]">
         {route && (
-          <a className="NotificationCard__link" href={`#${route}`}>
+          <a
+            className="text-[13px] font-medium text-[var(--tgui--link_color)]"
+            href={`#${route}`}
+          >
             Открыть
           </a>
         )}
         {!notification.isRead && (
           <Button
             size="s"
-            mode="outline"
+            mode="bezeled"
             loading={marking}
             disabled={marking}
             onClick={() => onMarkRead(notification.id)}
@@ -111,7 +118,7 @@ function NotificationCard({
           </Button>
         )}
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -160,23 +167,33 @@ export function NotificationsPage() {
         emptyText=""
         onRetry={() => void inbox.refetch()}
       >
-        <Section>
-          <p className="SettingsStatus" aria-live="polite">
-            {unreadCount > 0
-              ? `Непрочитанных: ${unreadCount}.`
-              : "Все уведомления прочитаны."}{" "}
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+        <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <BellRing size={16} className="text-[var(--app-info)] shrink-0" />
+            <p className="text-[14px] text-[var(--tgui--text_color)]" aria-live="polite">
+              {unreadCount > 0
+                ? `Непрочитанных: ${unreadCount}.`
+                : "Все уведомления прочитаны."}
+            </p>
+          </div>
+          <p className="text-[12px] text-[var(--tgui--hint_color)] leading-relaxed">
             Важные статусы поездки и брони сохраняются всегда, даже если
             некритичные уведомления выключены.
           </p>
-          <List>
-            <a className="NotificationCard__link" href="#/settings">
+          <div className="flex gap-2">
+            <a
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[14px] font-medium bg-[var(--tgui--secondary_fill)] text-[var(--tgui--link_color)]"
+              href="#/settings"
+            >
+              <Settings2 size={15} />
               Настройки уведомлений
             </a>
-          </List>
-          <div className="ButtonRow">
             <Button
               stretched
-              mode="outline"
+              size="s"
+              mode="bezeled"
+              before={<CheckCheck size={15} />}
               loading={markAll.isPending}
               disabled={markAll.isPending || unreadCount === 0}
               onClick={() => markAll.mutate()}
@@ -184,42 +201,41 @@ export function NotificationsPage() {
               Прочитать все
             </Button>
           </div>
-        </Section>
+        </div>
 
         {items.length === 0 ? (
-          <Section>
-            <p className="ReviewEmpty__title">Пока нет уведомлений</p>
-            <p className="ReviewEmpty__subtitle">
+          <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs">
+            <p className="text-[16px] font-semibold text-center text-[var(--tgui--text_color)]">
+              Пока нет уведомлений
+            </p>
+            <p className="text-[13px] text-center text-[var(--tgui--hint_color)] mt-1">
               Подтверждения брони, отмены и завершение поездок появятся здесь
             </p>
-          </Section>
+          </div>
         ) : (
-          <Section>
-            <List>
-              {items.map((notification) => (
-                <NotificationCard
-                  key={notification.id}
-                  notification={notification}
-                  marking={markRead.isPending}
-                  onMarkRead={(id) => markRead.mutate(id)}
-                />
-              ))}
-            </List>
+          <div className="flex flex-col gap-3">
+            {items.map((notification) => (
+              <NotificationCard
+                key={notification.id}
+                notification={notification}
+                marking={markRead.isPending}
+                onMarkRead={(id) => markRead.mutate(id)}
+              />
+            ))}
             {inbox.hasNextPage && (
-              <div className="ButtonRow">
-                <Button
-                  mode="outline"
-                  stretched
-                  loading={inbox.isFetchingNextPage}
-                  disabled={inbox.isFetchingNextPage}
-                  onClick={() => void inbox.fetchNextPage()}
-                >
-                  Показать ещё
-                </Button>
-              </div>
+              <Button
+                mode="bezeled"
+                stretched
+                loading={inbox.isFetchingNextPage}
+                disabled={inbox.isFetchingNextPage}
+                onClick={() => void inbox.fetchNextPage()}
+              >
+                Показать ещё
+              </Button>
             )}
-          </Section>
+          </div>
         )}
+      </div>
       </QueryState>
     </>
   );

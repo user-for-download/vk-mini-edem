@@ -2,7 +2,14 @@
 // Шаринг поездки в Telegram (паритет VK TripDetailsPanel → shareTrip):
 // ссылка в формате, который принимает AppRouter.parseTripStartParam
 // (`trip_<uuid>`), плюс hash-ссылка на детали для веба.
-// VK-мост здесь неприменим — используем Web Share API / буфер обмена.
+//
+// Порядок (нативный UX первым):
+// 1. внутри Telegram-клиента — shareURL SDK (нативный диалог t.me/share);
+// 2. Web Share API (браузеры);
+// 3. буфер обмена.
+// VK-мост здесь неприменим.
+
+import { getRawInitData, shareViaTelegram } from "@/utils/telegram-adapter";
 
 export function buildTripStartParam(tripId: string): string {
   return `trip_${tripId}`;
@@ -21,6 +28,12 @@ export async function shareTrip(
 ): Promise<"shared" | "copied" | "failed"> {
   const link = buildTripDeepLink(tripId);
   const text = `Присоединяйтесь к поездке: ${link}`;
+  // Внутри Telegram — нативный диалог шаринга (Web Share в WebView
+  // обычно отсутствует, а редирект shareURL вне клиента нам не нужен:
+  // наличие initData = признак TMA-сессии).
+  if (getRawInitData() !== undefined && shareViaTelegram(link, text)) {
+    return "shared";
+  }
   try {
     const navigatorWithShare = navigator as Navigator & {
       share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;

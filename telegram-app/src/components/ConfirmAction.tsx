@@ -11,7 +11,7 @@ export function ConfirmAction({
   confirmLabel,
   description,
   pending = false,
-  mode = "outline",
+  mode = "bezeled",
   disabled = false,
   onConfirm,
 }: {
@@ -19,7 +19,7 @@ export function ConfirmAction({
   confirmLabel: string;
   description: string;
   pending?: boolean;
-  mode?: "outline" | "plain";
+  mode?: "bezeled" | "plain";
   disabled?: boolean;
   onConfirm: () => void;
 }) {
@@ -28,6 +28,7 @@ export function ConfirmAction({
     return (
       <Button
         mode={mode}
+        size="s"
         stretched
         disabled={disabled || pending}
         onClick={() => setArmed(true)}
@@ -51,7 +52,7 @@ export function ConfirmAction({
         >
           {confirmLabel}
         </Button>
-        <Button mode="outline" stretched disabled={pending} onClick={() => setArmed(false)}>
+        <Button mode="bezeled" stretched disabled={pending} onClick={() => setArmed(false)}>
           Назад
         </Button>
       </div>

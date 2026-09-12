@@ -17,12 +17,13 @@ import {
   publicReadLimiter,
 } from "../middleware/rateLimit.js";
 import { ERROR_CODES } from "../errors.js";
+import { devRateMax } from "../env.js";
 import { serializeRideRequest } from "./serializers.js";
 
 const MAX_ACTIVE_REQUESTS = 3;
 const rideRequestMutationLimiter = createUserRateLimiter({
   windowMs: 60 * 60 * 1000,
-  max: 30,
+  max: devRateMax(30),
   keyPrefix: "ride-request-mutation",
 });
 

@@ -3,7 +3,7 @@
 // паттерн telegram-app/src/pages/__tests__/reviewsPage.test.tsx.
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppRoot } from "@telegram-apps/telegram-ui";
 
@@ -32,6 +32,17 @@ vi.mock("@/queries/useTripsQuery", async (importOriginal) => {
     useTripDetailQuery: mockUseTripDetail,
     useCancelTripMutation: mockUseCancelTrip,
     useCompleteTripMutation: mockUseCompleteTrip,
+    // Фоновая SearchPage за шторкой: пустая лента без загрузки.
+    useInfiniteTripsQuery: () => ({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    }),
   };
 });
 
@@ -49,7 +60,8 @@ vi.mock("@/store/useAuthStore", () => ({
   ),
 }));
 
-import { TripDetailsPage } from "@/pages/TripDetailsPage";
+import { TripDetailsRoute } from "@/components/TripDetailsModal";
+import { ToastProvider } from "@/components/ToastProvider";
 import { ApiError } from "@/api/client";
 
 const DRIVER = {
@@ -131,7 +143,11 @@ function render(): string {
     <AppRoot platform="base">
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={["/trips/t-1"]}>
-          <TripDetailsPage />
+          <ToastProvider>
+            <Routes>
+              <Route path="/trips/:tripId" element={<TripDetailsRoute />} />
+            </Routes>
+          </ToastProvider>
         </MemoryRouter>
       </QueryClientProvider>
     </AppRoot>,
@@ -178,7 +194,7 @@ describe("TripDetailsPage parity", () => {
       }),
     );
     const html = render();
-    expect(html).toContain("Ваша заявка");
+    expect(html).toContain("Вы записались попутчиком");
     expect(html).toContain("Отменить бронирование");
   });
 

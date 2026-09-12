@@ -1,51 +1,74 @@
 // telegram-app/src/helpers/searchFilters.ts
-// Полный набор поисковых фильтров (паритет VK SearchPanel):
-// разбор «Откуда → Куда» / «Откуда - Куда» и сборка TripFiltersDto.
+// Поисковые фильтры для ленты поездок: города + сегмент дат (Сегодня/
+// Завтра/Выходные/Все) + максимальная цена + теги. Сборка TripFiltersDto.
 // Вынесено в helper ради unit-тестов без DOM.
 import type { TripTag } from "@edem/contracts";
 import type { SearchTripsFilters } from "@/api/trips.api";
+import { toIsoDate } from "@/utils/date";
 
-const ROUTE_SEPARATOR_REGEX = /→|\s+[-—–]\s+/;
+export type DateSegment = "all" | "today" | "tomorrow" | "weekend";
 
-export function parseSearchQuery(raw: string): {
-  q?: string;
-  fromCity?: string;
-  toCity?: string;
-} {
-  const trimmed = raw.trim();
-  if (!trimmed) return {};
-  if (ROUTE_SEPARATOR_REGEX.test(trimmed)) {
-    const normalized = trimmed.replace(/\s+[-—–]\s+/g, "→");
-    const parts = normalized.split("→").map((part) => part.trim());
-    const result: { fromCity?: string; toCity?: string } = {};
-    if (parts[0]) result.fromCity = parts[0];
-    if (parts[1]) result.toCity = parts[1];
-    // Один город без направления — ищем по нему как по свободной строке,
-    // чтобы не терять результаты (бэкенд ищет q по городам и адресам).
-    if (!result.fromCity && !result.toCity) return { q: trimmed };
-    if (result.fromCity && !result.toCity) return { q: result.fromCity };
-    if (result.toCity && !result.fromCity) return { q: result.toCity };
-    return result;
+export const DATE_SEGMENTS: ReadonlyArray<{ value: DateSegment; label: string }> = [
+  { value: "all", label: "Все даты" },
+  { value: "today", label: "Сегодня" },
+  { value: "tomorrow", label: "Завтра" },
+];
+
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+function parseSegment(value: string | null): DateSegment {
+  return value === "today" || value === "tomorrow" || value === "weekend"
+    ? value
+    : "all";
+}
+
+/** URL-параметр ?segment= → DateSegment (мусор → "all"). */
+export function parseDateSegmentParam(value: string | null): DateSegment {
+  return parseSegment(value);
+}
+
+/**
+ * Сегмент дат → диапазон dateFrom/dateTo (локальные даты, ISO):
+ * - today/tomorrow — конкретный день;
+ * - weekend — ближайшие суббота–воскресенье; если выходные уже идут
+ *   (суббота/воскресенье) — от сегодня до воскресенья.
+ */
+export function dateSegmentToRange(
+  segment: DateSegment,
+  now: Date = new Date(),
+): { dateFrom?: string; dateTo?: string } {
+  if (segment === "all") return {};
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (segment === "today") {
+    const iso = toIsoDate(today);
+    return { dateFrom: iso, dateTo: iso };
   }
-  return { q: trimmed };
+  if (segment === "tomorrow") {
+    const iso = toIsoDate(new Date(today.getTime() + MS_IN_DAY));
+    return { dateFrom: iso, dateTo: iso };
+  }
+  const dayOfWeek = today.getDay(); // 0 = воскресенье, 6 = суббота
+  if (dayOfWeek === 0) {
+    const iso = toIsoDate(today);
+    return { dateFrom: iso, dateTo: iso };
+  }
+  const saturday = new Date(today.getTime() + (6 - dayOfWeek) * MS_IN_DAY);
+  const sunday = new Date(saturday.getTime() + MS_IN_DAY);
+  return { dateFrom: toIsoDate(saturday), dateTo: toIsoDate(sunday) };
 }
 
 export interface SearchFormState {
-  query: string;
   fromCity: string;
   toCity: string;
-  dateFrom: string;
-  dateTo: string;
+  dateSegment: DateSegment;
   maxPrice: string;
   tags: TripTag[];
 }
 
 export const EMPTY_SEARCH_FORM: SearchFormState = {
-  query: "",
   fromCity: "",
   toCity: "",
-  dateFrom: "",
-  dateTo: "",
+  dateSegment: "all",
   maxPrice: "",
   tags: [],
 };
@@ -53,13 +76,14 @@ export const EMPTY_SEARCH_FORM: SearchFormState = {
 export function buildSearchFilters(
   state: SearchFormState,
 ): SearchTripsFilters | undefined {
-  const result: SearchTripsFilters = { ...parseSearchQuery(state.query) };
+  const result: SearchTripsFilters = {};
   const fromCity = state.fromCity.trim();
   const toCity = state.toCity.trim();
   if (fromCity) result.fromCity = fromCity;
   if (toCity) result.toCity = toCity;
-  if (state.dateFrom) result.dateFrom = state.dateFrom;
-  if (state.dateTo) result.dateTo = state.dateTo;
+  const range = dateSegmentToRange(state.dateSegment);
+  if (range.dateFrom) result.dateFrom = range.dateFrom;
+  if (range.dateTo) result.dateTo = range.dateTo;
   const maxPrice = Number(state.maxPrice);
   if (state.maxPrice.trim() && Number.isFinite(maxPrice) && maxPrice > 0) {
     result.maxPrice = Math.floor(maxPrice);

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Button } from "@telegram-apps/telegram-ui";
+import { Button, Input, Textarea } from "@telegram-apps/telegram-ui";
+import { MessageSquareText, Send } from "lucide-react";
 import {
   FEEDBACK_SUBJECT_MAX_LENGTH,
   FEEDBACK_TEXT_MAX_LENGTH,
@@ -56,37 +57,38 @@ export function AppealForm() {
 
   return (
     <>
-      <label className="FormField" htmlFor="appeal-subject">
-        Тема
-        <input
+      <div className="FormField">
+        <label htmlFor="appeal-subject">Тема</label>
+        <Input
           id="appeal-subject"
-          className="TextInput"
+          before={<MessageSquareText size={16} className="text-[var(--tgui--hint_color)]" />}
           value={subject}
           maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
+          status={formError ? "error" : "default"}
           onChange={(event) => {
             setSubject(event.target.value);
             if (formError) setFormError(null);
             if (success) setSuccess(false);
           }}
         />
-      </label>
-      <label className="FormField" htmlFor="appeal-text">
-        Сообщение
-        <textarea
+      </div>
+      <div className="FormField">
+        <label htmlFor="appeal-text">Сообщение</label>
+        <Textarea
           id="appeal-text"
-          className="ProfileTextarea"
           rows={4}
           maxLength={FEEDBACK_TEXT_MAX_LENGTH}
           placeholder="Почему блокировка ошибочна и что просите пересмотреть"
           value={text}
           aria-invalid={Boolean(formError)}
+          status={formError ? "error" : "default"}
           onChange={(event) => {
             setText(event.target.value);
             if (formError) setFormError(null);
             if (success) setSuccess(false);
           }}
         />
-      </label>
+      </div>
       {text.length > 0 && (
         <p className="ReviewCounter" aria-live="polite">
           {text.length}/{FEEDBACK_TEXT_MAX_LENGTH}
@@ -105,6 +107,8 @@ export function AppealForm() {
       <div className="ButtonRow">
         <Button
           stretched
+          size="l"
+          before={<Send size={16} />}
           loading={appeal.isPending}
           disabled={!canSubmit}
           onClick={submit}

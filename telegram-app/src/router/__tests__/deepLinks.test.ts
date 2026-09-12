@@ -9,13 +9,14 @@ import {
 const UUID = "123e4567-e89b-12d3-a456-426614174000";
 
 // Маршруты ниже обязаны существовать в AppRouter (Routes):
-// /trips, /trips/:tripId, /trips/my, /bookings, /bookings/history,
-// /profile, /reviews, /settings, /notifications, /profile/support.
+// /trips, /trips/:tripId, /trips/my/new, /bookings (+?segment=), /profile, /reviews,
+// /settings, /notifications, /profile/support.
 const KNOWN_ROUTES = new Set([
   "/trips",
+  "/trips/my/new",
   "/bookings",
-  "/bookings/history",
-  "/trips/my",
+  "/bookings?segment=history",
+  "/bookings?segment=driver",
   "/profile",
   "/reviews",
   "/profile/support",
@@ -53,14 +54,17 @@ describe("parseTripStartParam", () => {
 describe("START_PARAM_ROUTES (паритет разделов VK + контракт)", () => {
   it("ведёт на существующие маршруты AppRouter", () => {
     expect(START_PARAM_ROUTES["bookings"]).toBe("/bookings");
-    expect(START_PARAM_ROUTES["history"]).toBe("/bookings/history");
-    expect(START_PARAM_ROUTES["my_trips"]).toBe("/trips/my");
+    expect(START_PARAM_ROUTES["history"]).toBe("/bookings?segment=history");
+    expect(START_PARAM_ROUTES["my_trips"]).toBe("/bookings?segment=driver");
     expect(START_PARAM_ROUTES["profile"]).toBe("/profile");
     expect(START_PARAM_ROUTES["reviews"]).toBe("/reviews");
     expect(START_PARAM_ROUTES["support"]).toBe("/profile/support");
     expect(START_PARAM_ROUTES["notifications"]).toBe("/notifications");
     expect(START_PARAM_ROUTES["settings"]).toBe("/settings");
     expect(START_PARAM_ROUTES["trips"]).toBe("/trips");
+    expect(START_PARAM_ROUTES["search"]).toBe("/trips");
+    expect(START_PARAM_ROUTES["create"]).toBe("/trips/my/new");
+    expect(START_PARAM_ROUTES["new"]).toBe("/trips/my/new");
     for (const route of Object.values(START_PARAM_ROUTES)) {
       expect(KNOWN_ROUTES.has(route)).toBe(true);
     }
@@ -74,14 +78,16 @@ describe("resolveStartParamRoute", () => {
   });
 
   it("section-токены ведут на свои разделы", () => {
-    expect(resolveStartParamRoute("bookings")).toBe("/bookings");
-    expect(resolveStartParamRoute("history")).toBe("/bookings/history");
+    expect(resolveStartParamRoute("bookings")).toBe("/bookings");    expect(resolveStartParamRoute("history")).toBe("/bookings?segment=history");
     expect(resolveStartParamRoute("profile")).toBe("/profile");
     expect(resolveStartParamRoute("reviews")).toBe("/reviews");
     expect(resolveStartParamRoute("support")).toBe("/profile/support");
-    expect(resolveStartParamRoute("my_trips")).toBe("/trips/my");
+    expect(resolveStartParamRoute("my_trips")).toBe("/bookings?segment=driver");
     expect(resolveStartParamRoute("notifications")).toBe("/notifications");
     expect(resolveStartParamRoute("settings")).toBe("/settings");
+    expect(resolveStartParamRoute("search")).toBe("/trips");
+    expect(resolveStartParamRoute("create")).toBe("/trips/my/new");
+    expect(resolveStartParamRoute("new")).toBe("/trips/my/new");
   });
 
   it("пустое/отсутствующее значение — null (навигации нет)", () => {

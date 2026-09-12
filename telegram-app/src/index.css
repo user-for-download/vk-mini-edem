@@ -1,55 +1,112 @@
-/* Базовые стили telegram-app. Палитра — нативные CSS-переменные Telegram
-   (themeParams.bindCssVars() в init.ts), остальное — минимум бренда поверх. */
-/* Браузерный reset — не относится к компонентам telegram-ui */
-html {
-  height: 100%;
+/* Базовые стили telegram-app: тема и компоненты — @telegram-apps/telegram-ui
+   (tgui.xelene.me), раскладка — Tailwind v4 утилитами на tgui-переменных
+   (язык примера edem-telegram-mini-app). Сам tgui-stylesheet подключён
+   в main.tsx раньше этого файла — наши правила приоритетнее.
+   Здесь только токены + семантические классы, которых нет в tgui. */
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+  --tg-safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --tg-safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --tg-viewport-height: 100dvh;
+  --tg-viewport-stable-height: 100dvh;
+
+  /* Semantic status tokens (single source of truth instead of ad-hoc
+     colors scattered across components). These sit on top of the
+     tgui palette and are re-tuned for the dark theme below, so every status
+     color adapts automatically together with --tgui--* variables.
+     Класс `dark` на documentElement тогглит AppConfig из темы Telegram
+     (miniApp.isDark) — tgui вешает свой хэшированный dark-класс, на который
+     извне опереться нельзя. */
+  --app-success: #1fa855;
+  --app-success-bg: rgba(31, 168, 85, 0.12);
+  --app-warning: #b8770a;
+  --app-warning-bg: rgba(184, 119, 10, 0.12);
+  --app-danger: #d33636;
+  --app-danger-bg: rgba(211, 54, 54, 0.1);
+  --app-info: var(--tgui--link_color);
+  --app-info-bg: var(--tgui--secondary_fill);
+  --app-purple: #7c5cd6;
+  --app-purple-bg: rgba(124, 92, 214, 0.12);
+  --app-indigo: #4f5fd6;
+  --app-indigo-bg: rgba(79, 95, 214, 0.12);
+  --app-rating: #b8860b;
 }
 
-body, #root {
-  height: 100%;
+.dark {
+  --app-success: #3ecf72;
+  --app-success-bg: rgba(62, 207, 114, 0.16);
+  --app-warning: #f0a93b;
+  --app-warning-bg: rgba(240, 169, 59, 0.16);
+  --app-danger: #f27272;
+  --app-danger-bg: rgba(242, 114, 114, 0.16);
+  --app-purple: #a78bfa;
+  --app-purple-bg: rgba(167, 139, 250, 0.18);
+  --app-indigo: #8b93f5;
+  --app-indigo-bg: rgba(139, 147, 245, 0.18);
+  --app-rating: #f0b93b;
+}
+
+html, body, #root {
+  min-height: 100%;
+  min-height: var(--tg-viewport-height, 100dvh);
 }
 
 body {
   margin: 0;
-  background: var(--tg-theme-bg-color, #fff);
+  padding: 0;
+  /* Вне колонки приложения (десктоп) — нейтральный фон, сама колонка
+     задана через --tgui--bg_color на .AppShell. */
+  background: var(--tgui--secondary_bg_color, var(--tg-theme-bg-color, #fff));
   color: var(--tg-theme-text-color, #000);
   font-family: -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
   /* Блокируем системный rubber-band/overscroll на уровне документа,
      не мешая внутреннему скроллу. */
   overscroll-behavior-y: none;
 }
 
+/* Prevent auto-zoom on iOS Safari/Telegram WebView when focusing text inputs
+   (tgui не выставляет 16px сам — дублируем поверх его стилей). */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Колонка приложения (язык примера): max-w-md по центру, боковые
+   разделители на широких экранах, фон — базовый tgui. Таббар —
+   FixedLayout отдельно (fixed, left:0/right:0) с теми же max-w-md +
+   mx-auto классами в AppRouter. */
 .AppShell {
   min-height: 100vh;
-  padding-bottom: 76px;
+  min-height: var(--tg-viewport-height, 100dvh);
+  max-width: 448px;
+  margin: 0 auto;
+  background: var(--tgui--bg_color);
+  border-left: 1px solid var(--tgui--outline);
+  border-right: 1px solid var(--tgui--outline);
 }
 
 .AppShell__content {
-  max-width: 720px;
-  margin: 0 auto;
+  padding-bottom: 96px;
 }
 
-.AppShell__tabbar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 10;
-}
-
-.PageHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 16px 12px;
-}
-
+/* Поле формы: div-контейнер + явный <label htmlFor> + tgui-контрол внутри.
+   Outer <label> здесь НЕЛЬЗЯ: корень tgui Input/Select/Textarea — div с
+   внутренним <label> (FormInput), вложенный label в label — невалидно
+   (a11y: invalid nesting). Несколько label на один контрол — валидно. */
 .FormField {
   display: grid;
   gap: 6px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 14px;
+}
+
+.FormField > label,
+.FormField > legend {
+  color: var(--tgui--hint_color, var(--tg-theme-hint-color, #707579));
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .FormError {
@@ -63,69 +120,98 @@ body {
   padding: 0 16px 16px;
 }
 
-/* Профиль / настройки (задача tg-migration-06): минимум поверх telegram-ui */
-.ProfileHead {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 16px 16px 8px;
-  text-align: center;
-}
-
-.ProfileHead__avatar {
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.ProfileHead__name {
-  margin: 0;
-  font-size: 20px;
+/* Статус-пилюля на --app-* токенах (замена инлайн-суффиксов
+   ReviewCard__badge / NotificationCard__badge). Смысл всегда дублируется
+   текстом, не только цветом (a11y: color + text). */
+.StatusPill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: baseline;
 }
 
-.ProfileHead__meta {
-  margin: 0;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 14px;
+.StatusPill[data-tone="warning"] {
+  color: var(--app-warning);
+  background: var(--app-warning-bg);
 }
 
-.ProfileHead__about {
-  margin: 4px 0 0;
-  font-size: 15px;
-  line-height: 1.4;
+.StatusPill[data-tone="danger"] {
+  color: var(--app-danger);
+  background: var(--app-danger-bg);
 }
 
-.ProfileTextarea {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--tg-theme-hint-color, #707579);
-  border-radius: 8px;
-  background: var(--tg-theme-bg-color, #fff);
-  color: var(--tg-theme-text-color, #000);
-  font: inherit;
-  padding: 10px 12px;
-  resize: vertical;
+.StatusPill[data-tone="info"] {
+  color: var(--app-info);
+  background: var(--app-info-bg);
 }
 
-.SettingsStatus {
-  margin: 4px 16px 12px;
-  font-size: 15px;
-  line-height: 1.4;
+.StatusPill[data-tone="success"] {
+  color: var(--app-success);
+  background: var(--app-success-bg);
 }
 
-.SettingsSaved {
-  margin: 8px 16px 0;
-  color: var(--tg-theme-link-color, #5288c1);
-  font-size: 14px;
+/* Теги-пилюли (tgui Chip-кнопки с aria-pressed): фокус клавиатуры виден
+   на пилюле (a11y: native button, no custom role). */
+.TagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.SettingsHint {
-  margin: 12px 16px 0;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 13px;
-  line-height: 1.4;
+.TagChips .TagChip:focus-within {
+  outline: 2px solid var(--app-info);
+  outline-offset: 2px;
 }
 
+/* Кружок иконки для Cell.before (язык ProfileTab примера):
+   w-8 h-8 rounded-full, тон — пастель из --app-* токенов. */
+.icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-circle--info {
+  color: var(--app-info);
+  background: var(--app-info-bg);
+}
+
+.icon-circle--success {
+  color: var(--app-success);
+  background: var(--app-success-bg);
+}
+
+.icon-circle--warning {
+  color: var(--app-warning);
+  background: var(--app-warning-bg);
+}
+
+.icon-circle--danger {
+  color: var(--app-danger);
+  background: var(--app-danger-bg);
+}
+
+.icon-circle--purple {
+  color: var(--app-purple);
+  background: var(--app-purple-bg);
+}
+
+.icon-circle--rating {
+  color: var(--app-rating);
+  background: var(--app-warning-bg);
+}
+
+/* Уведомления/поддержка/жалобы: FAQ и карточки обращений — tgui Accordion,
+   карточки списков — tailwind-утилиты на tgui-переменных (язык примера). */
 .Onboarding, .AccountState {
   box-sizing: border-box;
   width: min(100%, 640px);
@@ -141,88 +227,8 @@ body {
   line-height: 1.4;
 }
 
-/* Отзывы (tg-migration-08): паритет VK ReviewsPanel/CreateReviewModal */
-.ReviewTabs {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px 4px;
-}
-
-.ReviewCard {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--tg-theme-section-separator-color, #e7e8ec);
-}
-
-.ReviewCard:last-child {
-  border-bottom: 0;
-}
-
-.ReviewCard__head {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.ReviewCard__badge {
-  color: var(--tg-theme-hint-color, #707579);
-  font-weight: 400;
-}
-
-.ReviewCard__badge[data-status="rejected"] {
-  color: var(--tg-theme-destructive-text-color, #d14e4e);
-}
-
-.ReviewCard__route {
-  margin: 0 0 4px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 13px;
-}
-
-.ReviewCard__text {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.ReviewEmpty__title {
-  margin: 16px 16px 4px;
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.ReviewEmpty__subtitle {
-  margin: 0 16px 12px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 14px;
-  text-align: center;
-}
-
-.ReviewSelect {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--tg-theme-hint-color, #707579);
-  border-radius: 8px;
-  background: var(--tg-theme-bg-color, #fff);
-  color: var(--tg-theme-text-color, #000);
-  font: inherit;
-  padding: 10px 12px;
-}
-
-/* Однострочное поле форм поддержки/жалоб: нативный input вместо
-   telegram-ui Input — гарантированно SSR-безопасен для
-   renderToString-тестов (паттерн ReviewsPage). */
-.TextInput {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid var(--tg-theme-hint-color, #707579);
-  border-radius: 8px;
-  background: var(--tg-theme-bg-color, #fff);
-  color: var(--tg-theme-text-color, #000);
-  font: inherit;
-  padding: 10px 12px;
-}
+/* Отзывы: форма — tailwind-карточка, список — карточки, табы —
+   tgui SegmentedControl. Звёзды ввода — кастомный radiogroup (см. ниже). */
 
 .ReviewTarget {
   margin: 4px 16px;
@@ -230,6 +236,11 @@ body {
   font-weight: 600;
 }
 
+/* Звёзды рейтинга — осознанно НЕ tgui Rating: Rating неконтролируемый
+   (только defaultValue), а форма сбрасывает оценку программно
+   (setRating(5) после успешной отправки). Нативный radiogroup + radio +
+   aria-checked — каноничный a11y-паттерн, цвет — токен --app-rating.
+   Тач-таргеты 46px (a11y: ≥44px). */
 .ReviewStars {
   display: flex;
   gap: 4px;
@@ -249,7 +260,7 @@ body {
 }
 
 .ReviewStars__star[data-active="true"] {
-  color: var(--tg-theme-accent-text-color, #2481cc);
+  color: var(--app-rating);
 }
 
 .ReviewCounter {
@@ -261,116 +272,12 @@ body {
 
 .ReviewSuccess {
   margin: 8px 16px;
-  color: var(--tg-theme-accent-text-color, #2481cc);
+  color: var(--app-success);
   font-size: 14px;
 }
 
-.ReviewRating {
-  margin: 12px 16px 2px;
-  font-size: 17px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.ReviewRating__hint {
-  margin: 0 16px 8px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 13px;
-  text-align: center;
-}
-
-/* Уведомления/поддержка/жалобы (tg-migration-09): паритет VK
-   SupportPanel/NotificationsPanel/ReportModal на telegram-ui */
-.NotificationCard {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--tg-theme-section-separator-color, #e7e8ec);
-}
-
-.NotificationCard:last-child {
-  border-bottom: 0;
-}
-
-.NotificationCard__head {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.NotificationCard__badge {
-  color: var(--tg-theme-hint-color, #707579);
-  font-weight: 400;
-}
-
-.NotificationCard__badge[data-critical="true"] {
-  color: var(--tg-theme-destructive-text-color, #d14e4e);
-}
-
-.NotificationCard__text {
-  margin: 0 0 4px;
-  font-size: 15px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.NotificationCard__date {
-  margin: 0 0 8px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 13px;
-}
-
-.NotificationCard__actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.NotificationCard__link {
-  color: var(--tg-theme-link-color, #5288c1);
-  font-size: 14px;
-}
-
-.FaqItem {
-  border-bottom: 1px solid var(--tg-theme-section-separator-color, #e7e8ec);
-}
-
-.FaqItem:last-child {
-  border-bottom: 0;
-}
-
-.FaqItem__question {
-  width: 100%;
-  border: 0;
-  background: none;
-  color: var(--tg-theme-text-color, #000);
-  cursor: pointer;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 12px 16px;
-  text-align: left;
-}
-
-.FaqItem__answer {
-  margin: 0;
-  padding: 0 16px 12px;
-  color: var(--tg-theme-hint-color, #707579);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Fallback-экраны без telegram-ui (ошибки до/после AppRoot) */
+/* Fallback-экраны без telegram-ui (ошибки до/после AppRoot):
+   кнопка нативная осознанно, цвет — семантический токен. */
 .RootError {
   box-sizing: border-box;
   display: grid;
@@ -387,7 +294,7 @@ body {
 .RootError button {
   border: 0;
   border-radius: 8px;
-  background: #5288c1;
+  background: var(--app-info);
   color: #fff;
   cursor: pointer;
   font: inherit;

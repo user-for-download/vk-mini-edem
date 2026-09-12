@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Input, List, Section } from "@telegram-apps/telegram-ui";
+import { Button, Input } from "@telegram-apps/telegram-ui";
+import { Car, Palette, Hash } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { QueryState } from "@/components/QueryState";
 import { ConfirmAction } from "@/components/ConfirmAction";
@@ -120,14 +121,15 @@ export function VehiclePage() {
         onRetry={() => void vehicleQuery.refetch()}
       >
         {vehicleQuery.data && (
-          <Section>
-            <List>
+          <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+          <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
               {editing ? (
                 <>
-                  <label className="FormField" htmlFor="vehicle-model">
-                    Модель
+                  <div className="FormField">
+                    <label htmlFor="vehicle-model">Модель</label>
                     <Input
                       id="vehicle-model"
+                      before={<Car size={17} className="text-[var(--app-info)]" />}
                       value={model}
                       maxLength={VEHICLE_LIMITS.model}
                       placeholder="Skoda Octavia"
@@ -136,11 +138,12 @@ export function VehiclePage() {
                         if (formError) setFormError(null);
                       }}
                     />
-                  </label>
-                  <label className="FormField" htmlFor="vehicle-color">
-                    Цвет
+                  </div>
+                  <div className="FormField">
+                    <label htmlFor="vehicle-color">Цвет</label>
                     <Input
                       id="vehicle-color"
+                      before={<Palette size={16} className="text-[var(--tgui--hint_color)]" />}
                       value={color}
                       maxLength={VEHICLE_LIMITS.color}
                       placeholder="белый"
@@ -149,11 +152,12 @@ export function VehiclePage() {
                         if (formError) setFormError(null);
                       }}
                     />
-                  </label>
-                  <label className="FormField" htmlFor="vehicle-plate">
-                    Номер (необязательно)
+                  </div>
+                  <div className="FormField">
+                    <label htmlFor="vehicle-plate">Номер (необязательно)</label>
                     <Input
                       id="vehicle-plate"
+                      before={<Hash size={16} className="text-[var(--tgui--hint_color)]" />}
                       value={plate}
                       maxLength={VEHICLE_LIMITS.plate}
                       placeholder="Например: 583"
@@ -164,8 +168,8 @@ export function VehiclePage() {
                         if (formError) setFormError(null);
                       }}
                     />
-                  </label>
-                  <p className="ProfileHead__meta">
+                  </div>
+                  <p className="text-[12px] text-[var(--tgui--hint_color)] leading-relaxed">
                     Номер — примета для узнавания, видна только вам. Чтобы убрать номер,
                     очистите поле и сохраните.
                   </p>
@@ -174,11 +178,11 @@ export function VehiclePage() {
                       {formError ?? vehicleServerErrorMessage(upsert.error)}
                     </p>
                   )}
-                  <Button stretched loading={upsert.isPending} onClick={save}>
+                  <Button stretched size="l" loading={upsert.isPending} onClick={save}>
                     Сохранить автомобиль
                   </Button>
                   <Button
-                    mode="outline"
+                    mode="bezeled"
                     stretched
                     disabled={upsert.isPending}
                     onClick={cancelEditing}
@@ -188,16 +192,23 @@ export function VehiclePage() {
                 </>
               ) : vehicle ? (
                 <>
-                  <div className="ProfileHead">
-                    <p className="ProfileHead__name">{vehicle.model}</p>
-                    <p className="ProfileHead__meta">
-                      {vehicle.plate ? `${vehicle.color} · ${vehicle.plate}` : vehicle.color}
-                    </p>
-                    <p className="ProfileHead__meta">
-                      Модель и цвет видят другие пользователи, номер — только вы.
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <span className="icon-circle icon-circle--info">
+                      <Car size={20} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[16px] font-semibold text-[var(--tgui--text_color)] truncate">
+                        {vehicle.model}
+                      </div>
+                      <div className="text-[13px] text-[var(--tgui--hint_color)]">
+                        {vehicle.plate ? `${vehicle.color} · ${vehicle.plate}` : vehicle.color}
+                      </div>
+                    </div>
                   </div>
-                  <Button mode="outline" stretched onClick={startEditing}>
+                  <p className="text-[12px] text-[var(--tgui--hint_color)] leading-relaxed">
+                    Модель и цвет видят другие пользователи, номер — только вы.
+                  </p>
+                  <Button mode="bezeled" stretched size="s" onClick={startEditing}>
                     Изменить автомобиль
                   </Button>
                   <ConfirmAction
@@ -215,19 +226,26 @@ export function VehiclePage() {
                 </>
               ) : (
                 <>
-                  <div className="ProfileHead">
-                    <p className="ProfileHead__name">Автомобиль не добавлен</p>
-                    <p className="ProfileHead__meta">
-                      Чтобы публиковать поездки, добавьте автомобиль.
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <span className="icon-circle icon-circle--warning">
+                      <Car size={20} />
+                    </span>
+                    <div>
+                      <div className="text-[16px] font-semibold text-[var(--tgui--text_color)]">
+                        Автомобиль не добавлен
+                      </div>
+                      <div className="text-[13px] text-[var(--tgui--hint_color)]">
+                        Чтобы публиковать поездки, добавьте автомобиль.
+                      </div>
+                    </div>
                   </div>
-                  <Button stretched onClick={startEditing}>
+                  <Button stretched size="l" onClick={startEditing}>
                     Добавить автомобиль
                   </Button>
                 </>
               )}
-            </List>
-          </Section>
+          </div>
+          </div>
         )}
       </QueryState>
     </>

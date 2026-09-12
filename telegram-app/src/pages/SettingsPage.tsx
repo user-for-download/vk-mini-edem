@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, List, Section } from "@telegram-apps/telegram-ui";
+import { Button } from "@telegram-apps/telegram-ui";
+import { ArrowLeft, Bell, BellRing } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { MutationError } from "@/components/MutationError";
@@ -57,38 +58,46 @@ export function SettingsPage() {
         emptyText="Не удалось загрузить настройки."
         onRetry={() => void profile.refetch()}
       >
-        <Section>
-          <List>
-            <p className="SettingsStatus" aria-live="polite">
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+        <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="icon-circle icon-circle--info">
+              {enabled ? <BellRing size={18} /> : <Bell size={18} />}
+            </span>
+            <p className="text-[14px] text-[var(--tgui--text_color)]" aria-live="polite">
               {enabled
                 ? "Уведомления включены — подтверждение брони, отмена и завершение поездки."
                 : "Некритичные уведомления выключены — критичные статусы поездки и брони останутся в приложении."}
             </p>
-            <Button
-              stretched
-              loading={save.isPending}
-              disabled={save.isPending || enabled === null}
-              onClick={() => toggle(!enabled)}
-            >
-              {enabled ? "Выключить некритичные" : "Включить уведомления"}
-            </Button>
-            {showSaved && (
-              <p className="SettingsSaved" role="status">
-                Настройки сохранены
-              </p>
-            )}
-            <p className="SettingsHint">
-              Настройка синхронизируется с аккаунтом. Отдельные настройки звука и типов уведомлений пока
-              не поддерживаются.
+          </div>
+          <Button
+            stretched
+            size="l"
+            loading={save.isPending}
+            disabled={save.isPending || enabled === null}
+            onClick={() => toggle(!enabled)}
+          >
+            {enabled ? "Выключить некритичные" : "Включить уведомления"}
+          </Button>
+          {showSaved && (
+            <p className="text-[13px] text-[var(--tgui--link_color)]" role="status">
+              Настройки сохранены
             </p>
-            <Button mode="outline" stretched onClick={() => navigate("/notifications")}>
+          )}
+          <p className="text-[12px] text-[var(--tgui--hint_color)] leading-relaxed">
+            Настройка синхронизируется с аккаунтом. Отдельные настройки звука и типов уведомлений пока
+            не поддерживаются.
+          </p>
+          <div className="flex gap-2">
+            <Button mode="bezeled" size="s" stretched onClick={() => navigate("/notifications")}>
               Открыть уведомления
             </Button>
-            <Button mode="outline" stretched onClick={() => navigate("/profile")}>
+            <Button mode="bezeled" size="s" stretched before={<ArrowLeft size={15} />} onClick={() => navigate("/profile")}>
               Назад в профиль
             </Button>
-          </List>
-        </Section>
+          </div>
+        </div>
+      </div>
       </QueryState>
     </>
   );

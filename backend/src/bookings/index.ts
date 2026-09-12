@@ -26,6 +26,7 @@ import {
   cancelBookingLimiter,
   createUserRateLimiter,
 } from "../middleware/rateLimit.js";
+import { devRateMax } from "../env.js";
 import { getSanitizedBody } from "../middleware/sanitize.js";
 import { ERROR_CODES } from "../errors.js";
 import { getTripRange, rangesOverlap } from "../utils/overlap.js";
@@ -124,7 +125,7 @@ export const bookingsRouter = new Hono<AuthEnv>();
 
 const bookingDecisionLimiter = createUserRateLimiter({
   windowMs: 60 * 60 * 1000,
-  max: 100,
+  max: devRateMax(100),
   keyPrefix: "driver-booking-decision",
 });
 

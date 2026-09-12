@@ -1,5 +1,11 @@
 import { useRef, useState } from "react";
-import { Button, List, Placeholder, Section } from "@telegram-apps/telegram-ui";
+import {
+  Button,
+  Input,
+  Placeholder,
+  Select,
+  Textarea,
+} from "@telegram-apps/telegram-ui";
 import { REPORT_CATEGORIES, type Report } from "@edem/contracts";
 import { REPORT_DESCRIPTION_MAX_LENGTH } from "@edem/contracts";
 import { PageHeader } from "@/components/PageHeader";
@@ -32,19 +38,39 @@ function formatDate(createdAt: string): string {
   });
 }
 
+/** Тон статус-пилюли жалобы: ожидание — warning, работа — info,
+ * решение — success, отказ — danger. */
+function reportStatusTone(status: Report["status"]): string {
+  switch (status) {
+    case "resolved":
+      return "success";
+    case "rejected":
+      return "danger";
+    case "in_review":
+      return "info";
+    default:
+      return "warning";
+  }
+}
+
 function ReportCard({ report }: { report: Report }) {
   return (
-    <article className="ReviewCard">
-      <p className="ReviewCard__head">
-        {REPORT_CATEGORY_LABELS[report.category]} · {REPORT_TARGET_TYPE_LABELS[report.targetType]}
-        <span className="ReviewCard__badge" data-status={report.status}>
-          {" "}
-          · {REPORT_STATUS_LABELS[report.status]}
+    <div className="p-3.5 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          {`${REPORT_CATEGORY_LABELS[report.category]} · ${REPORT_TARGET_TYPE_LABELS[report.targetType]}`}
         </span>
-      </p>
-      <p className="ReviewCard__route">{formatDate(report.createdAt)}</p>
-      <p className="ReviewCard__text">{report.description}</p>
-    </article>
+        <span className="StatusPill shrink-0" data-tone={reportStatusTone(report.status)}>
+          {REPORT_STATUS_LABELS[report.status]}
+        </span>
+      </div>
+      <span className="text-[11px] text-[var(--tgui--hint_color)]">
+        {formatDate(report.createdAt)}
+      </span>
+      <div className="text-[13px] text-[var(--tgui--text_color)] leading-relaxed">
+        {report.description}
+      </div>
+    </div>
   );
 }
 
@@ -135,15 +161,16 @@ export function ReportsPage() {
     <>
       <PageHeader title="Жалобы" />
 
-      <Section>
-        <List>
-          <p className="ReviewCard__head">Сообщите о проблеме</p>
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+          <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+            Сообщите о проблеме
+          </span>
           <MutationError error={create.error} />
-          <label className="FormField" htmlFor="report-target-type">
-            Что случилось
-            <select
+          <div className="FormField">
+            <label htmlFor="report-target-type">Что случилось</label>
+            <Select
               id="report-target-type"
-              className="ReviewSelect"
               value={targetType}
               onChange={(event) => {
                 const next = event.target.value;
@@ -159,13 +186,12 @@ export function ReportsPage() {
                   </option>
                 ),
               )}
-            </select>
-          </label>
-          <label className="FormField" htmlFor="report-target-id">
-            Идентификатор объекта
-            <input
+            </Select>
+          </div>
+          <div className="FormField">
+            <label htmlFor="report-target-id">Идентификатор объекта</label>
+            <Input
               id="report-target-id"
-              className="TextInput"
               placeholder="Например: идентификатор поездки из её страницы"
               value={targetId}
               onChange={(event) => {
@@ -174,12 +200,11 @@ export function ReportsPage() {
                 if (success) setSuccess(false);
               }}
             />
-          </label>
-          <label className="FormField" htmlFor="report-category">
-            Причина
-            <select
+          </div>
+          <div className="FormField">
+            <label htmlFor="report-category">Причина</label>
+            <Select
               id="report-category"
-              className="ReviewSelect"
               value={category}
               onChange={(event) => {
                 const next = event.target.value;
@@ -192,25 +217,25 @@ export function ReportsPage() {
                   {REPORT_CATEGORY_LABELS[value]}
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="FormField" htmlFor="report-description">
-            Описание
-            <textarea
+            </Select>
+          </div>
+          <div className="FormField">
+            <label htmlFor="report-description">Описание</label>
+            <Textarea
               id="report-description"
-              className="ProfileTextarea"
               rows={4}
               maxLength={REPORT_DESCRIPTION_MAX_LENGTH}
               placeholder="Опишите, что произошло"
               value={description}
               aria-invalid={Boolean(formError)}
+              status={formError ? "error" : "default"}
               onChange={(event) => {
                 setDescription(event.target.value);
                 if (formError) setFormError(null);
                 if (success) setSuccess(false);
               }}
             />
-          </label>
+          </div>
           {description.length > 0 && (
             <p className="ReviewCounter" aria-live="polite">
               {description.length}/{REPORT_DESCRIPTION_MAX_LENGTH}
@@ -231,21 +256,21 @@ export function ReportsPage() {
               Жалоба отправлена
             </p>
           )}
-          <div className="ButtonRow">
-            <Button
-              stretched
-              loading={create.isPending}
-              disabled={!canSubmit}
-              onClick={submit}
-            >
-              {alreadyReported ? "Жалоба уже отправлена" : "Отправить жалобу"}
-            </Button>
-          </div>
-        </List>
-      </Section>
+          <Button
+            stretched
+            size="l"
+            loading={create.isPending}
+            disabled={!canSubmit}
+            onClick={submit}
+          >
+            {alreadyReported ? "Жалоба уже отправлена" : "Отправить жалобу"}
+          </Button>
+      </div>
 
-      <Section>
-        <p className="ReviewCard__head">Мои жалобы</p>
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Мои жалобы
+        </span>
         <QueryState
           loading={myReports.isLoading}
           error={myReports.error}
@@ -254,22 +279,20 @@ export function ReportsPage() {
           onRetry={() => void myReports.refetch()}
         >
           {!myReports.data || myReports.data.length === 0 ? (
-            <>
-              <p className="ReviewEmpty__title">Вы пока не отправляли жалоб</p>
-              <p className="ReviewEmpty__subtitle">
-                Жалобы на поездки доступны пассажирам с бронью. На свою поездку
-                жаловаться нельзя.
-              </p>
-            </>
+            <Placeholder
+              header="Вы пока не отправляли жалоб"
+              description="Жалобы на поездки доступны пассажирам с бронью. На свою поездку жаловаться нельзя."
+            />
           ) : (
-            <List>
+            <div className="flex flex-col gap-3">
               {myReports.data.map((report) => (
                 <ReportCard key={report.id} report={report} />
               ))}
-            </List>
+            </div>
           )}
         </QueryState>
-      </Section>
+      </div>
+      </div>
     </>
   );
 }

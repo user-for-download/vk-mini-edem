@@ -1,9 +1,19 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildTripDeepLink,
   buildTripStartParam,
   shareTrip,
 } from "@/helpers/tripShare";
+
+vi.mock("@/utils/telegram-adapter", () => ({
+  getRawInitData: vi.fn(),
+  shareViaTelegram: vi.fn(),
+}));
+
+import { getRawInitData, shareViaTelegram } from "@/utils/telegram-adapter";
+
+const mockedGetRawInitData = vi.mocked(getRawInitData);
+const mockedShareViaTelegram = vi.mocked(shareViaTelegram);
 
 const TRIP_ID = "123e4567-e89b-42d3-a456-426614174000";
 
@@ -20,8 +30,35 @@ describe("trip share links", () => {
 });
 
 describe("shareTrip", () => {
+  beforeEach(() => {
+    mockedGetRawInitData.mockReset();
+    mockedShareViaTelegram.mockReset();
+    // Дефолт — браузер вне Telegram: нативный шаринг не трогаем.
+    mockedGetRawInitData.mockReturnValue(undefined);
+    mockedShareViaTelegram.mockReturnValue(false);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("внутри Telegram — нативный shareURL первым", async () => {
+    mockedGetRawInitData.mockReturnValue("user=%7B%7D&hash=x");
+    mockedShareViaTelegram.mockReturnValue(true);
+    const share = vi.fn();
+    vi.stubGlobal("navigator", { share });
+    await expect(shareTrip(TRIP_ID)).resolves.toBe("shared");
+    expect(mockedShareViaTelegram).toHaveBeenCalledTimes(1);
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it("отказ Telegram-шаринга — откат на Web Share", async () => {
+    mockedGetRawInitData.mockReturnValue("user=%7B%7D&hash=x");
+    mockedShareViaTelegram.mockReturnValue(false);
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { share });
+    await expect(shareTrip(TRIP_ID)).resolves.toBe("shared");
+    expect(share).toHaveBeenCalledTimes(1);
   });
 
   it("uses Web Share when available", async () => {

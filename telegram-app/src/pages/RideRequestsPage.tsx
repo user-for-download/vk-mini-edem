@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Button, Cell, Input, List, Section } from "@telegram-apps/telegram-ui";
+import { Button, Input } from "@telegram-apps/telegram-ui";
+import { Calendar, MapPin, Users } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { QueryState } from "@/components/QueryState";
 import { ConfirmAction } from "@/components/ConfirmAction";
@@ -117,58 +118,159 @@ export function RideRequestsPage() {
     <>
       <PageHeader title="Ищу попутку" />
       <OfflineBanner />
-      <Section header="Новый запрос">
-        <List>
-          <label className="FormField">Откуда<Input list="request-cities" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-          <label className="FormField">Куда<Input list="request-cities" value={to} onChange={(event) => setTo(event.target.value)} /></label>
-          <datalist id="request-cities">{cities.data?.map((city) => <option key={city.id} value={city.name} />)}</datalist>
-          <label className="FormField">Не раньше<Input type="datetime-local" value={earliest} onChange={(event) => setEarliest(event.target.value)} /></label>
-          <label className="FormField">Не позже<Input type="datetime-local" value={latest} onChange={(event) => setLatest(event.target.value)} /></label>
-          <label className="FormField">Места<Input type="number" min="1" max="3" value={seats} onChange={(event) => setSeats(event.target.value)} /></label>
-          {validationError && <p className="FormError" role="alert">{validationError}</p>}
-          {create.error && <p className="FormError" role="alert">{bookingErrorMessage(create.error)}</p>}
-          <Button stretched loading={create.isPending} onClick={submit}>Опубликовать запрос</Button>
-        </List>
-      </Section>
+      <div className="flex flex-col gap-3.5 px-4 pt-1 pb-24">
+      <div className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3">
+        <span className="text-[13px] font-semibold text-[var(--tgui--text_color)]">
+          Новый запрос
+        </span>
+        <div className="FormField">
+          <label htmlFor="ride-from">Откуда</label>
+          <Input
+            id="ride-from"
+            before={<MapPin size={17} className="text-[var(--app-info)]" />}
+            list="request-cities"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+            placeholder="Город отправления"
+          />
+        </div>
+        <div className="FormField">
+          <label htmlFor="ride-to">Куда</label>
+          <Input
+            id="ride-to"
+            before={<MapPin size={17} className="text-[var(--app-success)]" />}
+            list="request-cities"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            placeholder="Город назначения"
+          />
+        </div>
+        <datalist id="request-cities">{cities.data?.map((city) => <option key={city.id} value={city.name} />)}</datalist>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="FormField">
+            <label htmlFor="ride-earliest">Не раньше</label>
+            <Input
+              id="ride-earliest"
+              before={<Calendar size={16} className="text-[var(--tgui--hint_color)]" />}
+              type="datetime-local"
+              value={earliest}
+              onChange={(event) => setEarliest(event.target.value)}
+            />
+          </div>
+          <div className="FormField">
+            <label htmlFor="ride-latest">Не позже</label>
+            <Input
+              id="ride-latest"
+              before={<Calendar size={16} className="text-[var(--tgui--hint_color)]" />}
+              type="datetime-local"
+              value={latest}
+              onChange={(event) => setLatest(event.target.value)}
+            />
+          </div>
+        </div>
+        <div className="FormField">
+          <label htmlFor="ride-seats">Места</label>
+          <Input
+            id="ride-seats"
+            before={<Users size={16} className="text-[var(--tgui--hint_color)]" />}
+            type="number"
+            min="1"
+            max="3"
+            value={seats}
+            onChange={(event) => setSeats(event.target.value)}
+          />
+        </div>
+        {validationError && <p className="FormError" role="alert">{validationError}</p>}
+        {create.error && <p className="FormError" role="alert">{bookingErrorMessage(create.error)}</p>}
+        <Button stretched size="l" loading={create.isPending} onClick={submit}>Опубликовать запрос</Button>
+      </div>
       {(status.error || cancel.error || update.error) && (
         <p className="FormError" role="alert">
           {bookingErrorMessage(status.error ?? cancel.error ?? update.error)}
         </p>
       )}
       <QueryState loading={requests.isLoading} error={requests.error} empty={!requests.data?.length} emptyText="Активных запросов нет." onRetry={() => void requests.refetch()}>
-        <List>
+        <div className="flex flex-col gap-3">
           {requests.data?.map((request) => (
-            <Section key={request.id}>
-              <Cell subtitle={`${request.earliestAt} — ${request.latestAt} · ${request.seats} мест`}>
-                {request.fromCity.name} → {request.toCity.name}
-              </Cell>
+            <div
+              key={request.id}
+              className="p-4 rounded-2xl bg-[var(--tgui--section_bg_color)] border border-[var(--tgui--outline)] shadow-xs flex flex-col gap-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[15px] font-bold text-[var(--tgui--text_color)] truncate">
+                  {`${request.fromCity.name} → ${request.toCity.name}`}
+                </span>
+                <span
+                  className="StatusPill"
+                  data-tone={request.status === "active" ? "success" : "warning"}
+                >
+                  {request.status === "active" ? "Активен" : request.status}
+                </span>
+              </div>
+              <div className="text-[13px] text-[var(--tgui--hint_color)]">
+                {`${request.earliestAt} — ${request.latestAt} · ${request.seats} мест`}
+              </div>
               {editingId === request.id ? (
                 <>
-                  <label className="FormField">Не раньше<Input type="datetime-local" value={editEarliest} onChange={(event) => setEditEarliest(event.target.value)} /></label>
-                  <label className="FormField">Не позже<Input type="datetime-local" value={editLatest} onChange={(event) => setEditLatest(event.target.value)} /></label>
-                  <label className="FormField">Действует до<Input type="datetime-local" value={editExpires} onChange={(event) => setEditExpires(event.target.value)} /></label>
-                  <label className="FormField">Места<Input type="number" min="1" max="3" value={editSeats} onChange={(event) => setEditSeats(event.target.value)} /></label>
+                  <div className="FormField">
+                    <label htmlFor={`ride-edit-earliest-${request.id}`}>Не раньше</label>
+                    <Input
+                      id={`ride-edit-earliest-${request.id}`}
+                      type="datetime-local"
+                      value={editEarliest}
+                      onChange={(event) => setEditEarliest(event.target.value)}
+                    />
+                  </div>
+                  <div className="FormField">
+                    <label htmlFor={`ride-edit-latest-${request.id}`}>Не позже</label>
+                    <Input
+                      id={`ride-edit-latest-${request.id}`}
+                      type="datetime-local"
+                      value={editLatest}
+                      onChange={(event) => setEditLatest(event.target.value)}
+                    />
+                  </div>
+                  <div className="FormField">
+                    <label htmlFor={`ride-edit-expires-${request.id}`}>Действует до</label>
+                    <Input
+                      id={`ride-edit-expires-${request.id}`}
+                      type="datetime-local"
+                      value={editExpires}
+                      onChange={(event) => setEditExpires(event.target.value)}
+                    />
+                  </div>
+                  <div className="FormField">
+                    <label htmlFor={`ride-edit-seats-${request.id}`}>Места</label>
+                    <Input
+                      id={`ride-edit-seats-${request.id}`}
+                      type="number"
+                      min="1"
+                      max="3"
+                      value={editSeats}
+                      onChange={(event) => setEditSeats(event.target.value)}
+                    />
+                  </div>
                   {editError && <p className="FormError" role="alert">{editError}</p>}
-                  <div className="ButtonRow">
-                    <Button stretched loading={update.isPending} onClick={() => submitEdit(request.id)}>Сохранить</Button>
-                    <Button mode="outline" stretched disabled={update.isPending} onClick={() => setEditingId(null)}>Отмена</Button>
+                  <div className="flex gap-2">
+                    <Button stretched size="s" loading={update.isPending} onClick={() => submitEdit(request.id)}>Сохранить</Button>
+                    <Button mode="bezeled" size="s" stretched disabled={update.isPending} onClick={() => setEditingId(null)}>Отмена</Button>
                   </div>
                 </>
               ) : (
-                <>
+                <div className="flex flex-wrap gap-2">
                   {request.status === "active" && (
-                    <Button mode="outline" stretched loading={status.isPending && status.variables?.id === request.id} disabled={status.isPending || cancel.isPending} onClick={() => status.mutate({ id: request.id, status: "paused" })}>
+                    <Button mode="bezeled" size="s" stretched loading={status.isPending && status.variables?.id === request.id} disabled={status.isPending || cancel.isPending} onClick={() => status.mutate({ id: request.id, status: "paused" })}>
                       Поставить на паузу
                     </Button>
                   )}
                   {request.status === "paused" && (
-                    <Button mode="outline" stretched loading={status.isPending && status.variables?.id === request.id} disabled={status.isPending || cancel.isPending} onClick={() => status.mutate({ id: request.id, status: "active" })}>
+                    <Button mode="bezeled" size="s" stretched loading={status.isPending && status.variables?.id === request.id} disabled={status.isPending || cancel.isPending} onClick={() => status.mutate({ id: request.id, status: "active" })}>
                       Возобновить
                     </Button>
                   )}
                   {(request.status === "active" || request.status === "paused") && (
                     <>
-                      <Button mode="outline" stretched disabled={status.isPending || cancel.isPending} onClick={() => startEdit(request)}>
+                      <Button mode="bezeled" size="s" stretched disabled={status.isPending || cancel.isPending} onClick={() => startEdit(request)}>
                         Редактировать
                       </Button>
                       <ConfirmAction
@@ -180,12 +282,13 @@ export function RideRequestsPage() {
                       />
                     </>
                   )}
-                </>
+                </div>
               )}
-            </Section>
+            </div>
           ))}
-        </List>
+        </div>
       </QueryState>
+      </div>
     </>
   );
 }

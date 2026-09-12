@@ -13,6 +13,25 @@ dotenv.config({ path: fs.existsSync(envPathDev) ? envPathDev : envPathProd });
 
 const NODE_ENV = process.env.NODE_ENV ?? "development";
 const isProduction = NODE_ENV === "production";
+const isDevelopment = NODE_ENV === "development";
+
+/**
+ * Dev-множитель rate-лимитов: в development все MAX-лимиты ×100.
+ *
+ * Зачем: dev-стенд делит один IP-бюджет (Vite-прокси, HMR-перезаходы,
+ * e2e-прогоны) — продовые 5 входов/5 мин постоянно дают 429
+ * «Слишком много попыток входа» и валят разработку.
+ *
+ * Границы безопасности:
+ * - явный ENV всегда побеждает (positiveIntEnv читает process.env первым);
+ * - NODE_ENV=test (vitest, .env.test) — строгие продовые значения:
+ *   user-rate-limit.test.ts завязан на 10 поездок/сутки → 429;
+ * - production — без изменений.
+ */
+const DEV_RATE_MULTIPLIER = 100;
+export function devRateMax(prodDefault: number): number {
+  return isDevelopment ? prodDefault * DEV_RATE_MULTIPLIER : prodDefault;
+}
 
 function failMissingEnv(name: string): never {
   throw new Error(`[env] Missing required environment variable: ${name}`);
@@ -147,7 +166,7 @@ export const env = {
    * Rate limit Telegram-auth.
    */
   TG_AUTH_RATE_WINDOW_MS: positiveIntEnv("TG_AUTH_RATE_WINDOW_MS", 5 * 60 * 1000),
-  TG_AUTH_RATE_MAX: positiveIntEnv("TG_AUTH_RATE_MAX", 5),
+  TG_AUTH_RATE_MAX: positiveIntEnv("TG_AUTH_RATE_MAX", devRateMax(5)),
 
   /**
    * Хосты Telegram-фронта (comma-separated): запросы со Host из
@@ -220,43 +239,43 @@ export const env = {
    * Rate limit для auth (раздельные лимитеры на каждый endpoint).
    */
   REFRESH_RATE_WINDOW_MS: positiveIntEnv("REFRESH_RATE_WINDOW_MS", 10 * 60 * 1000),
-  REFRESH_RATE_MAX: positiveIntEnv("REFRESH_RATE_MAX", 10),
+  REFRESH_RATE_MAX: positiveIntEnv("REFRESH_RATE_MAX", devRateMax(10)),
 
   /**
    * Rate limits (IP-based).
    */
   PUBLIC_READ_RATE_WINDOW_MS: positiveIntEnv("PUBLIC_READ_RATE_WINDOW_MS", 60 * 1000),
-  PUBLIC_READ_RATE_MAX: positiveIntEnv("PUBLIC_READ_RATE_MAX", 100),
+  PUBLIC_READ_RATE_MAX: positiveIntEnv("PUBLIC_READ_RATE_MAX", devRateMax(100)),
   MUTATION_RATE_WINDOW_MS: positiveIntEnv("MUTATION_RATE_WINDOW_MS", 60 * 1000),
-  MUTATION_RATE_MAX: positiveIntEnv("MUTATION_RATE_MAX", 30),
+  MUTATION_RATE_MAX: positiveIntEnv("MUTATION_RATE_MAX", devRateMax(30)),
 
   /**
    * Rate limits (user-based): «дорогие» действия по аккаунту.
    */
   CREATE_TRIP_RATE_WINDOW_MS: positiveIntEnv("CREATE_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CREATE_TRIP_RATE_MAX: positiveIntEnv("CREATE_TRIP_RATE_MAX", 10),
+  CREATE_TRIP_RATE_MAX: positiveIntEnv("CREATE_TRIP_RATE_MAX", devRateMax(10)),
   CANCEL_TRIP_RATE_WINDOW_MS: positiveIntEnv("CANCEL_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CANCEL_TRIP_RATE_MAX: positiveIntEnv("CANCEL_TRIP_RATE_MAX", 20),
+  CANCEL_TRIP_RATE_MAX: positiveIntEnv("CANCEL_TRIP_RATE_MAX", devRateMax(20)),
   CREATE_BOOKING_RATE_WINDOW_MS: positiveIntEnv("CREATE_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CREATE_BOOKING_RATE_MAX: positiveIntEnv("CREATE_BOOKING_RATE_MAX", 20),
+  CREATE_BOOKING_RATE_MAX: positiveIntEnv("CREATE_BOOKING_RATE_MAX", devRateMax(20)),
   CANCEL_BOOKING_RATE_WINDOW_MS: positiveIntEnv("CANCEL_BOOKING_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  CANCEL_BOOKING_RATE_MAX: positiveIntEnv("CANCEL_BOOKING_RATE_MAX", 20),
+  CANCEL_BOOKING_RATE_MAX: positiveIntEnv("CANCEL_BOOKING_RATE_MAX", devRateMax(20)),
   /** Завершение поездок водителем (PATCH /trips/:id/complete), 20 в сутки. */
   COMPLETE_TRIP_RATE_WINDOW_MS: positiveIntEnv("COMPLETE_TRIP_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  COMPLETE_TRIP_RATE_MAX: positiveIntEnv("COMPLETE_TRIP_RATE_MAX", 20),
+  COMPLETE_TRIP_RATE_MAX: positiveIntEnv("COMPLETE_TRIP_RATE_MAX", devRateMax(20)),
 
   /**
    * Rate limits (user-based): частые, но лёгкие действия по аккаунту
    * (профиль, машина, уведомления, личные списки). Окно — сутки.
    */
   PROFILE_UPDATE_RATE_WINDOW_MS: positiveIntEnv("PROFILE_UPDATE_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  PROFILE_UPDATE_RATE_MAX: positiveIntEnv("PROFILE_UPDATE_RATE_MAX", 50),
+  PROFILE_UPDATE_RATE_MAX: positiveIntEnv("PROFILE_UPDATE_RATE_MAX", devRateMax(50)),
   NOTIFICATION_READ_RATE_WINDOW_MS: positiveIntEnv("NOTIFICATION_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  NOTIFICATION_READ_RATE_MAX: positiveIntEnv("NOTIFICATION_READ_RATE_MAX", 100),
+  NOTIFICATION_READ_RATE_MAX: positiveIntEnv("NOTIFICATION_READ_RATE_MAX", devRateMax(100)),
   REVIEWS_READ_RATE_WINDOW_MS: positiveIntEnv("REVIEWS_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  REVIEWS_READ_RATE_MAX: positiveIntEnv("REVIEWS_READ_RATE_MAX", 100),
+  REVIEWS_READ_RATE_MAX: positiveIntEnv("REVIEWS_READ_RATE_MAX", devRateMax(100)),
   FEEDBACK_READ_RATE_WINDOW_MS: positiveIntEnv("FEEDBACK_READ_RATE_WINDOW_MS", 24 * 60 * 60 * 1000),
-  FEEDBACK_READ_RATE_MAX: positiveIntEnv("FEEDBACK_READ_RATE_MAX", 100),
+  FEEDBACK_READ_RATE_MAX: positiveIntEnv("FEEDBACK_READ_RATE_MAX", devRateMax(100)),
 
   LOG_LEVEL:
     process.env.LOG_LEVEL ||
@@ -291,7 +310,7 @@ export const env = {
     "ADMIN_LOGIN_RATE_WINDOW_MS",
     5 * 60 * 1000
   ),
-  ADMIN_LOGIN_RATE_MAX: positiveIntEnv("ADMIN_LOGIN_RATE_MAX", 5),
+  ADMIN_LOGIN_RATE_MAX: positiveIntEnv("ADMIN_LOGIN_RATE_MAX", devRateMax(5)),
 
   /**
    * Rate limit GET-эндпоинтов админ-панели (IP-based).
@@ -299,5 +318,5 @@ export const env = {
    * (дашборд + списки + пагинация).
    */
   ADMIN_READ_RATE_WINDOW_MS: positiveIntEnv("ADMIN_READ_RATE_WINDOW_MS", 60 * 1000),
-  ADMIN_READ_RATE_MAX: positiveIntEnv("ADMIN_READ_RATE_MAX", 300),
+  ADMIN_READ_RATE_MAX: positiveIntEnv("ADMIN_READ_RATE_MAX", devRateMax(300)),
 };

@@ -1,12 +1,14 @@
 import type { FC, PropsWithChildren } from "react";
+import { useEffect } from "react";
 import { AppRoot } from "@telegram-apps/telegram-ui";
-import { useLaunchParams } from "@telegram-apps/sdk-react";
+import { miniApp, useLaunchParams, useSignal } from "@telegram-apps/sdk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGate } from "@/components/AuthGate";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ApiError } from "@/api/client";
 import { Onboarding } from "@/components/Onboarding";
+import { ToastProvider } from "@/components/ToastProvider";
 import { WsProvider, TelegramRealtimeListener } from "@/providers/WebSocketProvider";
 
 const queryClient = new QueryClient({
@@ -76,16 +78,29 @@ function useTguiPlatform(): "base" | "ios" {
   return platform;
 }
 
+/** Живая тёмная тема Telegram (miniApp.isDark): ведём и проп appearance
+ * AppRoot (палитра tgui), и свой класс `dark` на documentElement (наши
+ * --app-* токены — tgui вешает свой хэшированный dark-класс, на который
+ * извне не опереться). В SSR (renderToString) эффекты не выполняются. */
+function useTelegramAppearance(): "dark" | "light" {
+  const isDark = useSignal(miniApp.isDark);
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
+  return isDark ? "dark" : "light";
+}
+
 export const AppConfig: FC<PropsWithChildren> = ({ children }) => {
   const platform = useTguiPlatform();
+  const appearance = useTelegramAppearance();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* ErrorBoundary — самый внешний рубеж, fallback без UI-кита. */}
       <ErrorBoundary fallback={ErrorFallback}>
-        <AppRoot platform={platform}>
+        <AppRoot platform={platform} appearance={appearance}>
           <OfflineBanner />
-          <AuthGate><Onboarding><WsProvider><TelegramRealtimeListener />{children}</WsProvider></Onboarding></AuthGate>
+          <AuthGate><Onboarding><WsProvider><TelegramRealtimeListener /><ToastProvider>{children}</ToastProvider></WsProvider></Onboarding></AuthGate>
         </AppRoot>
       </ErrorBoundary>
     </QueryClientProvider>

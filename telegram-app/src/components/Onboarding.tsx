@@ -1,5 +1,5 @@
 import { type FC, type PropsWithChildren, useRef, useState } from "react";
-import { Button, Cell, List, Placeholder, Section } from "@telegram-apps/telegram-ui";
+import { Button, Cell, List, Placeholder, Section, VisuallyHidden } from "@telegram-apps/telegram-ui";
 import { usersApi } from "@/api/users.api";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ONBOARDING_VERSION } from "@/onboarding/version";
@@ -53,7 +53,7 @@ export const Onboarding: FC<PropsWithChildren> = ({ children }) => {
   return (
     <main className="Onboarding" aria-labelledby="onboarding-title">
       <Placeholder header="Добро пожаловать в «Едем»" description="Сервис поиска попутчиков для совместных поездок. Вы общаетесь и рассчитываетесь напрямую с другими пользователями.">
-        <span id="onboarding-title" className="sr-only">Первый вход</span>
+        <VisuallyHidden Component="span" id="onboarding-title">Первый вход</VisuallyHidden>
       </Placeholder>
       {error && <p className="FormError" role="alert">{error}</p>}
       <Section header="Перед началом">

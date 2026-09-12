@@ -1,35 +1,71 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSearchFilters,
+  dateSegmentToRange,
   EMPTY_SEARCH_FORM,
-  parseSearchQuery,
+  parseDateSegmentParam,
 } from "@/helpers/searchFilters";
 
-describe("parseSearchQuery", () => {
-  it("returns an empty filter for blank input", () => {
-    expect(parseSearchQuery("   ")).toEqual({});
+// Фиксированное «сегодня» — среда 2026-09-09 (локальная дата),
+// чтобы сегменты выходных считались детерминированно.
+const NOW = new Date(2026, 8, 9, 12, 0, 0);
+
+describe("dateSegmentToRange", () => {
+  it("returns an empty range for all dates", () => {
+    expect(dateSegmentToRange("all", NOW)).toEqual({});
   });
 
-  it("keeps a free-text query as q", () => {
-    expect(parseSearchQuery("Москва")).toEqual({ q: "Москва" });
-  });
-
-  it("splits an arrow route into from/to cities", () => {
-    expect(parseSearchQuery("Москва → Тула")).toEqual({
-      fromCity: "Москва",
-      toCity: "Тула",
+  it("maps today to a single local date", () => {
+    expect(dateSegmentToRange("today", NOW)).toEqual({
+      dateFrom: "2026-09-09",
+      dateTo: "2026-09-09",
     });
   });
 
-  it("accepts dash separators like the VK search", () => {
-    expect(parseSearchQuery("Москва - Тула")).toEqual({
-      fromCity: "Москва",
-      toCity: "Тула",
+  it("maps tomorrow to a single local date", () => {
+    expect(dateSegmentToRange("tomorrow", NOW)).toEqual({
+      dateFrom: "2026-09-10",
+      dateTo: "2026-09-10",
     });
   });
 
-  it("falls back to q when only one side of the route is given", () => {
-    expect(parseSearchQuery("Москва → ")).toEqual({ q: "Москва" });
+  it("maps weekend to the upcoming Saturday–Sunday", () => {
+    // 2026-09-09 — среда: ближайшая суббота 12-го, воскресенье 13-го.
+    expect(dateSegmentToRange("weekend", NOW)).toEqual({
+      dateFrom: "2026-09-12",
+      dateTo: "2026-09-13",
+    });
+  });
+
+  it("keeps the current weekend when today is Saturday", () => {
+    const saturday = new Date(2026, 8, 12);
+    expect(dateSegmentToRange("weekend", saturday)).toEqual({
+      dateFrom: "2026-09-12",
+      dateTo: "2026-09-13",
+    });
+  });
+
+  it("keeps Sunday as the last day of the current weekend", () => {
+    const sunday = new Date(2026, 8, 13);
+    expect(dateSegmentToRange("weekend", sunday)).toEqual({
+      dateFrom: "2026-09-13",
+      dateTo: "2026-09-13",
+    });
+  });
+});
+
+describe("parseDateSegmentParam", () => {
+  it("accepts known segments", () => {
+    expect(parseDateSegmentParam("today")).toBe("today");
+    expect(parseDateSegmentParam("tomorrow")).toBe("tomorrow");
+    expect(parseDateSegmentParam("weekend")).toBe("weekend");
+    expect(parseDateSegmentParam("all")).toBe("all");
+  });
+
+  it("falls back to all for garbage and missing values", () => {
+    expect(parseDateSegmentParam("yesterday")).toBe("all");
+    expect(parseDateSegmentParam("")).toBe("all");
+    expect(parseDateSegmentParam(null)).toBe("all");
   });
 });
 
@@ -38,25 +74,23 @@ describe("buildSearchFilters", () => {
     expect(buildSearchFilters(EMPTY_SEARCH_FORM)).toBeUndefined();
   });
 
-  it("combines query, explicit cities, dates, price and tags", () => {
+  it("combines cities, date segment, price and tags", () => {
     const filters = buildSearchFilters({
-      query: "центр",
-      fromCity: "Москва",
-      toCity: "Тула",
-      dateFrom: "2026-10-01",
-      dateTo: "2026-10-05",
+      fromCity: "Вологда",
+      toCity: "Череповец",
+      dateSegment: "today",
       maxPrice: "1500",
       tags: ["Не курить"],
     });
     expect(filters).toMatchObject({
-      q: "центр",
-      fromCity: "Москва",
-      toCity: "Тула",
-      dateFrom: "2026-10-01",
-      dateTo: "2026-10-05",
+      fromCity: "Вологда",
+      toCity: "Череповец",
+      dateFrom: filters?.dateFrom,
+      dateTo: filters?.dateTo,
       maxPrice: 1500,
       tags: ["Не курить"],
     });
+    expect(filters?.dateFrom).toBe(filters?.dateTo);
   });
 
   it("ignores a non-numeric price instead of sending NaN", () => {
@@ -65,5 +99,13 @@ describe("buildSearchFilters", () => {
       maxPrice: "много",
     });
     expect(filters).toBeUndefined();
+  });
+
+  it("trims city names", () => {
+    const filters = buildSearchFilters({
+      ...EMPTY_SEARCH_FORM,
+      fromCity: "  Вологда  ",
+    });
+    expect(filters).toMatchObject({ fromCity: "Вологда" });
   });
 });

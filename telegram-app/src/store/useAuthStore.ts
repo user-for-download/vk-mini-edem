@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { retrieveRawInitData } from "@telegram-apps/sdk-react";
+import { getRawInitData } from "@/utils/telegram-adapter";
 import type { User } from "@/types";
 import { authApi } from "@/api/auth.api";
 import { ApiError, apiClient } from "@/api/client";
@@ -61,19 +61,14 @@ let refreshPromise: Promise<void> | null = null;
 /**
  * Строит auth-payload: initData РОВНО как её передал Telegram — без
  * пересортировки ключей и перекодировки, иначе HMAC на сервере не сойдётся.
- * retrieveRawInitData() возвращает сырую query-params строку.
+ * Сырую строку отдаёт telegram-adapter (fail-closed: вне Telegram — undefined).
  *
  * Вне Telegram (браузерный dev) SDK работает на mockTelegramEnv (mockEnv.ts):
  * там лежит dev-строка с hash=dev-hash для dev-bypass бэкенда. Если SDK
  * не инициализирован или launch params отсутствуют — bootstrap неуспешен.
  */
 async function getTelegramAuthPayload(): Promise<TelegramAuthRequest> {
-  let raw: string | null | undefined = null;
-  try {
-    raw = retrieveRawInitData();
-  } catch {
-    raw = null;
-  }
+  const raw = getRawInitData();
 
   if (!raw) {
     throw new Error("Telegram init data is unavailable");
