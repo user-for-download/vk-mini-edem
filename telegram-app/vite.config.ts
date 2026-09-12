@@ -75,11 +75,18 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      // Доступ через туннель/домен (tg-edem.binetc.fun) — иначе Vite блокирует
-      // запросы с незнакомых Host-заголовков. Хосты через ENV.
-      allowedHosts: env.VITE_ALLOWED_HOSTS
-        ? env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim()).filter(Boolean)
-        : undefined,
+      // Доступ через туннель/домен — иначе Vite блокирует запросы
+      // с незнакомых Host-заголовков. Дефолтный dev-домен зашит,
+      // дополнительные хосты — через VITE_ALLOWED_HOSTS (запятая).
+      allowedHosts: [
+        ...new Set([
+          "tg-dev.biet.site",
+          "edem-dev.biet.site",
+          ...(env.VITE_ALLOWED_HOSTS
+            ? env.VITE_ALLOWED_HOSTS.split(",").map((h) => h.trim())
+            : []),
+        ].filter(Boolean)),
+      ],
       proxy: {
         "/api": {
           target: apiTarget,
